@@ -1,0 +1,1244 @@
+<!DOCTYPE html><script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Maximum Closets Hub",
+  "schemaVersion": 1,
+  "description": "Maximum Closets Hub — combined pipeline board + pricing calculator + checklists + proposal generator. All 7 pipeline stages with per-job pricing, checklist tracking, and Claude proposal generation."
+}
+</script>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Maximum Closets</title>
+<style>
+:root {
+  color-scheme: dark;
+  --green:#4aad78; --green2:#3a9463; --green-bg:#0d2b1a; --green-border:#1a5c38;
+  --board-bg:#0d1016; --col-bg:#161824; --card-bg:#1e2233;
+  --text:#b8bccb; --muted:#6e738a; --border:#272b3e; --input-bg:#161824;
+  --red:#c0392b; --orange:#d08a0a;
+  --r:10px; --shadow:0 2px 8px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--board-bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);font-size:14px;min-height:100vh}
+header{background:rgba(0,0,0,0.22);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
+header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
+.hstats{color:rgba(255,255,255,0.8);font-size:11px}
+.hadd{background:rgba(255,255,255,0.22);color:#fff;border:none;padding:7px 13px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.hadd:hover{background:rgba(255,255,255,0.32)}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#4aad78;display:inline-block;margin-right:4px}
+.sync-dot.off{background:#e74c3c}
+.sync-dot.syncing{background:#f39c12;animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.agenda{background:rgba(0,0,0,0.18);padding:7px 14px;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.agenda::-webkit-scrollbar{display:none}
+.agenda-empty{color:rgba(255,255,255,0.45);font-size:11px;font-style:italic}
+.ag-item{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.13);border-radius:6px;padding:4px 9px;margin-right:7px;cursor:pointer;font-size:11px;color:#fff;font-weight:600;white-space:nowrap}
+.ag-item.today{background:rgba(235,90,70,0.75)}
+.ag-item.tmrw{background:rgba(242,165,0,0.75)}
+.ag-item.soon{background:rgba(0,121,191,0.55)}
+.ag-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.7);flex-shrink:0}
+.board{display:flex;gap:10px;padding:10px;overflow-x:auto;align-items:flex-start;min-height:calc(100vh - 80px)}
+.board::-webkit-scrollbar{height:6px}
+.board::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.25);border-radius:3px}
+.col{background:var(--col-bg);border-radius:var(--r);width:220px;min-width:220px;display:flex;flex-direction:column;max-height:calc(100vh - 68px)}
+.col-hd{padding:9px 11px 6px;display:flex;align-items:center;gap:5px}
+.col-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.col-hd h2{font-size:12px;font-weight:700;flex:1}
+.col-cnt{background:rgba(0,0,0,0.1);color:var(--muted);font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px}
+.cards{padding:0 7px;overflow-y:auto;flex:1}
+.cards::-webkit-scrollbar{width:3px}
+.cards::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.1);border-radius:2px}
+.card{background:var(--card-bg);border-radius:8px;padding:9px 10px;margin-bottom:7px;box-shadow:var(--shadow);cursor:pointer}
+.card:hover{box-shadow:0 3px 10px rgba(0,0,0,0.18)}
+.card-lbls{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px}
+.lbl{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase}
+.l-new{background:#0d2b1a;border:1.5px solid #1a5c38;color:#4aad78}
+.l-plans{background:#252008;border:1.5px solid #574e0d;color:#a89430}
+.l-followup{background:#271a07;border:1.5px solid #60400e;color:#c07d35}
+.l-ontrack{background:#091e30;border:1.5px solid #0d3d6e;color:#4a8fbf}
+.l-design{background:#1e0e2c;border:1.5px solid #4a1a6b;color:#9b5cc4}
+.l-inprog{background:#07232b;border:1.5px solid #0e4f60;color:#3aadca}
+.l-finalpay{background:#280d0d;border:1.5px solid #601a1a;color:#b05050}
+.l-done{background:#0d2b1a;border:1.5px solid #1a5c38;color:#4aad78}
+.card-name{font-weight:600;font-size:13px;color:var(--text);line-height:1.3}
+.card-val{font-size:11px;font-weight:700;color:var(--green2);margin-top:3px}
+.card-src{font-size:10px;color:var(--muted);margin-top:2px}
+.card-meta{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.chip{font-size:10px;color:var(--muted);background:#f0f1f3;padding:2px 5px;border-radius:3px}
+.chip.ov{color:#eb5a46;background:#ffedeb}
+.chip.today{color:#fff;background:#eb5a46;font-weight:700}
+.chip.tmrw{color:#172b4d;background:#f2a500;font-weight:700}
+.chip.soon{color:#fff;background:#0079bf}
+.prog-bar{background:#dfe1e6;border-radius:3px;height:4px;margin-top:6px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
+.prog-fill.full{background:#61bd4f}
+.col-add{display:flex;align-items:center;gap:5px;padding:6px 11px;color:var(--muted);font-size:12px;cursor:pointer;border-radius:6px;margin:3px 7px 8px}
+.col-add:hover{background:rgba(0,0,0,0.07);color:var(--text)}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;overflow-y:auto;padding:12px}
+.overlay.open{display:block}
+.modal{background:#1a1d27;border-radius:13px;width:100%;max-width:520px;margin:0 auto}
+.mh{padding:13px 15px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.mh h3{font-size:15px;font-weight:700;flex:1;margin-right:8px}
+.mclose{background:none;border:none;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
+.mtabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.mtabs::-webkit-scrollbar{display:none}
+.mtab{flex-shrink:0;padding:9px 10px 7px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.mtab.on{color:var(--green);border-bottom-color:var(--green)}
+.mtpane{display:none;padding:14px 15px}
+.mtpane.on{display:block}
+.f{margin-bottom:12px}
+.f label{display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.f input,.f select,.f textarea{width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;color:#d0d4e2;background:var(--input-bg);font-family:inherit}
+.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--green);background:#1e2336;color:#e2e5f0}
+.f input::placeholder,.f textarea::placeholder{color:#4a4f63}
+.f textarea{resize:vertical;min-height:52px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.g3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:7px}
+.lbl-pick{display:flex;flex-wrap:wrap;gap:5px}
+.lopt{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;opacity:.38;text-transform:uppercase;transition:opacity .15s}
+.lopt.on{opacity:1}
+.lopt.new{background:#0d2b1a;border:1.5px solid #1a5c38;color:#4aad78}
+.lopt.plans{background:#252008;border:1.5px solid #574e0d;color:#a89430}
+.lopt.followup{background:#271a07;border:1.5px solid #60400e;color:#c07d35}
+.lopt.ontrack{background:#091e30;border:1.5px solid #0d3d6e;color:#4a8fbf}
+.lopt.design{background:#1e0e2c;border:1.5px solid #4a1a6b;color:#9b5cc4}
+.lopt.inprog{background:#07232b;border:1.5px solid #0e4f60;color:#3aadca}
+.lopt.finalpay{background:#280d0d;border:1.5px solid #601a1a;color:#b05050}
+.pcard{border:1.5px solid var(--border);border-radius:9px;margin-bottom:10px;overflow:hidden}
+.pcard-hd{background:var(--green);color:#fff;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.pcard-hd h4{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.pcard-bd{padding:11px 12px}
+.pcard-bd.hide{display:none}
+.result{background:var(--green-bg);border:1.5px solid var(--green-border);border-radius:8px;padding:8px 11px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:var(--green)}
+.result strong{font-size:14px}
+.item-block{border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;position:relative}
+.item-block .ititle{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:7px}
+.rm{position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:50%;background:#fee2e2;border:none;color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:bold}
+.add-line{width:100%;padding:8px;background:#f0faf4;border:1.5px dashed var(--green-border);border-radius:8px;color:var(--green);font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
+.profit-big{background:linear-gradient(135deg,#1a5c38,#2e7d4f);color:#fff;border-radius:var(--r);padding:16px;text-align:center;margin-bottom:12px}
+.profit-big .plbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.8;margin-bottom:3px}
+.profit-big .pamt{font-size:38px;font-weight:800;letter-spacing:-1px}
+.profit-big .psub{font-size:11px;opacity:.7;margin-top:2px}
+.sum-g{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.sum-item{background:#f9f9f9;border-radius:8px;padding:11px;text-align:center}
+.sum-item .sl{font-size:10px;text-transform:uppercase;font-weight:700;color:var(--muted);margin-bottom:2px}
+.sum-item .sv{font-size:18px;font-weight:800}
+.sum-item.rc .sv{color:var(--red)}
+.bkdown{border:1.5px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px}
+.brow{display:flex;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.brow:last-child{border-bottom:none}
+.brow.tot{background:#f9f9f9;font-weight:700}
+.cv{color:var(--red);font-weight:600}
+.tip{font-size:11px;color:var(--muted);background:#f5f5f5;border-radius:6px;padding:6px 9px;margin-top:7px;line-height:1.4}
+.cl-sec{margin-bottom:12px}
+.cl-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.cl-hd span{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.cl-pct{font-size:11px;font-weight:700;color:var(--green)}
+.cl-bar{background:#dfe1e6;border-radius:3px;height:5px;margin-bottom:8px;overflow:hidden}
+.cl-fill{background:var(--green);height:100%;border-radius:3px;transition:width .3s}
+.cl-item{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f4f5f7;cursor:pointer}
+.cl-item:last-child{border-bottom:none}
+.cl-item input{margin-top:2px;width:15px;height:15px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
+.cl-item span{font-size:13px;color:var(--text);line-height:1.4}
+.cl-item.ck span{text-decoration:line-through;color:var(--muted)}
+.prop-inp{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:15px;color:var(--text);background:var(--input-bg);font-family:inherit;margin-bottom:10px}
+.prop-inp:focus{outline:none;border-color:var(--green);background:#fff}
+.gen-btn{width:100%;padding:13px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px}
+.gen-btn:active{background:var(--green2)}
+.move-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.mv-btn{background:#f4f5f7;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;color:var(--text)}
+.mv-btn:hover{background:var(--green);color:#fff;border-color:var(--green)}
+.mf{padding:10px 15px 14px;display:flex;gap:7px;justify-content:flex-end;border-top:1px solid var(--border)}
+.btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+.btn-p{background:var(--green);color:#fff}
+.btn-s{background:#f4f5f7;color:var(--text)}
+.btn-d{background:#eb5a46;color:#fff}
+.set-sec{border:1.5px solid var(--border);border-radius:9px;margin-bottom:10px;overflow:hidden}
+.set-hd{padding:9px 12px;background:#444;color:#fff;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-size:11px;font-weight:700;text-transform:uppercase}
+.set-bd{padding:11px 12px}
+.set-bd.hide{display:none}
+.srow{display:flex;align-items:center;gap:7px;margin-bottom:8px;font-size:12px}
+.srow:last-child{margin-bottom:0}
+.srow .sl{flex:1;color:var(--text)}
+.srow input{width:72px;padding:6px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-weight:600;text-align:center;background:var(--input-bg);color:#d0d4e2}
+.srow input:focus{border-color:var(--green);outline:none;background:#1e2336;color:#e2e5f0}
+.srow .su{font-size:10px;color:var(--muted);min-width:28px}
+.save-p{width:100%;padding:11px;background:var(--green);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px}
+.toast{text-align:center;font-size:11px;color:var(--green);font-weight:600;margin-top:5px;opacity:0;transition:opacity .3s}
+.sch-hd{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 6px}
+.sch-item{display:flex;align-items:center;gap:7px;padding:7px 10px;background:#22263a;border-radius:8px;margin-bottom:6px;border-left:4px solid var(--green)}
+.sch-item.today-item{border-left-color:#e74c3c;background:#2b1a1a}
+.sch-item.tmrw-item{border-left-color:#f39c12;background:#2b2410}
+.sch-del{background:none;border:none;color:#ccc;font-size:16px;cursor:pointer;margin-left:auto;line-height:1;padding:0 2px}
+.sch-del:hover{color:var(--red)}
+.sch-info{flex:1}
+.sch-type{font-size:12px;font-weight:700;color:var(--text)}
+.sch-when{font-size:10px;color:var(--muted);margin-top:1px}
+.sch-add{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.sch-add input,.sch-add select{padding:8px 9px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--input-bg);color:#d0d4e2;font-family:inherit}
+.sch-add input:focus,.sch-add select:focus{outline:none;border-color:var(--green);background:#1e2336;color:#e2e5f0}
+.sch-add input::placeholder{color:#4a4f63}
+.sch-note{grid-column:1/-1}
+.sch-btn{grid-column:1/-1;padding:9px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+.set-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;overflow-y:auto;padding:12px}
+.set-overlay.open{display:block}
+.prop-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:400;overflow-y:auto;padding:12px}
+.prop-overlay.open{display:block}
+.prop-doc{background:#1a1d27;border-radius:10px;width:100%;max-width:600px;margin:0 auto;padding:28px 24px 36px;font-family:'Segoe UI',Arial,sans-serif;color:#e8eaf0}
+.prop-co{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1a5c38}
+.prop-co-name{font-size:22px;font-weight:800;color:#1a5c38;line-height:1.1}
+.prop-co-info{font-size:11px;color:#8b90a8;text-align:right;line-height:1.7}
+.prop-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.prop-meta-box{background:#22263a;border-radius:8px;padding:12px 14px}
+.prop-meta-box h4{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8b90a8;margin-bottom:6px;font-weight:700}
+.prop-meta-box p{font-size:13px;color:#e8eaf0;line-height:1.5;font-weight:500}
+.prop-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:8px}
+.prop-table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px}
+.prop-table th{background:#1a5c38;color:#fff;padding:9px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.prop-table td{padding:9px 12px;border-bottom:1px solid #2e3248;vertical-align:top}
+.prop-table tr:nth-child(even) td{background:#1a1d27}
+.prop-totals{margin-left:auto;width:220px;margin-bottom:20px}
+.prop-trow{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #2e3248;color:#e8eaf0}
+.prop-trow:last-child{border-bottom:none;font-weight:800;font-size:15px;color:#2ecc71;padding-top:10px}
+.prop-deposit{background:#0d2b1a;border:2px solid #1a5c38;border-radius:8px;padding:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+.prop-deposit .dl{font-size:13px;color:#2ecc71;font-weight:600}
+.prop-deposit .da{font-size:20px;color:#2ecc71;font-weight:800}
+.prop-msg{background:#22263a;border-radius:8px;padding:12px 14px;font-size:12px;color:#8b90a8;line-height:1.6;margin-bottom:20px;font-style:italic}
+.prop-terms{font-size:10px;color:#666;line-height:1.6;border-top:1px solid #2e3248;padding-top:14px}
+.prop-terms strong{color:#8b90a8}
+.prop-actions{display:flex;gap:8px;margin-bottom:14px;position:sticky;top:0;background:rgba(0,0,0,0.7);padding:8px;border-radius:8px;z-index:10}
+.prop-actions button{flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
+.pa-close{background:#555;color:#fff}
+.pa-print{background:#1a5c38;color:#fff}
+@media print{
+  .prop-overlay{display:block!important;position:static;background:none;padding:0}
+  .prop-doc{border-radius:0;padding:20px;max-width:100%;box-shadow:none}
+  .prop-actions{display:none!important}
+  body > *:not(.prop-overlay){display:none!important}
+}
+.set-modal{background:#1a1d27;border-radius:13px;width:100%;max-width:500px;margin:0 auto;padding-bottom:16px}
+.set-modal .mh{padding:13px 15px 10px}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📐 Maximum Closets</h1>
+    <div class="hstats" id="hstats">Loading…</div>
+  </div>
+  <div style="display:flex;gap:7px;align-items:center">
+    <span title="Sync status"><span class="sync-dot syncing" id="sync-dot"></span></span>
+    <button class="hadd" onclick="openSettings()" style="background:rgba(255,255,255,0.15)">⚙️</button>
+    <button class="hadd" onclick="openAdd()">+ Job</button>
+  </div>
+</header>
+
+<div class="agenda" id="agenda"><span class="agenda-empty">No upcoming tasks</span></div>
+<div class="board" id="board"></div>
+
+<!-- JOB MODAL -->
+<div class="overlay" id="overlay">
+<div class="modal">
+  <div class="mh">
+    <h3 id="mtitle">New Job</h3>
+    <button class="mclose" onclick="closeModal()">×</button>
+  </div>
+  <div class="mtabs">
+    <div class="mtab on" onclick="mTab('info')">Info</div>
+    <div class="mtab" onclick="mTab('pricing')">💰 Pricing</div>
+    <div class="mtab" onclick="mTab('checklist')">✓ Checklist</div>
+    <div class="mtab" onclick="mTab('proposal')">📄 Proposal</div>
+    <div class="mtab" onclick="mTab('move')">Move</div>
+  </div>
+
+  <!-- INFO -->
+  <div class="mtpane on" id="mp-info">
+    <div class="f"><label>Customer Name *</label><input type="text" id="f-name" placeholder="e.g. Elliot Blue Coat" /></div>
+    <div class="f g2">
+      <div><label>Phone</label><input type="tel" id="f-phone" placeholder="(631) 555-0000" inputmode="tel" /></div>
+      <div><label>Date Visited</label><input type="date" id="f-date" /></div>
+    </div>
+    <div class="f"><label>Email</label><input type="email" id="f-email" placeholder="customer@email.com" inputmode="email" /></div>
+    <div class="f g2">
+      <div><label>Stage</label>
+        <select id="f-stage">
+          <option value="0">Lead / Customer</option><option value="1">Measure / Consult</option>
+          <option value="2">Estimate Sent</option><option value="3">Deposit Paid</option>
+          <option value="4">Install Scheduled</option><option value="5">Install</option><option value="6">Done</option>
+        </select>
+      </div>
+      <div><label>Job Source</label>
+        <select id="f-source">
+          <option value="">—</option><option>Jed Referral</option><option>Customer Referral</option>
+          <option>Google</option><option>Instagram</option><option>Facebook</option>
+          <option>Repeat Customer</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="f"><label>Labels</label>
+      <div class="lbl-pick">
+        <div class="lopt new" data-v="new" onclick="toggleLbl(this)">New Lead</div>
+        <div class="lopt plans" data-v="plans" onclick="toggleLbl(this)">Need Plans Sent</div>
+        <div class="lopt followup" data-v="followup" onclick="toggleLbl(this)">Follow Up Soon</div>
+        <div class="lopt ontrack" data-v="ontrack" onclick="toggleLbl(this)">On Track</div>
+        <div class="lopt design" data-v="design" onclick="toggleLbl(this)">Design & Send</div>
+        <div class="lopt inprog" data-v="inprog" onclick="toggleLbl(this)">In Progress</div>
+        <div class="lopt finalpay" data-v="finalpay" onclick="toggleLbl(this)">Final Payment Due</div>
+      </div>
+    </div>
+    <div class="f"><label>Notes</label><textarea id="f-notes" placeholder="Any notes about this job…"></textarea></div>
+    <div class="sch-hd">📅 Scheduled Tasks</div>
+    <div id="sch-list"></div>
+    <div class="sch-add">
+      <select id="sch-type">
+        <option value="Measure">Measure</option>
+        <option value="Install">Install</option>
+        <option value="Cut Job">Cut Job</option>
+        <option value="Client Meeting">Client Meeting</option>
+        <option value="Drawing">Drawing</option>
+        <option value="Other">Other</option>
+      </select>
+      <input type="date" id="sch-date" />
+      <input type="time" id="sch-time" placeholder="Time (optional)" class="sch-note" />
+      <input type="text" id="sch-note" placeholder="Note (e.g. Massapequa)" class="sch-note" />
+      <button class="sch-btn" onclick="addSchedItem()">+ Add to Schedule</button>
+    </div>
+    <div style="padding:12px 0 2px">
+      <button class="btn btn-p" style="width:100%;padding:11px;font-size:14px" onclick="saveCardAndToast()">💾 Save</button>
+      <p class="toast" id="info-toast" style="margin-top:6px">✓ Saved!</p>
+    </div>
+  </div>
+
+  <!-- PRICING -->
+  <div class="mtpane" id="mp-pricing">
+    <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('mel')"><h4>Melamine</h4><span id="mel-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
+      <div class="pcard-bd" id="mel-bd">
+        <div class="f g2">
+          <div><label>Color</label><select id="mel-type" onchange="melTypeChange()"><option value="white">White</option><option value="color">Color</option></select></div>
+          <div><label>Price By</label><select id="mel-method" onchange="melTypeChange()"><option value="sqft">Sq Ft</option><option value="sheets">Sheets</option></select></div>
+        </div>
+        <div class="f"><label id="mel-qty-lbl">Sq Ft</label><input type="number" id="mel-qty" placeholder="0" oninput="calcMel()" inputmode="decimal" /></div>
+        <div class="f g2">
+          <div><label>Cost / <span id="mel-cu">sq ft</span></label><input type="number" id="mel-cost" step=".01" oninput="calcMel()" inputmode="decimal" /></div>
+          <div><label>Sell / <span id="mel-su">sq ft</span></label><input type="number" id="mel-sell" step=".01" oninput="calcMel()" inputmode="decimal" /></div>
+        </div>
+        <div class="result"><span>Cost → Sale</span><strong id="mel-res">$0 → $0</strong></div>
+      </div>
+    </div>
+    <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('doors')"><h4>Doors</h4><span id="doors-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
+      <div class="pcard-bd hide" id="doors-bd"><div id="door-items"></div><button class="add-line" onclick="addDoor()">+ Add Door Style</button></div>
+    </div>
+    <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('drawers')"><h4>Drawer Boxes</h4><span id="drawers-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
+      <div class="pcard-bd hide" id="drawers-bd"><div id="drawer-items"></div><button class="add-line" onclick="addDrawer()">+ Add Drawer Type</button></div>
+    </div>
+    <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('hw')"><h4>Hardware</h4><span id="hw-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
+      <div class="pcard-bd hide" id="hw-bd"><div id="hw-items"></div><button class="add-line" onclick="addHw()">+ Add Hardware Item</button></div>
+    </div>
+    <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('special')"><h4>Special Items</h4><span id="special-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
+      <div class="pcard-bd hide" id="special-bd"><div id="special-items"></div><button class="add-line" onclick="addSpecial()">+ Add Special Item</button></div>
+    </div>
+    <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('labor')"><h4>Labor</h4><span id="labor-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
+      <div class="pcard-bd hide" id="labor-bd">
+        <div class="f g2">
+          <div><label>Helper Hours</label><input type="number" id="hlp-hrs" oninput="calcLabor()" inputmode="decimal" /></div>
+          <div><label>Helper $/hr</label><input type="number" id="hlp-rate" oninput="calcLabor()" inputmode="decimal" /></div>
+        </div>
+        <div class="result" style="margin-bottom:10px"><span>Helper Cost</span><strong id="hlp-res">$0</strong></div>
+        <div class="f g2">
+          <div><label>Lead Install %</label><input type="number" id="lead-pct" step=".5" oninput="calcAll()" inputmode="decimal" /></div>
+          <div><label>Owner %</label><input type="number" id="owner-pct" step=".5" value="0" oninput="calcAll()" inputmode="decimal" /></div>
+        </div>
+        <p class="tip">% of total sale price from all line items above.</p>
+      </div>
+    </div>
+    <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('psum')"><h4>Summary</h4><span id="profit-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0 profit</span></div>
+      <div class="pcard-bd hide" id="psum-bd">
+        <div style="padding-bottom:10px">
+          <button class="btn btn-p" style="width:100%;padding:11px;font-size:14px" onclick="saveCardAndToast('pricing-toast')">💾 Save</button>
+          <p class="toast" id="pricing-toast" style="margin-top:6px">✓ Saved!</p>
+        </div>
+        <div class="profit-big"><p class="plbl">Your Profit</p><p class="pamt" id="profit-amt">$0</p><p class="psub" id="profit-marg">0% margin</p></div>
+        <div class="sum-g">
+          <div class="sum-item"><div class="sl">Total Sale</div><div class="sv" id="s-kcd">$0</div></div>
+          <div class="sum-item rc"><div class="sl">Total Cost</div><div class="sv" id="s-cost">$0</div></div>
+        </div>
+        <div class="bkdown">
+          <div class="brow"><span>Melamine</span><span class="cv" id="s-mel">$0</span></div>
+          <div class="brow"><span>Doors</span><span class="cv" id="s-doors">$0</span></div>
+          <div class="brow"><span>Drawer Boxes</span><span class="cv" id="s-drawers">$0</span></div>
+          <div class="brow"><span>Hardware</span><span class="cv" id="s-hw">$0</span></div>
+          <div class="brow"><span>Special Items</span><span class="cv" id="s-sp">$0</span></div>
+          <div class="brow"><span>Helper Labor</span><span class="cv" id="s-hlp">$0</span></div>
+          <div class="brow"><span>Lead Install (<span id="s-lpct">8</span>%)</span><span class="cv" id="s-lead">$0</span></div>
+          <div class="brow"><span>Owner (<span id="s-opct">0</span>%)</span><span class="cv" id="s-owner">$0</span></div>
+          <div class="brow tot"><span>TOTAL COSTS</span><span class="cv" id="s-total">$0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHECKLIST -->
+  <div class="mtpane" id="mp-checklist">
+    <div id="cl-content"><p style="color:var(--muted);font-size:13px">Save job first to see checklist.</p></div>
+  </div>
+
+  <!-- PROPOSAL -->
+  <div class="mtpane" id="mp-proposal">
+    <div class="f"><label>Customer Address</label><input type="text" id="p-addr" placeholder="50 Greybarn Lane, Amityville NY 11701" oninput="savePropFields()" /></div>
+    <div class="f g2">
+      <div><label>Discount ($)</label><input type="number" id="p-disc" placeholder="0" inputmode="decimal" step=".01" oninput="savePropFields()" /></div>
+      <div><label>Tax ($)</label><input type="number" id="p-tax" placeholder="0" inputmode="decimal" step=".01" oninput="savePropFields()" /></div>
+    </div>
+    <div class="f">
+      <label>Project Description</label>
+      <textarea id="p-desc" rows="3" placeholder="Describe the scope of work for the customer…" oninput="savePropFields()" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;color:#d0d4e2;background:var(--input-bg);font-family:inherit;resize:vertical"></textarea>
+      <button onclick="autoDesc()" style="margin-top:5px;width:100%;padding:8px;background:#22263a;border:1.5px solid var(--border);border-radius:7px;color:var(--green);font-size:12px;font-weight:700;cursor:pointer">✨ Auto-fill from pricing</button>
+    </div>
+    <div class="f"><label>Message to Customer</label><textarea id="p-notes" class="prop-inp" rows="2" placeholder="Thank you for choosing Maximum Closets!" oninput="savePropFields()"></textarea></div>
+    <div class="f">
+      <label>3D Renders / Photos</label>
+      <input type="file" id="p-imgs" multiple accept="image/*" onchange="addProposalImages(this)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:13px;cursor:pointer"/>
+      <div id="p-img-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+    </div>
+    <div class="f" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="p-plans" onchange="savePropFields()" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0"/>
+      <label for="p-plans" style="font-size:13px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0">Plans / drawings included with this proposal</label>
+    </div>
+    <div style="margin-bottom:10px">
+      <button class="btn btn-p" style="width:100%;padding:11px;font-size:14px" onclick="savePropFieldsAndToast()">💾 Save</button>
+      <p class="toast" id="prop-toast" style="margin-top:6px">✓ Saved!</p>
+    </div>
+    <button class="gen-btn" onclick="previewProposal()">👁 Preview Proposal</button>
+    <button class="gen-btn" style="background:#444;margin-top:8px" onclick="printProposal()">🖨 Print / Save as PDF</button>
+    <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:7px">No internet needed — generates instantly from your pricing data</p>
+  </div>
+
+  <!-- MOVE -->
+  <div class="mtpane" id="mp-move">
+    <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Move to stage</p>
+    <div class="move-btns" id="mv-btns"></div>
+    <button class="btn btn-d" style="width:100%;margin-top:8px" onclick="deleteJob()">🗑 Delete Job</button>
+  </div>
+</div>
+</div>
+
+<!-- PROPOSAL PREVIEW -->
+<div class="prop-overlay" id="prop-overlay">
+  <div class="prop-actions">
+    <button class="pa-close" onclick="closePropPreview()">✕ Close</button>
+    <button class="pa-print" onclick="window.print()">🖨 Print / PDF</button>
+    <button onclick="sendProposalEmail()" style="background:#0079bf;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">✉️ Send</button>
+  </div>
+  <div class="prop-doc" id="prop-doc"></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="set-overlay" id="set-overlay">
+<div class="set-modal">
+  <div class="mh"><h3>⚙️ Pricing Defaults</h3><button class="mclose" onclick="closeSettings()">×</button></div>
+  <div style="padding:14px 15px">
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-mel')">Melamine<span>▾</span></div>
+      <div class="set-bd" id="s-mel">
+        <p style="font-size:10px;color:#aaa;margin-bottom:6px;font-weight:700">WHITE — BY SQ FT</p>
+        <div class="srow"><span class="sl">Cost/sqft</span><input type="number" id="sw-wsc" step=".01" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">Sell/sqft</span><input type="number" id="sw-wss" step=".01" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <p style="font-size:10px;color:#aaa;margin:8px 0 6px;font-weight:700">WHITE — BY SHEETS</p>
+        <div class="srow"><span class="sl">Cost/sheet</span><input type="number" id="sw-whtc" step="1" inputmode="decimal"/><span class="su">$/ea</span></div>
+        <div class="srow"><span class="sl">Sell/sheet</span><input type="number" id="sw-whts" step="1" inputmode="decimal"/><span class="su">$/ea</span></div>
+        <p style="font-size:10px;color:#aaa;margin:8px 0 6px;font-weight:700">COLOR — BY SQ FT</p>
+        <div class="srow"><span class="sl">Cost/sqft</span><input type="number" id="sw-csc" step=".01" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">Sell/sqft</span><input type="number" id="sw-css" step=".01" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <p style="font-size:10px;color:#aaa;margin:8px 0 6px;font-weight:700">COLOR — BY SHEETS</p>
+        <div class="srow"><span class="sl">Cost/sheet</span><input type="number" id="sw-chtc" step="1" inputmode="decimal"/><span class="su">$/ea</span></div>
+        <div class="srow"><span class="sl">Sell/sheet</span><input type="number" id="sw-chts" step="1" inputmode="decimal"/><span class="su">$/ea</span></div>
+      </div>
+    </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-doors')">Doors ($/sqft)<span>▾</span></div>
+      <div class="set-bd" id="s-doors">
+        <div class="srow"><span class="sl">White Flat</span><input type="number" id="sd-wf" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">White Shaker</span><input type="number" id="sd-ws" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">Color Flat</span><input type="number" id="sd-cf" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">Color Shaker/Glass</span><input type="number" id="sd-cs" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">Default markup</span><input type="number" id="sd-mu" step=".05" inputmode="decimal"/><span class="su">×</span></div>
+      </div>
+    </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-drw')">Drawer Boxes<span>▾</span></div>
+      <div class="set-bd" id="s-drw">
+        <div class="srow"><span class="sl">White Flat cost</span><input type="number" id="sdrw-wc" step="1" inputmode="decimal"/><span class="su">$</span></div>
+        <div class="srow"><span class="sl">White Flat sell</span><input type="number" id="sdrw-ws" step="1" inputmode="decimal"/><span class="su">$</span></div>
+        <div class="srow"><span class="sl">Shaker cost</span><input type="number" id="sdrw-sc" step="1" inputmode="decimal"/><span class="su">$</span></div>
+        <div class="srow"><span class="sl">Shaker sell</span><input type="number" id="sdrw-ss" step="1" inputmode="decimal"/><span class="su">$</span></div>
+      </div>
+    </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-hw')">Hardware (cost → sell)<span>▾</span></div>
+      <div class="set-bd" id="s-hw">
+        <div class="srow"><span class="sl">Hinges</span><input type="number" id="shw-hc" step=".01" inputmode="decimal" style="width:60px"/><span class="su">→</span><input type="number" id="shw-hs" step=".5" inputmode="decimal" style="width:60px"/></div>
+        <div class="srow"><span class="sl">Handles Nickel</span><input type="number" id="shw-nc" step=".01" inputmode="decimal" style="width:60px"/><span class="su">→</span><input type="number" id="shw-ns" step=".5" inputmode="decimal" style="width:60px"/></div>
+        <div class="srow"><span class="sl">Handles Black</span><input type="number" id="shw-bc" step=".01" inputmode="decimal" style="width:60px"/><span class="su">→</span><input type="number" id="shw-bs" step=".5" inputmode="decimal" style="width:60px"/></div>
+        <div class="srow"><span class="sl">Drawer Slides SC</span><input type="number" id="shw-dc" step=".01" inputmode="decimal" style="width:60px"/><span class="su">→</span><input type="number" id="shw-ds" step=".5" inputmode="decimal" style="width:60px"/></div>
+        <div class="srow"><span class="sl">Closet Rod Chrome</span><input type="number" id="shw-rc" step=".01" inputmode="decimal" style="width:60px"/><span class="su">→</span><input type="number" id="shw-rs" step=".5" inputmode="decimal" style="width:60px"/></div>
+      </div>
+    </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-labor')">Labor Defaults<span>▾</span></div>
+      <div class="set-bd" id="s-labor">
+        <div class="srow"><span class="sl">Default helper hours</span><input type="number" id="sl-hlh" step="1" inputmode="decimal"/><span class="su">hrs</span></div>
+        <div class="srow"><span class="sl">Helper rate</span><input type="number" id="sl-hr" step="1" inputmode="decimal"/><span class="su">$/hr</span></div>
+        <div class="srow"><span class="sl">Lead installer %</span><input type="number" id="sl-lp" step=".5" inputmode="decimal"/><span class="su">%</span></div>
+      </div>
+    </div>
+    <button class="save-p" onclick="saveSettings()">💾 Save Prices</button>
+    <p class="toast" id="set-toast">✓ Saved!</p>
+  </div>
+</div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDElEwNEqIiA54oH4OpRoJcFY0TcseFCFc",
+  authDomain: "maximum-closets.firebaseapp.com",
+  databaseURL: "https://maximum-closets-default-rtdb.firebaseio.com",
+  projectId: "maximum-closets",
+  storageBucket: "maximum-closets.firebasestorage.app",
+  messagingSenderId: "475464335749",
+  appId: "1:475464335749:web:fdd6081bf16b59dac344ec",
+  measurementId: "G-RF4CB4J9PQ"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ── SYNC DOT ──
+function setSyncDot(state){
+  const d=document.getElementById('sync-dot');
+  if(!d)return;
+  d.className='sync-dot'+(state==='on'?' ':state==='off'?' off':' syncing');
+}
+
+// ── SAVE TO FIREBASE ──
+// Use window._pw so both module and regular scripts share the same reference
+window._pw={id:null,data:null};
+let saveTimer=null;
+window.fbSave=function(){
+  setSyncDot('syncing');
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    const data={jobs,clSt,pricingData,schedData,p:P};
+    set(ref(db,'mc'),data)
+      .then(()=>setSyncDot('on'))
+      .catch(()=>setSyncDot('off'));
+  },200);
+};
+// Immediate flush — used on card close so data is never lost
+window.fbFlush=function(){
+  clearTimeout(saveTimer);
+  setSyncDot('syncing');
+  const snap={jobs,clSt,pricingData:JSON.parse(JSON.stringify(pricingData)),schedData,p:P};
+  set(ref(db,'mc'),snap)
+    .then(()=>{window._pw={id:null,data:null};setSyncDot('on');})
+    .catch(()=>setSyncDot('off'));
+};
+
+// ── LISTEN FOR CHANGES FROM OTHER DEVICES ──
+onValue(ref(db,'mc'),(snap)=>{
+  const data=snap.val();
+  if(!data)return;
+  if(data.jobs)jobs=data.jobs;
+  if(data.clSt)clSt=data.clSt;
+  if(data.schedData)schedData=data.schedData;
+  if(data.p)P=Object.assign({},DEF,data.p);
+  // Merge pricing — never overwrite the currently-open card OR the recently-flushed card
+  if(data.pricingData){
+    const localCard=editId?pricingData[editId]:null;
+    const pw=window._pw;
+    pricingData=data.pricingData;
+    if(editId&&localCard)pricingData[editId]=localCard;
+    if(pw.id&&pw.data)pricingData[pw.id]=pw.data;
+  }
+  render();renderAgenda();
+  setSyncDot('on');
+});
+
+// Initial load
+get(ref(db,'mc')).then(snap=>{
+  const data=snap.val();
+  if(data){
+    if(data.jobs)jobs=data.jobs;
+    if(data.clSt)clSt=data.clSt;
+    if(data.pricingData)pricingData=data.pricingData;
+    if(data.schedData)schedData=data.schedData;
+    if(data.p)P=Object.assign({},DEF,data.p);
+  } else {
+    seedJobs();
+  }
+  render();renderAgenda();
+  setSyncDot('on');
+}).catch(()=>{
+  loadData();render();renderAgenda();setSyncDot('off');
+});
+
+</script>
+
+<script>
+const DEF = {
+  wSqftC:5.50, wSqftS:6.46, wShtC:264, wShtS:310,
+  cSqftC:3.33, cSqftS:8.33, cShtC:160, cShtS:400,
+  dWF:7, dWS:15, dCF:10, dCS:15, dMu:2.25,
+  drwWC:55, drwWS:120, drwSC:65, drwSS:140,
+  hgC:3.30, hgS:10, hnC:1.57, hnS:10, hbC:4.26, hbS:10, slC:5.06, slS:12, rdC:5.30, rdS:16,
+  hlpRate:20, leadPct:8, hlpHrs:8
+};
+let P = {...DEF};
+function loadP(){try{P=Object.assign({},DEF,JSON.parse(localStorage.getItem('mc-p')||'{}'));}catch(e){P={...DEF};}}
+function saveP(obj){try{localStorage.setItem('mc-p',JSON.stringify(obj));}catch(e){}}
+
+const STAGES=['Lead / Customer','Measure / Consult','Estimate Sent','Deposit Paid','Install Scheduled','Install','Done'];
+const SCOLS=['#6b778c','#f2a500','#eb5a46','#61bd4f','#00c2e0','#0079bf','#1a5c38'];
+const LBLS={new:{c:'l-new',t:'New Lead'},plans:{c:'l-plans',t:'Need Plans Sent'},followup:{c:'l-followup',t:'Follow Up Soon'},ontrack:{c:'l-ontrack',t:'On Track'},design:{c:'l-design',t:'Design & Send'},inprog:{c:'l-inprog',t:'In Progress'},finalpay:{c:'l-finalpay',t:'Final Payment Due'},done:{c:'l-done',t:'Done'}};
+const CL={
+  0:[{n:'New Lead',items:['Get full name, phone & email','Understand scope (rooms, style, timeline)','Schedule measure / consult']}],
+  1:[{n:'Measure & Design',items:['Measure all spaces + take photos','Note client preferences (color, style, hardware)','Draft design in KCD','Price job in pricing tab','Send estimate to client']}],
+  2:[{n:'Estimate Follow-Up',items:['Follow up if no response in 3 days','Handle revisions if needed','Estimate approved by client','Request deposit']}],
+  3:[{n:'Deposit Received',items:['Confirm deposit received','Order materials','Confirm install date & add to Google Calendar']}],
+  4:[{n:'Install Prep',items:['Confirm date with client','Confirm Miguel availability','Confirm materials are ready','Send reminder to client 2 days before']}],
+  5:[{n:'Install Day',items:['Materials prepped & loaded','Install completed','Client sign-off','Final payment collected','Ask for a review']}],
+  6:[]
+};
+
+let jobs=[],clSt={},editId=null,selLbls=[],schedData={},pricingData={},isRestoring=false;
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
+
+function loadData(){
+  try{jobs=JSON.parse(localStorage.getItem('mc-jobs2')||'[]')}catch(e){jobs=[]}
+  try{clSt=JSON.parse(localStorage.getItem('mc-cl2')||'{}')}catch(e){clSt={}}
+  try{pricingData=JSON.parse(localStorage.getItem('mc-pd')||'{}')}catch(e){pricingData={}}
+  try{schedData=JSON.parse(localStorage.getItem('mc-sched')||'{}')}catch(e){schedData={}}
+  if(!jobs.length)seedJobs();
+}
+function saveData(){
+  localStorage.setItem('mc-jobs2',JSON.stringify(jobs));
+  localStorage.setItem('mc-cl2',JSON.stringify(clSt));
+  localStorage.setItem('mc-pd',JSON.stringify(pricingData));
+  localStorage.setItem('mc-sched',JSON.stringify(schedData));
+  if(window.fbSave)window.fbSave();
+}
+
+function dayLabel(d){
+  if(!d)return'';
+  const today=new Date();today.setHours(0,0,0,0);
+  const dt=new Date(d+'T12:00:00');dt.setHours(0,0,0,0);
+  const diff=Math.round((dt-today)/86400000);
+  if(diff===0)return'TODAY';if(diff===1)return'TOMORROW';
+  if(diff>1&&diff<=6)return dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  if(diff<0)return'OVERDUE';
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function dayClass(d){
+  if(!d)return'soon';
+  const today=new Date();today.setHours(0,0,0,0);
+  const dt=new Date(d+'T12:00:00');dt.setHours(0,0,0,0);
+  const diff=Math.round((dt-today)/86400000);
+  if(diff<=0)return'today';if(diff===1)return'tmrw';return'soon';
+}
+
+function addSchedItem(){
+  if(!editId){alert('Save the job first.');return;}
+  const type=document.getElementById('sch-type').value;
+  const date=document.getElementById('sch-date').value;
+  const time=document.getElementById('sch-time').value;
+  const note=document.getElementById('sch-note').value.trim();
+  if(!date){alert('Please pick a date.');return;}
+  if(!schedData[editId])schedData[editId]=[];
+  schedData[editId].push({id:uid(),type,date,time,note});
+  schedData[editId].sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('sch-date').value='';
+  document.getElementById('sch-time').value='';
+  document.getElementById('sch-note').value='';
+  saveData();renderSchedList(editId);renderAgenda();render();
+}
+function deleteSchedItem(jid,iid){
+  if(!schedData[jid])return;
+  schedData[jid]=schedData[jid].filter(x=>x.id!==iid);
+  saveData();renderSchedList(jid);renderAgenda();render();
+}
+function renderSchedList(jid){
+  const el=document.getElementById('sch-list');if(!el)return;
+  const items=(schedData[jid]||[]);
+  if(!items.length){el.innerHTML='<p style="font-size:12px;color:var(--muted);margin-bottom:6px">No tasks scheduled yet.</p>';return;}
+  el.innerHTML=items.map(it=>{
+    const dc=dayClass(it.date);
+    return`<div class="sch-item ${dc==='today'?'today-item':dc==='tmrw'?'tmrw-item':''}">
+      <div class="sch-info"><div class="sch-type">${it.type}${it.note?' — '+it.note:''}</div><div class="sch-when">${dayLabel(it.date)}${it.time?' · '+it.time:''}</div></div>
+      <button class="sch-del" onclick="deleteSchedItem('${jid}','${it.id}')">×</button></div>`;
+  }).join('');
+}
+function renderAgenda(){
+  const ag=document.getElementById('agenda');if(!ag)return;
+  const today=new Date();today.setHours(0,0,0,0);
+  const all=[];
+  jobs.forEach(job=>{
+    (schedData[job.id]||[]).forEach(it=>{
+      const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);
+      const diff=Math.round((d-today)/86400000);
+      if(diff>=-1&&diff<=6)all.push({...it,jobName:job.name,jobId:job.id,diff});
+    });
+  });
+  all.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  if(!all.length){ag.innerHTML='<span class="agenda-empty">No upcoming tasks this week</span>';return;}
+  ag.innerHTML=all.map(it=>`<span class="ag-item ${dayClass(it.date)}" onclick="openEdit('${it.jobId}')"><span class="ag-dot"></span>${dayLabel(it.date)}${it.time?' '+it.time:''} — ${it.type}: ${it.jobName}${it.note?' · '+it.note:''}</span>`).join('');
+}
+
+function seedJobs(){
+  const s=[
+    {name:'Liz',stage:0,source:'Jed Referral',labels:[],notes:'',date:'',phone:''},
+    {name:'Terry Moran',stage:0,source:'Jed Referral',labels:[],notes:'',date:'',phone:''},
+    {name:'Teddy and Dianne',stage:0,source:'',labels:[],notes:'',date:'',phone:''},
+    {name:'James & Linda Fox',stage:0,source:'Jed Referral',labels:['new'],notes:'',date:'',phone:''},
+    {name:'Demarius',stage:1,source:'',labels:[],notes:'',date:'',phone:''},
+    {name:'Amy Heller Stein',stage:1,source:'Jed Referral',labels:['plans'],notes:'',date:'2026-06-09',phone:''},
+    {name:'Denise Viafore Part 2',stage:1,source:'',labels:['plans'],notes:'',date:'',phone:''},
+    {name:'Mike Carneys Brazil',stage:1,source:'Jed Referral',labels:['plans'],notes:'',date:'',phone:''},
+    {name:'Joe Gresetto (Laundry)',stage:1,source:'Jed Referral',labels:['plans'],notes:'',date:'2026-06-16',phone:''},
+    {name:'Nicole',stage:2,source:'',labels:[],notes:'',date:'2026-06-03',phone:''},
+    {name:'Sean Flagerty',stage:2,source:'',labels:['followup'],notes:'',date:'',phone:''},
+    {name:'Lori S. Baldwin',stage:2,source:'Jed Referral',labels:[],notes:'',date:'2026-06-16',phone:''},
+    {name:'Dan Cr Merrick – Kitchen & Bath',stage:2,source:'Jed Referral',labels:['ontrack','design'],notes:'',date:'',phone:''},
+    {name:'Jordan Sieg',stage:2,source:'',labels:['design'],notes:'',date:'',phone:''},
+    {name:'Elliot Blue Coat',stage:3,source:'Jed Referral',labels:['inprog'],notes:'',date:'2026-06-09',phone:'5167298953'},
+    {name:'Janet',stage:4,source:'',labels:[],notes:'',date:'2026-05-29',phone:''},
+    {name:'Bammarito',stage:5,source:'Jed Referral',labels:['inprog'],notes:'',date:'2026-06-18',phone:''},
+  ];
+  jobs=s.map(j=>({id:uid(),...j}));
+  saveData();
+}
+
+function clKey(jid,si,ci,ii){return`${jid}:${si}:${ci}:${ii}`}
+function getChecklistItems(jid,si){
+  const base=(CL[si]||[]).map(sec=>({...sec,items:[...sec.items]}));
+  if(si===3){const hasDoors=(pricingData[jid]?.doorC||0)>0||(pricingData[jid]?.inputs?.doors||[]).some(d=>d.sqft>0);if(hasDoors&&base[0])base[0].items.push('Order hinges');}
+  return base;
+}
+function getProgress(jid,si){
+  const lists=getChecklistItems(jid,si);let tot=0,done=0;
+  lists.forEach((cl,ci)=>cl.items.forEach((_,ii)=>{tot++;if(clSt[clKey(jid,si,ci,ii)])done++;}));
+  return{tot,done,pct:tot>0?Math.round(done/tot*100):100};
+}
+function toggleCL(jid,si,ci,ii){const k=clKey(jid,si,ci,ii);clSt[k]=!clSt[k];saveData();renderCL(jid,si);render();}
+function renderCL(jid,si){
+  const el=document.getElementById('cl-content');if(!el)return;
+  const lists=getChecklistItems(jid,si);
+  if(!lists.length){el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:4px 0">No checklist for this stage.</p>';return;}
+  el.innerHTML='';
+  lists.forEach((cl,ci)=>{
+    const items=cl.items;
+    const done=items.reduce((d,_,ii)=>d+(clSt[clKey(jid,si,ci,ii)]?1:0),0);
+    const pct=Math.round(done/items.length*100);
+    const div=document.createElement('div');div.className='cl-sec';
+    div.innerHTML=`<div class="cl-hd"><span>${cl.n}</span><span class="cl-pct">${pct}%</span></div>
+      <div class="cl-bar"><div class="cl-fill" style="width:${pct}%"></div></div>
+      ${items.map((item,ii)=>{const ck=clSt[clKey(jid,si,ci,ii)]||false;
+        return`<div class="cl-item ${ck?'ck':''}" onclick="toggleCL('${jid}',${si},${ci},${ii})">
+          <input type="checkbox" ${ck?'checked':''} onclick="event.stopPropagation();toggleCL('${jid}',${si},${ci},${ii})"/>
+          <span>${item}</span></div>`;}).join('')}`;
+    el.appendChild(div);
+  });
+}
+
+let melC=0,melSl=0,doorC=0,doorSl=0,drwC=0,drwSl=0,hwC=0,hwSl=0,hlpC=0,spC=0,spSl=0;
+let doorIdx=0,drwIdx=0,hwIdx=0,spIdx=0;
+const SPECIAL_ITEMS=[
+  {l:'Valet Rod 12" Nickel',c:12.55},{l:'Valet Rod 12" Black',c:13.07},{l:'Valet Rod 12" Satin Brass',c:19.11},
+  {l:'Valet Rod 14" Nickel',c:24.79},{l:'Valet Rod 14" Black',c:30.35},
+  {l:'Tie Rack 14" Double Chrome',c:49.80},{l:'Tie Rack 14" Double Black',c:50.09},{l:'Tie Rack 14" Double Satin Brass',c:30.00},
+  {l:'Pants Rack 18"x14" Chrome',c:222.72},{l:'Pants Rack 13 Pants 24" Chrome',c:103.54},
+  {l:'Belt Rack 12" Chrome',c:18.82},
+  {l:'Belt Holder 14" Chrome',c:46.55},{l:'Belt Holder 14" Satin Brass',c:46.55},{l:'Belt Holder 14" Black',c:46.43},
+  {l:'Hamper Cloth Tilt Out 30" Black',c:71.01},{l:'Tilt Out Hamper 21"x14" Chrome',c:60.09},
+  {l:'Ironing Board Rotating 14" Silver',c:292.44},
+  {l:'Jewelry Tray 21 3/8"x12 1/8" Black',c:61.06},
+  {l:'Wire Pull-Out Baskets 24"W 16"D 11"H Chrome',c:55.16}
+];
+function fmtD(n){return'$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
+function fmt(n){return'$'+Math.round(Math.abs(n)).toLocaleString()}
+function vn(id,d=0){return parseFloat(document.getElementById(id)?.value)||d}
+
+function melTypeChange(){
+  const t=document.getElementById('mel-type').value,m=document.getElementById('mel-method').value;
+  const unit=m==='sqft'?'sq ft':'sheet';
+  document.getElementById('mel-qty-lbl').textContent=m==='sqft'?'Sq Ft':'Sheets';
+  document.getElementById('mel-cu').textContent=unit;document.getElementById('mel-su').textContent=unit;
+  let c,s;
+  if(t==='white'&&m==='sqft'){c=P.wSqftC;s=P.wSqftS;}
+  else if(t==='white'&&m==='sheets'){c=P.wShtC;s=P.wShtS;}
+  else if(t==='color'&&m==='sqft'){c=P.cSqftC;s=P.cSqftS;}
+  else{c=P.cShtC;s=P.cShtS;}
+  document.getElementById('mel-cost').value=c;document.getElementById('mel-sell').value=s;calcMel();
+}
+function calcMel(){
+  const qty=vn('mel-qty'),cost=vn('mel-cost',P.wSqftC),sell=vn('mel-sell',P.wSqftS);
+  melC=qty*cost;melSl=qty*sell;
+  document.getElementById('mel-res').textContent=fmt(melC)+' → '+fmt(melSl);
+  document.getElementById('mel-badge').textContent=fmt(melSl);calcAll();
+}
+function getDoorStyles(){return[{v:'white-flat',l:'White Flat',c:P.dWF},{v:'white-shaker',l:'White Shaker',c:P.dWS},{v:'color-flat',l:'Color Flat',c:P.dCF},{v:'color-shaker',l:'Color Shaker/Glass',c:P.dCS}]}
+function addDoor(){
+  doorIdx++;const id='dr-'+doorIdx;const styles=getDoorStyles();
+  const opts=styles.map(s=>`<option value="${s.v}">${s.l} — $${s.c}/sqft</option>`).join('');
+  const div=document.createElement('div');div.className='item-block';div.id=id;
+  div.innerHTML=`<div class="ititle">Door ${doorIdx}</div><button class="rm" onclick="rmItem('${id}','door')">×</button>
+    <div class="f"><label>Style</label><select onchange="calcDoors()">${opts}</select></div>
+    <div class="f g2"><div><label>Sq Ft</label><input type="number" class="dsqft" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div>
+    <div><label>Markup ×</label><input type="number" class="dmu" value="${P.dMu}" step=".05" oninput="calcDoors()" inputmode="decimal"/></div></div>
+    <div class="result"><span>Cost → Sale</span><strong class="dres">$0 → $0</strong></div>`;
+  document.getElementById('door-items').appendChild(div);calcDoors();
+}
+function calcDoors(){
+  const styles=getDoorStyles();doorC=0;doorSl=0;
+  document.querySelectorAll('#door-items .item-block').forEach(b=>{
+    const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
+    const mu=parseFloat(b.querySelector('.dmu')?.value)||P.dMu;
+    const st=styles.find(s=>s.v===sel?.value)||styles[0];
+    const c=sqft*st.c,sl=c*mu;doorC+=c;doorSl+=sl;
+    const r=b.querySelector('.dres');if(r)r.textContent=fmt(c)+' → '+fmt(sl);
+  });
+  document.getElementById('doors-badge').textContent=fmt(doorSl);calcAll();
+}
+function addDrawer(){
+  drwIdx++;const id='drw-'+drwIdx;const div=document.createElement('div');div.className='item-block';div.id=id;
+  div.innerHTML=`<div class="ititle">Drawer ${drwIdx}</div><button class="rm" onclick="rmItem('${id}','drw')">×</button>
+    <div class="f g2"><div><label>Type</label><select onchange="calcDrawers()">
+      <option value="wf">White Flat ($${P.drwWC}→$${P.drwWS})</option>
+      <option value="sh">Shaker ($${P.drwSC}→$${P.drwSS})</option></select></div>
+    <div><label>Qty</label><input type="number" class="dqty" placeholder="0" oninput="calcDrawers()" inputmode="decimal"/></div></div>
+    <div class="result"><span>Cost → Sale</span><strong class="drres">$0 → $0</strong></div>`;
+  document.getElementById('drawer-items').appendChild(div);calcDrawers();
+}
+function calcDrawers(){
+  drwC=0;drwSl=0;
+  document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
+    const t=b.querySelector('select')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
+    const c=(t==='sh'?P.drwSC:P.drwWC)*q,sl=(t==='sh'?P.drwSS:P.drwWS)*q;
+    drwC+=c;drwSl+=sl;const r=b.querySelector('.drres');if(r)r.textContent=fmt(c)+' → '+fmt(sl);
+  });
+  document.getElementById('drawers-badge').textContent=fmt(drwSl);calcAll();
+}
+function getHWPresets(){return[{v:'hg',l:'Soft-Close Hinges',c:P.hgC,s:P.hgS},{v:'hn',l:'Handles 96MM Nickel',c:P.hnC,s:P.hnS},{v:'hb',l:'Handles 96MM Black',c:P.hbC,s:P.hbS},{v:'sl',l:'Drawer Slides SC',c:P.slC,s:P.slS},{v:'rd',l:'Closet Rod Chrome',c:P.rdC,s:P.rdS},{v:'cu',l:'Custom Item',c:0,s:0}]}
+function addHw(){
+  hwIdx++;const id='hw-'+hwIdx;const presets=getHWPresets();
+  const opts=presets.map(p=>`<option value="${p.v}">${p.l}</option>`).join('');
+  const div=document.createElement('div');div.className='item-block';div.id=id;
+  div.innerHTML=`<div class="ititle">Hardware ${hwIdx}</div><button class="rm" onclick="rmItem('${id}','hw')">×</button>
+    <div class="f"><label>Item</label><select id="${id}-t" onchange="hwPre('${id}')">${opts}</select></div>
+    <div class="f g3"><div><label>Qty</label><input type="number" id="${id}-q" placeholder="0" oninput="calcHw()" inputmode="decimal"/></div>
+    <div><label>Cost $</label><input type="number" id="${id}-c" step=".01" oninput="calcHw()" inputmode="decimal"/></div>
+    <div><label>Sell $</label><input type="number" id="${id}-s" step=".01" oninput="calcHw()" inputmode="decimal"/></div></div>
+    <div class="result"><span>Cost → Sale</span><strong id="${id}-r">$0 → $0</strong></div>`;
+  document.getElementById('hw-items').appendChild(div);hwPre(id);
+}
+function hwPre(id){
+  const presets=getHWPresets();const t=document.getElementById(id+'-t')?.value;
+  const p=presets.find(x=>x.v===t)||presets[0];
+  document.getElementById(id+'-c').value=p.c;document.getElementById(id+'-s').value=p.s;calcHw();
+}
+function calcHw(){
+  hwC=0;hwSl=0;
+  document.querySelectorAll('#hw-items .item-block').forEach(b=>{
+    const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
+    const c=parseFloat(document.getElementById(bid+'-c')?.value)||0,s=parseFloat(document.getElementById(bid+'-s')?.value)||0;
+    hwC+=q*c;hwSl+=q*s;const r=document.getElementById(bid+'-r');if(r)r.textContent=fmt(q*c)+' → '+fmt(q*s);
+  });
+  document.getElementById('hw-badge').textContent=fmt(hwSl);calcAll();
+}
+function addSpecial(){
+  spIdx++;const id='sp-'+spIdx;
+  const opts=SPECIAL_ITEMS.map((p,i)=>`<option value="${i}">${p.l} — $${p.c.toFixed(2)}</option>`).join('');
+  const div=document.createElement('div');div.className='item-block';div.id=id;
+  div.innerHTML=`<div class="ititle">Special Item ${spIdx}</div><button class="rm" onclick="rmItem('${id}','special')">×</button>
+    <div class="f"><label>Item</label><select id="${id}-t" onchange="spPre('${id}')">${opts}</select></div>
+    <div class="f g3"><div><label>Qty</label><input type="number" id="${id}-q" placeholder="1" value="1" oninput="calcSpecial()" inputmode="decimal"/></div>
+    <div><label>Cost $</label><input type="number" id="${id}-c" step=".01" oninput="calcSpecial()" inputmode="decimal"/></div>
+    <div><label>Sell $</label><input type="number" id="${id}-s" step=".01" oninput="calcSpecial()" inputmode="decimal"/></div></div>
+    <div class="result"><span>Cost → Sale</span><strong id="${id}-r">$0 → $0</strong></div>`;
+  document.getElementById('special-items').appendChild(div);spPre(id);
+}
+function spPre(id){
+  const idx=parseInt(document.getElementById(id+'-t')?.value)||0;
+  const p=SPECIAL_ITEMS[idx]||SPECIAL_ITEMS[0];
+  const cEl=document.getElementById(id+'-c');const sEl=document.getElementById(id+'-s');
+  if(cEl)cEl.value=p.c.toFixed(2);if(sEl)sEl.value=(p.c*2).toFixed(2);calcSpecial();
+}
+function calcSpecial(){
+  spC=0;spSl=0;
+  document.querySelectorAll('#special-items .item-block').forEach(b=>{
+    const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
+    const c=parseFloat(document.getElementById(bid+'-c')?.value)||0,s=parseFloat(document.getElementById(bid+'-s')?.value)||0;
+    spC+=q*c;spSl+=q*s;const r=document.getElementById(bid+'-r');if(r)r.textContent=fmt(q*c)+' → '+fmt(q*s);
+  });
+  document.getElementById('special-badge').textContent=fmt(spSl);calcAll();
+}
+function calcLabor(){
+  const hrsEl=document.getElementById('hlp-hrs');
+  const hrs=(!hrsEl||hrsEl.value==='')?P.hlpHrs:parseFloat(hrsEl.value)||0;
+  const rate=vn('hlp-rate',P.hlpRate);hlpC=hrs*rate;
+  document.getElementById('hlp-res').textContent=fmt(hlpC);document.getElementById('labor-badge').textContent=fmt(hlpC);calcAll();
+}
+function calcAll(){
+  const sale=melSl+doorSl+drwSl+hwSl+spSl;
+  const lp=vn('lead-pct',P.leadPct)/100,op=vn('owner-pct',0)/100;
+  const lc=sale*lp,oc=sale*op,tot=melC+doorC+drwC+hwC+spC+hlpC+lc+oc;
+  const profit=sale-tot,margin=sale>0?(profit/sale*100):0;
+  const profitEl=document.getElementById('profit-amt');
+  if(profitEl){profitEl.textContent=(profit<0?'-':'')+fmtD(profit);profitEl.style.color=profit<0?'#ff6b6b':'white';}
+  const setT=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
+  setT('profit-marg',margin.toFixed(1)+'% margin');setT('s-kcd',fmtD(sale));setT('s-cost',fmtD(tot));
+  setT('s-mel',fmtD(melC));setT('s-doors',fmtD(doorC));setT('s-drawers',fmtD(drwC));setT('s-hw',fmtD(hwC));
+  setT('s-sp',fmtD(spC));setT('s-hlp',fmtD(hlpC));setT('s-lead',fmtD(lc));setT('s-owner',fmtD(oc));setT('s-total',fmtD(tot));
+  setT('s-lpct',vn('lead-pct',P.leadPct));setT('s-opct',vn('owner-pct',0));
+  document.getElementById('profit-badge').textContent=(profit<0?'-':'')+fmt(profit)+' profit';
+  if(editId){
+    const job=jobs.find(j=>j.id===editId);
+    if(job){job.sale=Math.round(sale);job.cost=Math.round(tot);}
+    pricingData[editId]={...(pricingData[editId]||{}),kcd:sale,melC,doorC,drwC,hwC,spC,hlpC,lc,oc,tot,profit};
+    snapshotInputs();saveData();render();
+  }
+}
+function snapshotInputs(){
+  if(!editId||isRestoring)return;
+  const doors=[];
+  document.querySelectorAll('#door-items .item-block').forEach(b=>{
+    const sel=b.querySelector('select');
+    doors.push({style:sel?.value||'white-flat',sqft:parseFloat(b.querySelector('.dsqft')?.value)||0,mu:parseFloat(b.querySelector('.dmu')?.value)||P.dMu});
+  });
+  const drawers=[];
+  document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
+    drawers.push({type:b.querySelector('select')?.value||'wf',qty:parseFloat(b.querySelector('.dqty')?.value)||0});
+  });
+  const hardware=[];
+  document.querySelectorAll('#hw-items .item-block').forEach(b=>{
+    const bid=b.id;
+    hardware.push({preset:document.getElementById(bid+'-t')?.value||'hg',qty:parseFloat(document.getElementById(bid+'-q')?.value)||0,cost:parseFloat(document.getElementById(bid+'-c')?.value)||0,sell:parseFloat(document.getElementById(bid+'-s')?.value)||0});
+  });
+  const specialItems=[];
+  document.querySelectorAll('#special-items .item-block').forEach(b=>{
+    const bid=b.id;
+    specialItems.push({itemIdx:parseInt(document.getElementById(bid+'-t')?.value)||0,qty:parseFloat(document.getElementById(bid+'-q')?.value)||1,cost:parseFloat(document.getElementById(bid+'-c')?.value)||0,sell:parseFloat(document.getElementById(bid+'-s')?.value)||0});
+  });
+  pricingData[editId].inputs={
+    melType:document.getElementById('mel-type')?.value||'white',melMethod:document.getElementById('mel-method')?.value||'sqft',
+    melQty:parseFloat(document.getElementById('mel-qty')?.value)||0,melCost:parseFloat(document.getElementById('mel-cost')?.value)||0,melSell:parseFloat(document.getElementById('mel-sell')?.value)||0,
+    doors,drawers,hardware,specialItems,
+    hlpHrs:parseFloat(document.getElementById('hlp-hrs')?.value??''),hlpRate:parseFloat(document.getElementById('hlp-rate')?.value)||P.hlpRate,
+    leadPct:parseFloat(document.getElementById('lead-pct')?.value)||P.leadPct,ownerPct:parseFloat(document.getElementById('owner-pct')?.value)||0,
+    addr:document.getElementById('p-addr')?.value||'',pDisc:document.getElementById('p-disc')?.value||'',pTax:document.getElementById('p-tax')?.value||'',pNotes:document.getElementById('p-notes')?.value||'',pDesc:document.getElementById('p-desc')?.value||'',pPlans:document.getElementById('p-plans')?.checked||false
+  };
+}
+let proposalImages=[];
+function savePropFields(){
+  if(!editId)return;
+  if(!pricingData[editId])pricingData[editId]={};if(!pricingData[editId].inputs)pricingData[editId].inputs={};
+  pricingData[editId].inputs.addr=document.getElementById('p-addr')?.value||'';
+  pricingData[editId].inputs.pDisc=document.getElementById('p-disc')?.value||'';
+  pricingData[editId].inputs.pTax=document.getElementById('p-tax')?.value||'';
+  pricingData[editId].inputs.pNotes=document.getElementById('p-notes')?.value||'';
+  pricingData[editId].inputs.pDesc=document.getElementById('p-desc')?.value||'';
+  pricingData[editId].inputs.pPlans=document.getElementById('p-plans')?.checked||false;
+  pricingData[editId].proposalImages=proposalImages;
+  saveData();
+}
+function savePropFieldsAndToast(){
+  savePropFields();
+  const t=document.getElementById('prop-toast');
+  if(t){t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);}
+}
+function autoDesc(){
+  const parts=[];
+  const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
+  if(melQty>0){
+    const m=document.getElementById('mel-method')?.value==='sqft'?'sq ft':'sheets';
+    parts.push(`${melQty} ${m} of melamine`);
+  }
+  const doorParts=[];
+  document.querySelectorAll('#door-items .item-block').forEach(b=>{
+    const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
+    if(sqft>0){const lbl=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'doors';doorParts.push(`${sqft} sq ft of ${lbl}`);}
+  });
+  if(doorParts.length)parts.push(doorParts.join(' + ')+' doors');
+  let drwCount=0;
+  document.querySelectorAll('#drawer-items .item-block').forEach(b=>{drwCount+=parseFloat(b.querySelector('.dqty')?.value)||0;});
+  if(drwCount>0)parts.push(`${drwCount} drawer box${drwCount>1?'es':''}`);
+  const hrs=vn('hlp-hrs',8);
+  let desc='This proposal covers a custom closet system';
+  if(parts.length)desc+=' built with '+parts.join(', ');
+  if(hrs>0)desc+=`. Installation is estimated at ${hrs} hours and includes all labor, hardware, and clean-up`;
+  desc+='. All units are constructed from ¾" melamine with finished edges and installed to fit your exact space.';
+  const el=document.getElementById('p-desc');if(el)el.value=desc;
+  savePropFields();
+}
+function addProposalImages(input){
+  Array.from(input.files).forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      proposalImages.push({name:file.name,dataUrl:e.target.result});
+      renderProposalImagePreview();savePropFields();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+function removeProposalImage(idx){
+  proposalImages.splice(idx,1);renderProposalImagePreview();savePropFields();
+}
+function renderProposalImagePreview(){
+  const el=document.getElementById('p-img-preview');if(!el)return;
+  el.innerHTML=proposalImages.map((img,i)=>`<div style="position:relative;width:80px;height:80px"><img src="${img.dataUrl}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border)"><button onclick="removeProposalImage(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e74c3c;border:none;color:#fff;font-size:13px;cursor:pointer;line-height:1;font-weight:bold">×</button></div>`).join('');
+}
+function rmItem(id,type){
+  document.getElementById(id)?.remove();
+  if(type==='door')calcDoors();else if(type==='drw')calcDrawers();else if(type==='special')calcSpecial();else calcHw();
+}
+function toggleP(key){document.getElementById(key+'-bd').classList.toggle('hide');}
+
+function buildProposalLines(){
+  const lines=[];
+  if(melSl>0)lines.push(document.getElementById('mel-type').value==='white'?'White Melamine':'Color Melamine');
+  document.querySelectorAll('#door-items .item-block').forEach(b=>{
+    const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
+    if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push(`${sname} Doors`);}
+  });
+  document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
+    const t=b.querySelector('select')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
+    if(q>0)lines.push(`${t==='sh'?'Shaker':'White Flat'} Drawer Boxes (qty ${q})`);
+  });
+  document.querySelectorAll('#hw-items .item-block').forEach(b=>{
+    const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
+    const lbl=document.getElementById(bid+'-t')?.options[document.getElementById(bid+'-t').selectedIndex]?.text||'Hardware';
+    if(q>0)lines.push(`${lbl} (qty ${q})`);
+  });
+  document.querySelectorAll('#special-items .item-block').forEach(b=>{
+    const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
+    const sel=document.getElementById(bid+'-t');const idx=parseInt(sel?.value)||0;
+    const lbl=SPECIAL_ITEMS[idx]?.l||'Special Item';
+    if(q>0)lines.push(`${lbl} (qty ${q})`);
+  });
+  return lines;
+}
+function getProposalData(){
+  const job=jobs.find(j=>j.id===editId);if(!job)return null;
+  const sale=melSl+doorSl+drwSl+hwSl+spSl;if(!sale){alert('Add pricing in the Pricing tab first.');return null;}
+  const disc=vn('p-disc',0),tax=vn('p-tax',0),addr=document.getElementById('p-addr')?.value||'',notes=document.getElementById('p-notes')?.value||'';
+  const desc=document.getElementById('p-desc')?.value||'';
+  const plans=document.getElementById('p-plans')?.checked||false;
+  const subtotal=sale,afterDisc=subtotal-disc,total=afterDisc+tax,deposit=total/2;
+  const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,subtotal,afterDisc,total,deposit,today,propNum:'MC-'+Date.now().toString().slice(-6),lines:buildProposalLines()};
+}
+function buildProposalHTML(d){
+  const rowsHtml=d.lines.map(l=>`<tr><td>${l}</td></tr>`).join('');
+  const discRow=d.disc>0?`<div class="prop-trow"><span>Discount</span><span>-$${d.disc.toFixed(2)}</span></div>`:'';
+  const taxRow=d.tax>0?`<div class="prop-trow"><span>Tax</span><span>$${d.tax.toFixed(2)}</span></div>`:'';
+  return`<div class="prop-co"><div><div class="prop-co-name">Maximum Closets</div><div style="font-size:11px;color:#888;margin-top:3px">Custom Closet Installation · Long Island, NY</div></div>
+    <div class="prop-co-info">james@maximumclosets.com<br>Proposal #${d.propNum}<br>${d.today}</div></div>
+    <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${d.job.name}${d.addr?'<br>'+d.addr:''}${d.job.phone?'<br>'+d.job.phone:''}${d.job.email?'<br>'+d.job.email:''}</p></div>
+    <div class="prop-meta-box"><h4>Project Details</h4><p>Custom Closet Installation${d.job.source?'<br>Ref: '+d.job.source:''}</p></div></div>
+    <p class="prop-title">Line Items</p>
+    <table class="prop-table"><thead><tr><th>What's Included</th></tr></thead><tbody>${rowsHtml||'<tr><td style="color:#aaa;font-style:italic">No line items</td></tr>'}</tbody></table>
+    <div class="prop-totals"><div class="prop-trow"><span>Subtotal</span><span>$${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>${discRow}${taxRow}
+    <div class="prop-trow"><span><strong>Total</strong></span><span><strong>$${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span></div></div>
+    <div class="prop-deposit"><div class="dl">50% Deposit Required to Schedule</div><div class="da">$${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+    ${d.desc?`<div style="background:#22263a;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#c8cad8;line-height:1.7"><strong style="color:#e8eaf0;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
+    ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">${d.images.map(img=>`<img src="${img.dataUrl}" style="width:100%;border-radius:8px;border:1px solid #2e3248;object-fit:cover;max-height:160px">`).join('')}</div></div>`:''}
+    ${d.plans?`<div style="background:#0d2b1a;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#4aad78;font-weight:600">📐 Design plans / drawings are included with this proposal</div>`:''}
+    ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
+    <div class="prop-terms"><strong>Terms & Conditions:</strong> A 50% deposit is required before scheduling. The remaining balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Maximum Closets is not responsible for pre-existing structural issues. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge. This proposal is valid for 30 days.</div>`;
+}
+function previewProposal(){const d=getProposalData();if(!d)return;document.getElementById('prop-doc').innerHTML=buildProposalHTML(d);document.getElementById('prop-overlay').classList.add('open');}
+function printProposal(){const d=getProposalData();if(!d)return;document.getElementById('prop-doc').innerHTML=buildProposalHTML(d);document.getElementById('prop-overlay').classList.add('open');setTimeout(()=>window.print(),300);}
+function closePropPreview(){document.getElementById('prop-overlay').classList.remove('open');}
+function sendProposalEmail(){
+  const job=jobs.find(j=>j.id===editId);if(!job)return;const d=getProposalData();if(!d)return;
+  const to=job.email||'',subject=encodeURIComponent('Your Custom Closet Proposal — Maximum Closets');
+  const lines=d.lines.map(l=>'  • '+l).join('\n');
+  const body=encodeURIComponent(`Hi ${d.job.name.split(' ')[0]},\n\nThank you for choosing Maximum Closets!\n\nWHAT'S INCLUDED:\n${lines||'  Custom closet installation'}\n\nPRICING:\nSubtotal: $${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}${d.disc>0?'\nDiscount: -$'+d.disc.toFixed(2):''}${d.tax>0?'\nTax: $'+d.tax.toFixed(2):''}\nTotal: $${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}\n50% Deposit Due: $${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}\n${d.notes?'\n'+d.notes:''}\n\nTERMS:\nA 50% deposit is required before scheduling. The remaining balance is due upon completion. This proposal is valid for 30 days.\n\nMaximum Closets\njames@maximumclosets.com`);
+  window.location.href=`mailto:${to}?subject=${subject}&body=${body}`;
+}
+document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
+
+function render(){
+  const board=document.getElementById('board');board.innerHTML='';
+  STAGES.forEach((stage,si)=>{
+    const sj=jobs.filter(j=>j.stage===si);
+    const col=document.createElement('div');col.className='col';
+    col.innerHTML=`<div class="col-hd"><div class="col-dot" style="background:${SCOLS[si]}"></div><h2>${stage}</h2><span class="col-cnt">${sj.length}</span></div>
+      <div class="cards" id="col-${si}"></div><div class="col-add" onclick="openAdd(${si})">＋ Add a card</div>`;
+    board.appendChild(col);
+    const ce=col.querySelector(`#col-${si}`);
+    sj.forEach(job=>{
+      const card=document.createElement('div');card.className='card';card.onclick=()=>openEdit(job.id);
+      const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
+      const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
+      const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+      const pr=getProgress(job.id,si);const hasL=(CL[si]||[]).length>0&&pr.tot>0;
+      card.innerHTML=`${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
+        <div class="card-name">${job.name}</div>
+        ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
+        ${job.source?`<div class="card-src">📌 ${job.source}</div>`:''}
+        ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
+        ${ds||hasL?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''}</div>`:''}
+        ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
+        ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}`;
+      ce.appendChild(card);
+    });
+  });
+  const active=jobs.filter(j=>j.stage<6);
+  const pip=active.reduce((s,j)=>s+(j.sale||0),0);
+  const com=jobs.filter(j=>j.stage>=3&&j.stage<6).reduce((s,j)=>s+(j.sale||0),0);
+  const cl=jobs.filter(j=>j.stage===6).reduce((s,j)=>s+(j.sale||0),0);
+  document.getElementById('hstats').textContent=`${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
+}
+
+function mTab(name){
+  document.querySelectorAll('.mtab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.mtpane').forEach(p=>p.classList.remove('on'));
+  document.querySelector(`.mtab[onclick="mTab('${name}')"]`).classList.add('on');
+  document.getElementById('mp-'+name).classList.add('on');
+  if(name==='checklist'&&editId){const job=jobs.find(j=>j.id===editId);if(job)renderCL(job.id,job.stage);}
+}
+function resetPricing(){
+  melC=0;melSl=0;doorC=0;doorSl=0;drwC=0;drwSl=0;hwC=0;hwSl=0;hlpC=0;spC=0;spSl=0;doorIdx=0;drwIdx=0;hwIdx=0;spIdx=0;
+  document.getElementById('door-items').innerHTML='';document.getElementById('drawer-items').innerHTML='';document.getElementById('hw-items').innerHTML='';document.getElementById('special-items').innerHTML='';
+  document.getElementById('mel-qty').value='';document.getElementById('hlp-hrs').value=P.hlpHrs;
+  document.getElementById('hlp-rate').value=P.hlpRate;document.getElementById('lead-pct').value=P.leadPct;document.getElementById('owner-pct').value=0;
+  document.getElementById('mel-type').value='white';document.getElementById('mel-method').value='sqft';melTypeChange();
+  ['mel-badge','doors-badge','drawers-badge','hw-badge','labor-badge'].forEach(id=>document.getElementById(id).textContent='$0');
+  ['profit-amt','s-kcd','s-cost','s-mel','s-doors','s-drawers','s-hw','s-hlp','s-lead','s-owner','s-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='$0';});
+  document.getElementById('profit-badge').textContent='$0 profit';
+  const pm=document.getElementById('profit-marg');if(pm)pm.textContent='0% margin';
+}
+function loadPricingForJob(jid){
+  const pd=pricingData[jid];if(!pd?.inputs)return;const inp=pd.inputs;isRestoring=true;
+  const mtEl=document.getElementById('mel-type'),mmEl=document.getElementById('mel-method');
+  if(mtEl)mtEl.value=inp.melType||'white';if(mmEl)mmEl.value=inp.melMethod||'sqft';melTypeChange();
+  if(inp.melQty)document.getElementById('mel-qty').value=inp.melQty;
+  if(inp.melCost)document.getElementById('mel-cost').value=inp.melCost;
+  if(inp.melSell)document.getElementById('mel-sell').value=inp.melSell;
+  (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl)muEl.value=d.mu;}});
+  (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;}});
+  (inp.hardware||[]).forEach(h=>{addHw();const bid='hw-'+hwIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=h.preset;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=h.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=h.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=h.sell;});
+  if(inp.hlpHrs!==undefined){const e=document.getElementById('hlp-hrs');if(e)e.value=inp.hlpHrs;}
+  if(inp.hlpRate!==undefined){const e=document.getElementById('hlp-rate');if(e)e.value=inp.hlpRate;}
+  if(inp.leadPct!==undefined){const e=document.getElementById('lead-pct');if(e)e.value=inp.leadPct;}
+  if(inp.ownerPct!==undefined){const e=document.getElementById('owner-pct');if(e)e.value=inp.ownerPct;}
+  const addrEl=document.getElementById('p-addr');if(addrEl)addrEl.value=inp.addr||'';
+  const discEl=document.getElementById('p-disc');if(discEl)discEl.value=inp.pDisc||'';
+  const taxEl=document.getElementById('p-tax');if(taxEl)taxEl.value=inp.pTax||'';
+  const notesEl=document.getElementById('p-notes');if(notesEl)notesEl.value=inp.pNotes||'';
+  const descEl=document.getElementById('p-desc');if(descEl)descEl.value=inp.pDesc||'';
+  const plansEl=document.getElementById('p-plans');if(plansEl)plansEl.checked=inp.pPlans||false;
+  proposalImages=pricingData[jid]?.proposalImages||[];renderProposalImagePreview();
+  (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=si.itemIdx;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;});
+  isRestoring=false;calcMel();calcDoors();calcDrawers();calcHw();calcSpecial();calcLabor();
+}
+function openAdd(stage=0){
+  editId=null;selLbls=[];document.getElementById('mtitle').textContent='New Job';
+  ['f-name','f-phone','f-email','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-stage').value=stage;document.getElementById('f-source').value='';document.getElementById('f-date').value='';
+  document.querySelectorAll('.lopt').forEach(el=>el.classList.remove('on'));
+  document.getElementById('p-addr').value='';document.getElementById('p-notes').value='';document.getElementById('p-disc').value='';
+  document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';
+  mTab('info');document.getElementById('overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('f-name').focus(),100);
+}
+function openEdit(id){
+  const job=jobs.find(j=>j.id===id);if(!job)return;
+  editId=id;selLbls=[...(job.labels||[])];
+  document.getElementById('mtitle').textContent=job.name;
+  document.getElementById('f-name').value=job.name;document.getElementById('f-phone').value=job.phone||'';
+  document.getElementById('f-email').value=job.email||'';document.getElementById('f-stage').value=job.stage;
+  document.getElementById('f-source').value=job.source||'';document.getElementById('f-date').value=job.date||'';
+  document.getElementById('f-notes').value=job.notes||'';
+  document.querySelectorAll('.lopt').forEach(el=>el.classList.toggle('on',selLbls.includes(el.dataset.v)));
+  document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
+  document.getElementById('p-notes').value='';document.getElementById('p-addr').value='';document.getElementById('p-disc').value='';
+  resetPricing();loadPricingForJob(id);renderSchedList(id);mTab('info');
+  document.getElementById('overlay').classList.add('open');
+}
+function toggleLbl(el){const v=el.dataset.v;el.classList.toggle('on');selLbls=selLbls.includes(v)?selLbls.filter(l=>l!==v):[...selLbls,v];}
+
+function saveCardAndToast(toastId='info-toast'){
+  saveCard();
+  const t=document.getElementById(toastId);
+  if(t){t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);}
+}
+function captureInfoFields(){
+  return{name:document.getElementById('f-name').value.trim(),labels:[...selLbls],stage:parseInt(document.getElementById('f-stage').value),
+    source:document.getElementById('f-source').value,date:document.getElementById('f-date').value,
+    phone:document.getElementById('f-phone').value.trim(),email:document.getElementById('f-email').value.trim(),notes:document.getElementById('f-notes').value.trim()};
+}
+function saveCard(){
+  const data=captureInfoFields();
+  if(!data.name){alert('Please enter a customer name.');return;}
+  if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0)jobs[idx]={...jobs[idx],...data};}
+  else{const nj={id:uid(),...data,sale:0,cost:0};jobs.push(nj);editId=nj.id;}
+  saveData();render();
+  const job=jobs.find(j=>j.id===editId);
+  if(job)document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
+  document.getElementById('mtitle').textContent=data.name;
+}
+function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){job.stage=si;saveData();render();closeModal();}}
+function deleteJob(){
+  if(!editId||!confirm('Delete this job?'))return;
+  jobs=jobs.filter(j=>j.id!==editId);delete clSt[editId];delete pricingData[editId];
+  saveData();render();closeModal();
+}
+function closeModal(){
+  if(editId){
+    const infoData=captureInfoFields();
+    if(infoData.name){
+      const idx=jobs.findIndex(j=>j.id===editId);
+      if(idx>=0)jobs[idx]={...jobs[idx],...infoData};
+    }
+    savePropFields();
+    if(pricingData[editId]){
+      window._pw={id:editId,data:JSON.parse(JSON.stringify(pricingData[editId]))};
+    }
+    saveData();
+    if(window.fbFlush)window.fbFlush();
+  }
+  document.getElementById('overlay').classList.remove('open');editId=null;
+}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
+
+function openSettings(){
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
+  for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
+  document.getElementById('set-overlay').classList.add('open');
+}
+function closeSettings(){document.getElementById('set-overlay').classList.remove('open');}
+document.getElementById('set-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('set-overlay'))closeSettings();});
+function saveSettings(){
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
+  for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
+  saveP(P);if(window.fbSave)window.fbSave();
+  const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
+}
+function toggleSet(id){document.getElementById(id).classList.toggle('hide');}
+
+loadP();
+render();renderAgenda();
+</script>
+</body>
+</html>
+</new_string>
+</new_string>
