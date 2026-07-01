@@ -1163,6 +1163,7 @@ function openAdd(stage=0){
 function openEdit(id){
   const job=jobs.find(j=>j.id===id);if(!job)return;
   editId=id;selLbls=[...(job.labels||[])];
+  isRestoring=true;
   document.getElementById('mtitle').textContent=job.name;
   document.getElementById('f-name').value=job.name;document.getElementById('f-phone').value=job.phone||'';
   document.getElementById('f-email').value=job.email||'';document.getElementById('f-stage').value=job.stage;
