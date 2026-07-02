@@ -1071,6 +1071,7 @@ function sendProposalEmail(){
   const to=job.email||'',subject=encodeURIComponent('Your Custom Closet Proposal — Maximum Closets');
   const lines=d.lines.map(l=>'  • '+l).join('\n');
   const body=encodeURIComponent(`Hi ${d.job.name.split(' ')[0]},\n\nThank you for choosing Maximum Closets!\n\nWHAT'S INCLUDED:\n${lines||'  Custom closet installation'}\n\nPRICING:\nSubtotal: $${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}${d.disc>0?'\nDiscount: -$'+d.disc.toFixed(2):''}${d.tax>0?'\nTax: $'+d.tax.toFixed(2):''}\nTotal: $${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}\n50% Deposit Due: $${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}\n${d.notes?'\n'+d.notes:''}\n\nTERMS:\nA 50% deposit is required before scheduling. The remaining balance is due upon completion. This proposal is valid for 30 days.\n\nMaximum Closets\njames@maximumclosets.com`);
+  if(d.images&&d.images.length){d.images.forEach((img,i)=>{setTimeout(()=>{const a=document.createElement('a');a.href=img.dataUrl;a.download=img.name||('proposal-photo-'+(i+1)+'.jpg');document.body.appendChild(a);a.click();a.remove();},i*350);});}
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`,'_blank');
 }
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
