@@ -239,7 +239,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
   <input type="password" id="lock-pin" placeholder="Code" autocomplete="current-password" />
   <button id="lock-btn">Unlock</button>
   <p class="lerr" id="lock-err"></p>
-  <p class="lver">v2.0 · Jul 3 2026</p>
+  <p class="lver">v2.1 · Jul 3 2026</p>
 </div>
 
 <header>
@@ -248,7 +248,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
     <div class="hstats" id="hstats">Loading…</div>
   </div>
   <div style="display:flex;gap:7px;align-items:center">
-    <span style="font-size:9px;color:rgba(255,255,255,0.4);font-weight:700">v2.0</span>
+    <span style="font-size:9px;color:rgba(255,255,255,0.4);font-weight:700">v2.1</span>
     <span title="Sync status"><span class="sync-dot syncing" id="sync-dot"></span></span>
     <button class="hadd" onclick="lockDevice()" title="Lock this device" style="background:rgba(255,255,255,0.15)">🔒</button>
     <button class="hadd" onclick="openSettings()" style="background:rgba(255,255,255,0.15)">⚙️</button>
@@ -739,10 +739,10 @@ function loadData(){
   try{schedData=JSON.parse(localStorage.getItem('mc-sched')||'{}')}catch(e){schedData={}}
 }
 function saveData(){
-  localStorage.setItem('mc-jobs2',JSON.stringify(jobs));
-  localStorage.setItem('mc-cl2',JSON.stringify(clSt));
-  localStorage.setItem('mc-pd',JSON.stringify(pricingData));
-  localStorage.setItem('mc-sched',JSON.stringify(schedData));
+  try{localStorage.setItem('mc-jobs2',JSON.stringify(jobs));}catch(e){}
+  try{localStorage.setItem('mc-cl2',JSON.stringify(clSt));}catch(e){}
+  try{localStorage.setItem('mc-pd',JSON.stringify(pricingData));}catch(e){}
+  try{localStorage.setItem('mc-sched',JSON.stringify(schedData));}catch(e){}
   if(window.fbSave)window.fbSave();
 }
 
@@ -1103,8 +1103,16 @@ function addProposalImages(input){
   Array.from(input.files).forEach(file=>{
     const reader=new FileReader();
     reader.onload=e=>{
-      proposalImages.push({name:file.name,dataUrl:e.target.result});
-      renderProposalImagePreview();savePropFields();
+      const im=new Image();
+      im.onload=()=>{
+        const max=1200;let w=im.width,h=im.height;
+        if(w>max||h>max){const s=Math.min(max/w,max/h);w=Math.round(w*s);h=Math.round(h*s);}
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(im,0,0,w,h);
+        proposalImages.push({name:file.name,dataUrl:c.toDataURL('image/jpeg',0.72)});
+        renderProposalImagePreview();savePropFields();
+      };
+      im.src=e.target.result;
     };
     reader.readAsDataURL(file);
   });
