@@ -1009,14 +1009,17 @@ function calcLabor(){
 }
 function calcAll(){
   const materialSale=melSl+doorSl+drwSl+hwSl+spSl;
+  const materialCost=melC+doorC+drwC+hwC+spC;
   const lp=vn('lead-pct',P.leadPct)/100,op=vn('owner-pct',0)/100;
   const lc=materialSale*lp,oc=materialSale*op;
   const employeeSum=hlpC+lc+oc;
-  // Employee section (helper cost + owner% + installer%) adds into the displayed Total,
-  // then gets subtracted back out (along with material costs) to compute the real Profit.
+  // Employee section (helper cost + owner% + installer%) adds into the displayed Total
+  // (sale) for visibility, but Total Cost stays material-only. Profit is computed from
+  // the material sale directly (not the employee-inflated Total) so higher helper
+  // hours/owner %/installer % actually reduce Profit instead of canceling out.
   const sale=materialSale+employeeSum;
-  const tot=melC+doorC+drwC+hwC+spC+employeeSum;
-  const profit=sale-tot,margin=sale>0?(profit/sale*100):0;
+  const tot=materialCost;
+  const profit=materialSale-employeeSum-materialCost,margin=sale>0?(profit/sale*100):0;
   const profitEl=document.getElementById('profit-amt');
   if(profitEl){profitEl.textContent=(profit<0?'-':'')+fmtD(profit);profitEl.style.color=profit<0?'#ff6b6b':'white';}
   const setT=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
@@ -1027,7 +1030,7 @@ function calcAll(){
   document.getElementById('profit-badge').textContent=(profit<0?'-':'')+fmt(profit)+' profit';
   if(editId){
     const job=jobs.find(j=>j.id===editId);
-    if(job){job.sale=Math.round(sale);job.cost=Math.round(tot);}
+    if(job){job.sale=Math.round(sale);job.cost=Math.round(tot);job.profit=Math.round(profit);}
     pricingData[editId]={...(pricingData[editId]||{}),kcd:sale,melC,doorC,drwC,hwC,spC,hlpC,lc,oc,tot,profit};
     snapshotInputs();saveData();render();
   }
@@ -1219,7 +1222,7 @@ function render(){
       const pr=getProgress(job.id,si);const hasL=(CL[si]||[]).length>0&&pr.tot>0;
       card.innerHTML=`${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
-        ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
+        ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.profit!==undefined?job.profit:(job.sale-job.cost)).toLocaleString():''}</div>`:''}
         ${job.source?`<div class="card-src">📌 ${job.source}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
         ${ds||hasL?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''}</div>`:''}
