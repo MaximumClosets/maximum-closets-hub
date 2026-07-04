@@ -14,7 +14,6 @@
 :root {
   color-scheme: dark;
   --green:#4aad78; --green2:#3a9463; --green-bg:#0d2b1a; --green-border:#1a5c38;
-  --gold:#b8860b; --gold2:#96700a; --gold-bg:#2b2208; --gold-border:#5c4a10;
   --board-bg:#0d1016; --col-bg:#161824; --card-bg:#1e2233;
   --text:#b8bccb; --muted:#6e738a; --border:#272b3e; --input-bg:#161824;
   --red:#c0392b; --orange:#d08a0a;
@@ -107,7 +106,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .lopt.inprog{background:#07232b;border:1.5px solid #0e4f60;color:#3aadca}
 .lopt.finalpay{background:#280d0d;border:1.5px solid #601a1a;color:#b05050}
 .pcard{border:1.5px solid var(--border);border-radius:9px;margin-bottom:10px;overflow:hidden}
-.pcard-hd{background:var(--gold);color:#fff;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.pcard-hd{background:var(--green);color:#fff;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
 .pcard-hd h4{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .pcard-bd{padding:11px 12px}
 .pcard-bd.hide{display:none}
@@ -116,7 +115,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .item-block{border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;position:relative}
 .item-block .ititle{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:7px}
 .rm{position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:50%;background:#fee2e2;border:none;color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:bold}
-.add-line{width:100%;padding:8px;background:#faf3df;border:1.5px dashed var(--gold-border);border-radius:8px;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
+.add-line{width:100%;padding:8px;background:#f0faf4;border:1.5px dashed var(--green-border);border-radius:8px;color:var(--green);font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
 .profit-big{background:linear-gradient(135deg,#1a5c38,#2e7d4f);color:#fff;border-radius:var(--r);padding:16px;text-align:center;margin-bottom:12px}
 .profit-big .plbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.8;margin-bottom:3px}
 .profit-big .pamt{font-size:38px;font-weight:800;letter-spacing:-1px}
@@ -153,7 +152,6 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .mf{padding:10px 15px 14px;display:flex;gap:7px;justify-content:flex-end;border-top:1px solid var(--border)}
 .btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none}
 .btn-p{background:var(--green);color:#fff}
-#mp-pricing .btn-p{background:var(--gold)}
 .btn-s{background:#f4f5f7;color:var(--text)}
 .btn-d{background:#eb5a46;color:#fff}
 .set-sec{border:1.5px solid var(--border);border-radius:9px;margin-bottom:10px;overflow:hidden}
@@ -1003,23 +1001,16 @@ function calcSpecial(){
   document.getElementById('special-badge').textContent=fmt(spSl);calcAll();
 }
 function calcLabor(){
-  const hrs=vn('hlp-hrs',0);
+  const hrsEl=document.getElementById('hlp-hrs');
+  const hrs=(!hrsEl||hrsEl.value==='')?P.hlpHrs:parseFloat(hrsEl.value)||0;
   const rate=vn('hlp-rate',P.hlpRate);hlpC=hrs*rate;
   document.getElementById('hlp-res').textContent=fmt(hlpC);document.getElementById('labor-badge').textContent=fmt(hlpC);calcAll();
 }
 function calcAll(){
-  const materialSale=melSl+doorSl+drwSl+hwSl+spSl;
-  const materialCost=melC+doorC+drwC+hwC+spC;
+  const sale=melSl+doorSl+drwSl+hwSl+spSl;
   const lp=vn('lead-pct',P.leadPct)/100,op=vn('owner-pct',0)/100;
-  const lc=materialSale*lp,oc=materialSale*op;
-  const employeeSum=hlpC+lc+oc;
-  // Employee section (helper cost + owner% + installer%) adds into the displayed Total
-  // (sale) for visibility, but Total Cost stays material-only. Profit is computed from
-  // the material sale directly (not the employee-inflated Total) so higher helper
-  // hours/owner %/installer % actually reduce Profit instead of canceling out.
-  const sale=materialSale+employeeSum;
-  const tot=materialCost;
-  const profit=materialSale-employeeSum-materialCost,margin=sale>0?(profit/sale*100):0;
+  const lc=sale*lp,oc=sale*op,tot=melC+doorC+drwC+hwC+spC+hlpC+lc+oc;
+  const profit=sale-tot,margin=sale>0?(profit/sale*100):0;
   const profitEl=document.getElementById('profit-amt');
   if(profitEl){profitEl.textContent=(profit<0?'-':'')+fmtD(profit);profitEl.style.color=profit<0?'#ff6b6b':'white';}
   const setT=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
@@ -1030,13 +1021,14 @@ function calcAll(){
   document.getElementById('profit-badge').textContent=(profit<0?'-':'')+fmt(profit)+' profit';
   if(editId){
     const job=jobs.find(j=>j.id===editId);
-    if(job){job.sale=Math.round(sale);job.cost=Math.round(tot);job.profit=Math.round(profit);}
+    if(job){job.sale=Math.round(sale);job.cost=Math.round(tot);}
     pricingData[editId]={...(pricingData[editId]||{}),kcd:sale,melC,doorC,drwC,hwC,spC,hlpC,lc,oc,tot,profit};
     snapshotInputs();saveData();render();
   }
 }
 function snapshotInputs(){
   if(!editId||isRestoring)return;
+  if(!pricingData[editId])pricingData[editId]={};
   const doors=[];
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');
@@ -1222,7 +1214,7 @@ function render(){
       const pr=getProgress(job.id,si);const hasL=(CL[si]||[]).length>0&&pr.tot>0;
       card.innerHTML=`${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
-        ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.profit!==undefined?job.profit:(job.sale-job.cost)).toLocaleString():''}</div>`:''}
+        ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
         ${job.source?`<div class="card-src">📌 ${job.source}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
         ${ds||hasL?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''}</div>`:''}
@@ -1246,23 +1238,27 @@ function mTab(name){
   if(name==='checklist'&&editId){const job=jobs.find(j=>j.id===editId);if(job)renderCL(job.id,job.stage);}
 }
 function resetPricing(){
+  const wasRestoring=isRestoring;isRestoring=true;
   melC=0;melSl=0;doorC=0;doorSl=0;drwC=0;drwSl=0;hwC=0;hwSl=0;hlpC=0;spC=0;spSl=0;doorIdx=0;drwIdx=0;hwIdx=0;spIdx=0;
   document.getElementById('door-items').innerHTML='';document.getElementById('drawer-items').innerHTML='';document.getElementById('hw-items').innerHTML='';document.getElementById('special-items').innerHTML='';
-  document.getElementById('mel-qty').value='';document.getElementById('hlp-hrs').value=0;
+  document.getElementById('mel-qty').value='';document.getElementById('hlp-hrs').value=P.hlpHrs;
   document.getElementById('hlp-rate').value=P.hlpRate;document.getElementById('lead-pct').value=P.leadPct;document.getElementById('owner-pct').value=0;
   document.getElementById('mel-type').value='white';document.getElementById('mel-method').value='sqft';melTypeChange();
   ['mel-badge','doors-badge','drawers-badge','hw-badge','labor-badge'].forEach(id=>document.getElementById(id).textContent='$0');
   ['profit-amt','s-kcd','s-cost','s-mel','s-doors','s-drawers','s-hw','s-hlp','s-lead','s-owner','s-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='$0';});
   document.getElementById('profit-badge').textContent='$0 profit';
   const pm=document.getElementById('profit-marg');if(pm)pm.textContent='0% margin';
+  isRestoring=wasRestoring;
 }
 function loadPricingForJob(jid){
+  const pw=window._pw;
+  if(pw&&pw.id===jid&&pw.data)pricingData[jid]=JSON.parse(JSON.stringify(pw.data));
   const pd=pricingData[jid];if(!pd?.inputs)return;const inp=pd.inputs;isRestoring=true;
   const mtEl=document.getElementById('mel-type'),mmEl=document.getElementById('mel-method');
   if(mtEl)mtEl.value=inp.melType||'white';if(mmEl)mmEl.value=inp.melMethod||'sqft';melTypeChange();
-  if(inp.melQty!==undefined)document.getElementById('mel-qty').value=inp.melQty;
-  if(inp.melCost!==undefined)document.getElementById('mel-cost').value=inp.melCost;
-  if(inp.melSell!==undefined)document.getElementById('mel-sell').value=inp.melSell;
+  if(inp.melQty)document.getElementById('mel-qty').value=inp.melQty;
+  if(inp.melCost)document.getElementById('mel-cost').value=inp.melCost;
+  if(inp.melSell)document.getElementById('mel-sell').value=inp.melSell;
   (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl)muEl.value=d.mu;}});
   (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;}});
   (inp.hardware||[]).forEach(h=>{addHw();const bid='hw-'+hwIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=h.preset;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=h.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=h.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=h.sell;});
@@ -1339,6 +1335,7 @@ function closeModal(){
       const idx=jobs.findIndex(j=>j.id===editId);
       if(idx>=0)jobs[idx]={...jobs[idx],...infoData};
     }
+    snapshotInputs();
     savePropFields();
     if(pricingData[editId]){
       window._pw={id:editId,data:JSON.parse(JSON.stringify(pricingData[editId]))};
