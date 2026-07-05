@@ -432,6 +432,11 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
       <input type="file" id="p-imgs" multiple accept="image/*" onchange="addProposalImages(this)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:13px;cursor:pointer"/>
       <div id="p-img-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
+    <div class="f">
+      <label>Plans / Drawings (PDF)</label>
+      <input type="file" id="p-plans-pdf" accept="application/pdf" onchange="addPlansPdf(this)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:13px;cursor:pointer"/>
+      <div id="p-plans-pdf-preview" style="margin-top:8px"></div>
+    </div>
     <div class="f" style="display:flex;align-items:center;gap:8px">
       <input type="checkbox" id="p-plans" onchange="savePropFields()" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0"/>
       <label for="p-plans" style="font-size:13px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0">Plans / drawings included with this proposal</label>
@@ -1061,6 +1066,7 @@ function snapshotInputs(){
 }
 
 let proposalImages=[];
+let proposalPlansPdf=null;
 function savePropFields(){
   if(!editId)return;
   if(!pricingData[editId])pricingData[editId]={};if(!pricingData[editId].inputs)pricingData[editId].inputs={};
@@ -1071,6 +1077,7 @@ function savePropFields(){
   pricingData[editId].inputs.pDesc=document.getElementById('p-desc')?.value||'';
   pricingData[editId].inputs.pPlans=document.getElementById('p-plans')?.checked||false;
   pricingData[editId].proposalImages=proposalImages;
+  pricingData[editId].proposalPlansPdf=proposalPlansPdf;
   saveData();
 }
 function savePropFieldsAndToast(){
@@ -1124,6 +1131,28 @@ function addProposalImages(input){
 function removeProposalImage(idx){
   proposalImages.splice(idx,1);renderProposalImagePreview();savePropFields();
 }
+function addPlansPdf(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    proposalPlansPdf={name:file.name,dataUrl:e.target.result};
+    renderPlansPdfPreview();savePropFields();
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+function removePlansPdf(){
+  proposalPlansPdf=null;renderPlansPdfPreview();savePropFields();
+}
+function renderPlansPdfPreview(){
+  const el=document.getElementById('p-plans-pdf-preview');if(!el)return;
+  if(!proposalPlansPdf){el.innerHTML='';return;}
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;background:#22263a;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text)">
+    <span>📎 ${proposalPlansPdf.name}</span>
+    <a href="${proposalPlansPdf.dataUrl}" download="${proposalPlansPdf.name}" style="color:var(--green);text-decoration:underline;margin-left:auto">Download</a>
+    <button onclick="removePlansPdf()" style="background:#e74c3c;border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:13px;line-height:1;font-weight:bold;flex-shrink:0">×</button>
+  </div>`;
+}
 function renderProposalImagePreview(){
   const el=document.getElementById('p-img-preview');if(!el)return;
   el.innerHTML=proposalImages.map((img,i)=>`<div style="position:relative;width:80px;height:80px"><img src="${img.dataUrl}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border)"><button onclick="removeProposalImage(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e74c3c;border:none;color:#fff;font-size:13px;cursor:pointer;line-height:1;font-weight:bold">×</button></div>`).join('');
@@ -1166,7 +1195,7 @@ function getProposalData(){
   const plans=document.getElementById('p-plans')?.checked||false;
   const subtotal=sale,afterDisc=subtotal-disc,total=afterDisc+tax,deposit=total/2;
   const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-  return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,subtotal,afterDisc,total,deposit,today,propNum:'MC-'+Date.now().toString().slice(-6),lines:buildProposalLines()};
+  return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,plansPdf:proposalPlansPdf,subtotal,afterDisc,total,deposit,today,propNum:'MC-'+Date.now().toString().slice(-6),lines:buildProposalLines()};
 }
 function buildProposalHTML(d){
   const rowsHtml=d.lines.map(l=>`<tr><td>${l}</td></tr>`).join('');
@@ -1184,6 +1213,7 @@ function buildProposalHTML(d){
     ${d.desc?`<div style="background:#22263a;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#c8cad8;line-height:1.7"><strong style="color:#e8eaf0;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
     ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">${d.images.map(img=>`<img src="${img.dataUrl}" style="width:100%;border-radius:8px;border:1px solid #2e3248;object-fit:cover;max-height:160px">`).join('')}</div></div>`:''}
     ${d.plans?`<div style="background:#0d2b1a;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#4aad78;font-weight:600">📐 Design plans / drawings are included with this proposal</div>`:''}
+    ${d.plansPdf?`<div style="background:#22263a;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#e8eaf0;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><a href="${d.plansPdf.dataUrl}" download="${d.plansPdf.name}" style="color:#4aad78;font-weight:600;text-decoration:underline">${d.plansPdf.name}</a></div>`:''}
     ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
     <div class="prop-terms"><strong>Terms & Conditions:</strong> A 50% deposit is required before scheduling. The remaining balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Maximum Closets is not responsible for pre-existing structural issues. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge. This proposal is valid for 30 days.</div>`;
 }
@@ -1195,6 +1225,7 @@ function sendProposalEmail(){
   const to=job.email||'',subject=encodeURIComponent('Your Custom Closet Proposal — Maximum Closets');
   const lines=d.lines.map(l=>'  • '+l).join('\n');
   const body=encodeURIComponent(`Hi ${d.job.name.split(' ')[0]},\n\nThank you for choosing Maximum Closets!\n\nWHAT'S INCLUDED:\n${lines||'  Custom closet installation'}\n\nPRICING:\nSubtotal: $${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}${d.disc>0?'\nDiscount: -$'+d.disc.toFixed(2):''}${d.tax>0?'\nTax: $'+d.tax.toFixed(2):''}\nTotal: $${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}\n50% Deposit Due: $${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}\n${d.notes?'\n'+d.notes:''}\n\nTERMS:\nA 50% deposit is required before scheduling. The remaining balance is due upon completion. This proposal is valid for 30 days.\n\nMaximum Closets\njames@maximumclosets.com`);
+  if(d.plansPdf)alert('Reminder: this app can\'t auto-attach the plans PDF to an email. Use the "Download" link on the Proposal tab (or the link in the printed proposal) to grab "'+d.plansPdf.name+'" and attach it yourself before sending.');
   window.location.href=`mailto:${to}?subject=${subject}&body=${body}`;
 }
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
@@ -1276,6 +1307,7 @@ function loadPricingForJob(jid){
   const descEl=document.getElementById('p-desc');if(descEl)descEl.value=inp.pDesc||'';
   const plansEl=document.getElementById('p-plans');if(plansEl)plansEl.checked=inp.pPlans||false;
   proposalImages=pricingData[jid]?.proposalImages||[];renderProposalImagePreview();
+  proposalPlansPdf=pricingData[jid]?.proposalPlansPdf||null;renderPlansPdfPreview();
   (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=si.itemIdx;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;});
   isRestoring=false;calcMel();calcDoors();calcDrawers();calcHw();calcSpecial();calcLabor();
 }
@@ -1286,6 +1318,8 @@ function openAdd(stage=0){
   document.querySelectorAll('.lopt').forEach(el=>el.classList.remove('on'));
   document.getElementById('p-addr').value='';document.getElementById('p-notes').value='';document.getElementById('p-disc').value='';
   document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';
+  proposalImages=[];renderProposalImagePreview();
+  proposalPlansPdf=null;renderPlansPdfPreview();
   mTab('info');document.getElementById('overlay').classList.add('open');
   setTimeout(()=>document.getElementById('f-name').focus(),100);
 }
