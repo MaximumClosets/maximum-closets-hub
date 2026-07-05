@@ -464,7 +464,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
   <div class="prop-actions">
     <button class="pa-close" onclick="closePropPreview()">✕ Close</button>
     <button class="pa-print" onclick="window.print()">🖨 Print / PDF</button>
-    <button onclick="sendProposalEmail()" style="background:#0079bf;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">✉️ Send</button>
+    <button onclick="sendProposalEmail()" style="background:#0079bf;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">✉️ Send via Gmail</button>
   </div>
   <div class="prop-doc" id="prop-doc"></div>
 </div>
@@ -1222,11 +1222,10 @@ function printProposal(){const d=getProposalData();if(!d)return;document.getElem
 function closePropPreview(){document.getElementById('prop-overlay').classList.remove('open');}
 function sendProposalEmail(){
   const job=jobs.find(j=>j.id===editId);if(!job)return;const d=getProposalData();if(!d)return;
-  const to=job.email||'',subject=encodeURIComponent('Your Custom Closet Proposal — Maximum Closets');
+  const to=encodeURIComponent(job.email||''),subject=encodeURIComponent('Your Custom Closet Proposal — Maximum Closets');
   const lines=d.lines.map(l=>'  • '+l).join('\n');
   const body=encodeURIComponent(`Hi ${d.job.name.split(' ')[0]},\n\nThank you for choosing Maximum Closets!\n\nWHAT'S INCLUDED:\n${lines||'  Custom closet installation'}\n\nPRICING:\nSubtotal: $${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}${d.disc>0?'\nDiscount: -$'+d.disc.toFixed(2):''}${d.tax>0?'\nTax: $'+d.tax.toFixed(2):''}\nTotal: $${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}\n50% Deposit Due: $${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}\n${d.notes?'\n'+d.notes:''}\n\nTERMS:\nA 50% deposit is required before scheduling. The remaining balance is due upon completion. This proposal is valid for 30 days.\n\nMaximum Closets\njames@maximumclosets.com`);
-  if(d.plansPdf)alert('Reminder: this app can\'t auto-attach the plans PDF to an email. Use the "Download" link on the Proposal tab (or the link in the printed proposal) to grab "'+d.plansPdf.name+'" and attach it yourself before sending.');
-  window.location.href=`mailto:${to}?subject=${subject}&body=${body}`;
+  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`,'_blank');
   if(d.plansPdf)setTimeout(()=>alert('Reminder: this app can\'t auto-attach the plans PDF to an email. Use the "Download" link on the Proposal tab (or the link in the printed proposal) to grab "'+d.plansPdf.name+'" and attach it yourself before sending.'),300);
 }
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
