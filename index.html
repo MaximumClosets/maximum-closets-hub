@@ -283,6 +283,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
       <div><label>Date Visited</label><input type="date" id="f-date" /></div>
     </div>
     <div class="f"><label>Email</label><input type="email" id="f-email" placeholder="customer@email.com" inputmode="email" /></div>
+    <div class="f"><label>Address</label><input type="text" id="f-addr" placeholder="50 Greybarn Lane, Amityville NY 11701" /></div>
     <div class="f g2">
       <div><label>Stage</label>
         <select id="f-stage">
@@ -1237,6 +1238,7 @@ function mTab(name){
   document.querySelector(`.mtab[onclick="mTab('${name}')"]`).classList.add('on');
   document.getElementById('mp-'+name).classList.add('on');
   if(name==='checklist'&&editId){const job=jobs.find(j=>j.id===editId);if(job)renderCL(job.id,job.stage);}
+  if(name==='proposal'){const pAddr=document.getElementById('p-addr');if(pAddr&&!pAddr.value){const fAddr=document.getElementById('f-addr')?.value||'';if(fAddr)pAddr.value=fAddr;}}
 }
 function resetPricing(){
   const wasRestoring=isRestoring;isRestoring=true;
@@ -1279,7 +1281,7 @@ function loadPricingForJob(jid){
 }
 function openAdd(stage=0){
   editId=null;selLbls=[];document.getElementById('mtitle').textContent='New Job';
-  ['f-name','f-phone','f-email','f-notes'].forEach(id=>document.getElementById(id).value='');
+  ['f-name','f-phone','f-email','f-addr','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-stage').value=stage;document.getElementById('f-source').value='';document.getElementById('f-date').value='';
   document.querySelectorAll('.lopt').forEach(el=>el.classList.remove('on'));
   document.getElementById('p-addr').value='';document.getElementById('p-notes').value='';document.getElementById('p-disc').value='';
@@ -1294,11 +1296,13 @@ function openEdit(id){
   document.getElementById('f-name').value=job.name;document.getElementById('f-phone').value=job.phone||'';
   document.getElementById('f-email').value=job.email||'';document.getElementById('f-stage').value=job.stage;
   document.getElementById('f-source').value=job.source||'';document.getElementById('f-date').value=job.date||'';
+  document.getElementById('f-addr').value=job.addr||'';
   document.getElementById('f-notes').value=job.notes||'';
   document.querySelectorAll('.lopt').forEach(el=>el.classList.toggle('on',selLbls.includes(el.dataset.v)));
   document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
   document.getElementById('p-notes').value='';document.getElementById('p-addr').value='';document.getElementById('p-disc').value='';
   resetPricing();loadPricingForJob(id);renderSchedList(id);mTab('info');
+  if(job.addr)document.getElementById('p-addr').value=job.addr;
   document.getElementById('overlay').classList.add('open');
 }
 function toggleLbl(el){const v=el.dataset.v;el.classList.toggle('on');selLbls=selLbls.includes(v)?selLbls.filter(l=>l!==v):[...selLbls,v];}
@@ -1311,13 +1315,14 @@ function saveCardAndToast(toastId='info-toast'){
 function captureInfoFields(){
   return{name:document.getElementById('f-name').value.trim(),labels:[...selLbls],stage:parseInt(document.getElementById('f-stage').value),
     source:document.getElementById('f-source').value,date:document.getElementById('f-date').value,
-    phone:document.getElementById('f-phone').value.trim(),email:document.getElementById('f-email').value.trim(),notes:document.getElementById('f-notes').value.trim()};
+    phone:document.getElementById('f-phone').value.trim(),email:document.getElementById('f-email').value.trim(),addr:document.getElementById('f-addr').value.trim(),notes:document.getElementById('f-notes').value.trim()};
 }
 function saveCard(){
   const data=captureInfoFields();
   if(!data.name){alert('Please enter a customer name.');return;}
   if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0)jobs[idx]={...jobs[idx],...data};}
   else{const nj={id:uid(),...data,sale:0,cost:0};jobs.push(nj);editId=nj.id;}
+  calcAll();
   saveData();render();
   const job=jobs.find(j=>j.id===editId);
   if(job)document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
@@ -1330,12 +1335,16 @@ function deleteJob(){
   saveData();render();closeModal();
 }
 function closeModal(){
+  const infoData=captureInfoFields();
+  if(!editId&&infoData.name){
+    const nj={id:uid(),...infoData,sale:0,cost:0};jobs.push(nj);editId=nj.id;
+  }
   if(editId){
-    const infoData=captureInfoFields();
     if(infoData.name){
       const idx=jobs.findIndex(j=>j.id===editId);
       if(idx>=0)jobs[idx]={...jobs[idx],...infoData};
     }
+    calcAll();
     snapshotInputs();
     savePropFields();
     if(pricingData[editId]){
