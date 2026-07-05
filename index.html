@@ -190,7 +190,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .prop-co{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1a5c38}
 .prop-co-name{font-size:22px;font-weight:800;color:#1a5c38;line-height:1.1}
 .prop-co-info{font-size:11px;color:#555;text-align:right;line-height:1.7}
-.prop-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.prop-meta{margin-bottom:24px}
 .prop-meta-box{background:#f4f5f7;border-radius:8px;padding:12px 14px}
 .prop-meta-box h4{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#666;margin-bottom:6px;font-weight:700}
 .prop-meta-box p{font-size:13px;color:#222;line-height:1.5;font-weight:500}
@@ -1208,8 +1208,7 @@ function buildProposalHTML(d){
   const taxRow=d.tax>0?`<div class="prop-trow"><span>Tax</span><span>$${d.tax.toFixed(2)}</span></div>`:'';
   return`<div class="prop-co"><div><div class="prop-co-name">Maximum Closets</div><div style="font-size:11px;color:#888;margin-top:3px">Custom Closet Installation · Long Island, NY</div></div>
     <div class="prop-co-info">james@maximumclosets.com<br>Proposal #${d.propNum}<br>${d.today}</div></div>
-    <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${d.job.name}${d.addr?'<br>'+d.addr:''}${d.job.phone?'<br>'+d.job.phone:''}${d.job.email?'<br>'+d.job.email:''}</p></div>
-    <div class="prop-meta-box"><h4>Project Details</h4><p>Custom Closet Installation${d.job.source?'<br>Ref: '+d.job.source:''}</p></div></div>
+    <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${d.job.name}${d.addr?'<br>'+d.addr:''}${d.job.phone?'<br>'+d.job.phone:''}${d.job.email?'<br>'+d.job.email:''}</p></div></div>
     <p class="prop-title">Line Items</p>
     <table class="prop-table"><thead><tr><th>What's Included</th></tr></thead><tbody>${rowsHtml||'<tr><td style="color:#aaa;font-style:italic">No line items</td></tr>'}</tbody></table>
     <div class="prop-totals"><div class="prop-trow"><span>Subtotal</span><span>$${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>${discRow}${taxRow}
