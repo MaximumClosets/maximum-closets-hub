@@ -1165,10 +1165,15 @@ function toggleP(key){document.getElementById(key+'-bd').classList.toggle('hide'
 
 function buildProposalLines(){
   const lines=[];
-  if(melSl>0)lines.push(document.getElementById('mel-type').value==='white'?'White Melamine':'Color Melamine');
+  const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
+  if(melQty>0){
+    const melType=document.getElementById('mel-type').value==='white'?'White Melamine':'Color Melamine';
+    const melUnit=document.getElementById('mel-method')?.value==='sqft'?'sq ft':'sheets';
+    lines.push(`${melType} (${melQty} ${melUnit})`);
+  }
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
-    if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push(`${sname} Doors`);}
+    if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push(`${sname} Doors (${sqft} sq ft)`);}
   });
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
     const t=b.querySelector('select')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
