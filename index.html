@@ -186,28 +186,28 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .set-overlay.open{display:block}
 .prop-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:400;overflow-y:auto;padding:12px}
 .prop-overlay.open{display:block}
-.prop-doc{background:#1a1d27;border-radius:10px;width:100%;max-width:600px;margin:0 auto;padding:28px 24px 36px;font-family:'Segoe UI',Arial,sans-serif;color:#e8eaf0}
+.prop-doc{background:#fff;border-radius:10px;width:100%;max-width:600px;margin:0 auto;padding:28px 24px 36px;font-family:'Segoe UI',Arial,sans-serif;color:#222}
 .prop-co{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1a5c38}
 .prop-co-name{font-size:22px;font-weight:800;color:#1a5c38;line-height:1.1}
-.prop-co-info{font-size:11px;color:#8b90a8;text-align:right;line-height:1.7}
+.prop-co-info{font-size:11px;color:#555;text-align:right;line-height:1.7}
 .prop-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
-.prop-meta-box{background:#22263a;border-radius:8px;padding:12px 14px}
-.prop-meta-box h4{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8b90a8;margin-bottom:6px;font-weight:700}
-.prop-meta-box p{font-size:13px;color:#e8eaf0;line-height:1.5;font-weight:500}
+.prop-meta-box{background:#f4f5f7;border-radius:8px;padding:12px 14px}
+.prop-meta-box h4{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#666;margin-bottom:6px;font-weight:700}
+.prop-meta-box p{font-size:13px;color:#222;line-height:1.5;font-weight:500}
 .prop-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:8px}
 .prop-table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px}
 .prop-table th{background:#1a5c38;color:#fff;padding:9px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-.prop-table td{padding:9px 12px;border-bottom:1px solid #2e3248;vertical-align:top}
-.prop-table tr:nth-child(even) td{background:#1a1d27}
+.prop-table td{padding:9px 12px;border-bottom:1px solid #e0e0e0;vertical-align:top}
+.prop-table tr:nth-child(even) td{background:#f7f7f7}
 .prop-totals{margin-left:auto;width:220px;margin-bottom:20px}
-.prop-trow{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #2e3248;color:#e8eaf0}
-.prop-trow:last-child{border-bottom:none;font-weight:800;font-size:15px;color:#2ecc71;padding-top:10px}
-.prop-deposit{background:#0d2b1a;border:2px solid #1a5c38;border-radius:8px;padding:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
-.prop-deposit .dl{font-size:13px;color:#2ecc71;font-weight:600}
-.prop-deposit .da{font-size:20px;color:#2ecc71;font-weight:800}
-.prop-msg{background:#22263a;border-radius:8px;padding:12px 14px;font-size:12px;color:#8b90a8;line-height:1.6;margin-bottom:20px;font-style:italic}
-.prop-terms{font-size:10px;color:#666;line-height:1.6;border-top:1px solid #2e3248;padding-top:14px}
-.prop-terms strong{color:#8b90a8}
+.prop-trow{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid #e0e0e0;color:#222}
+.prop-trow:last-child{border-bottom:none;font-weight:800;font-size:15px;color:#1a5c38;padding-top:10px}
+.prop-deposit{background:#eaf6ef;border:2px solid #1a5c38;border-radius:8px;padding:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+.prop-deposit .dl{font-size:13px;color:#1a5c38;font-weight:600}
+.prop-deposit .da{font-size:20px;color:#1a5c38;font-weight:800}
+.prop-msg{background:#f4f5f7;border-radius:8px;padding:12px 14px;font-size:12px;color:#555;line-height:1.6;margin-bottom:20px;font-style:italic}
+.prop-terms{font-size:10px;color:#666;line-height:1.6;border-top:1px solid #e0e0e0;padding-top:14px}
+.prop-terms strong{color:#444}
 .prop-actions{display:flex;gap:8px;margin-bottom:14px;position:sticky;top:0;background:rgba(0,0,0,0.7);padding:8px;border-radius:8px;z-index:10}
 .prop-actions button{flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
 .pa-close{background:#555;color:#fff}
@@ -1215,10 +1215,10 @@ function buildProposalHTML(d){
     <div class="prop-totals"><div class="prop-trow"><span>Subtotal</span><span>$${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>${discRow}${taxRow}
     <div class="prop-trow"><span><strong>Total</strong></span><span><strong>$${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span></div></div>
     <div class="prop-deposit"><div class="dl">50% Deposit Required to Schedule</div><div class="da">$${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
-    ${d.desc?`<div style="background:#22263a;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#c8cad8;line-height:1.7"><strong style="color:#e8eaf0;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
-    ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">${d.images.map(img=>`<img src="${img.dataUrl}" style="width:100%;border-radius:8px;border:1px solid #2e3248;object-fit:cover;max-height:160px">`).join('')}</div></div>`:''}
-    ${d.plans?`<div style="background:#0d2b1a;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#4aad78;font-weight:600">📐 Design plans / drawings are included with this proposal</div>`:''}
-    ${d.plansPdf?`<div style="background:#22263a;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#e8eaf0;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><a href="${d.plansPdf.dataUrl}" download="${d.plansPdf.name}" style="color:#4aad78;font-weight:600;text-decoration:underline">${d.plansPdf.name}</a></div>`:''}
+    ${d.desc?`<div style="background:#f4f5f7;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#333;line-height:1.7"><strong style="color:#222;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
+    ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">${d.images.map(img=>`<img src="${img.dataUrl}" style="width:100%;border-radius:8px;border:1px solid #ddd;object-fit:cover;max-height:160px">`).join('')}</div></div>`:''}
+    ${d.plans?`<div style="background:#eaf6ef;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1a5c38;font-weight:600">📐 Design plans / drawings are included with this proposal</div>`:''}
+    ${d.plansPdf?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><a href="${d.plansPdf.dataUrl}" download="${d.plansPdf.name}" style="color:#1a5c38;font-weight:600;text-decoration:underline">${d.plansPdf.name}</a></div>`:''}
     ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
     <div class="prop-terms"><strong>Terms & Conditions:</strong> A 50% deposit is required before scheduling. The remaining balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Maximum Closets is not responsible for pre-existing structural issues. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge. This proposal is valid for 30 days.</div>`;
 }
