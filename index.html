@@ -190,7 +190,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .prop-co{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #1a5c38}
 .prop-co-name{font-size:22px;font-weight:800;color:#1a5c38;line-height:1.1}
 .prop-co-info{font-size:11px;color:#555;text-align:right;line-height:1.7}
-.prop-meta{margin-bottom:24px}
+.prop-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
 .prop-meta-box{background:#f4f5f7;border-radius:8px;padding:12px 14px}
 .prop-meta-box h4{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#666;margin-bottom:6px;font-weight:700}
 .prop-meta-box p{font-size:13px;color:#222;line-height:1.5;font-weight:500}
@@ -1169,26 +1169,26 @@ function buildProposalLines(){
   if(melQty>0){
     const melType=document.getElementById('mel-type').value==='white'?'White Melamine':'Color Melamine';
     const melUnit=document.getElementById('mel-method')?.value==='sqft'?'sq ft':'sheets';
-    lines.push(`${melType} (${melQty} ${melUnit})`);
+    lines.push({label:melType,qty:`${melQty} ${melUnit}`});
   }
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
-    if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push(`${sname} Doors (${sqft} sq ft)`);}
+    if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push({label:`${sname} Doors`,qty:`${sqft} sq ft`});}
   });
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
     const t=b.querySelector('select')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
-    if(q>0)lines.push(`${t==='sh'?'Shaker':'White Flat'} Drawer Boxes (qty ${q})`);
+    if(q>0)lines.push({label:`${t==='sh'?'Shaker':'White Flat'} Drawer Boxes`,qty:q});
   });
   document.querySelectorAll('#hw-items .item-block').forEach(b=>{
     const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
     const lbl=document.getElementById(bid+'-t')?.options[document.getElementById(bid+'-t').selectedIndex]?.text||'Hardware';
-    if(q>0)lines.push(`${lbl} (qty ${q})`);
+    if(q>0)lines.push({label:lbl,qty:q});
   });
   document.querySelectorAll('#special-items .item-block').forEach(b=>{
     const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
     const sel=document.getElementById(bid+'-t');const idx=parseInt(sel?.value)||0;
     const lbl=SPECIAL_ITEMS[idx]?.l||'Special Item';
-    if(q>0)lines.push(`${lbl} (qty ${q})`);
+    if(q>0)lines.push({label:lbl,qty:q});
   });
   return lines;
 }
@@ -1200,17 +1200,21 @@ function getProposalData(){
   const plans=document.getElementById('p-plans')?.checked||false;
   const subtotal=sale,afterDisc=subtotal-disc,total=afterDisc+tax,deposit=total/2;
   const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-  return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,plansPdf:proposalPlansPdf,subtotal,afterDisc,total,deposit,today,propNum:'MC-'+Date.now().toString().slice(-6),lines:buildProposalLines()};
+  const hrs=vn('hlp-hrs',P.hlpHrs);
+  const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
+  const melColor=melQty>0?(document.getElementById('mel-type')?.value==='white'?'White':'Color'):'';
+  return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,plansPdf:proposalPlansPdf,subtotal,afterDisc,total,deposit,today,hrs,melColor,propNum:'MC-'+Date.now().toString().slice(-6),lines:buildProposalLines()};
 }
 function buildProposalHTML(d){
-  const rowsHtml=d.lines.map(l=>`<tr><td>${l}</td></tr>`).join('');
+  const rowsHtml=d.lines.map(l=>`<tr><td>${l.label}</td><td style="text-align:right;white-space:nowrap">${l.qty}</td></tr>`).join('');
   const discRow=d.disc>0?`<div class="prop-trow"><span>Discount</span><span>-$${d.disc.toFixed(2)}</span></div>`:'';
   const taxRow=d.tax>0?`<div class="prop-trow"><span>Tax</span><span>$${d.tax.toFixed(2)}</span></div>`:'';
   return`<div class="prop-co"><div><div class="prop-co-name">Maximum Closets</div><div style="font-size:11px;color:#888;margin-top:3px">Custom Closet Installation · Long Island, NY</div></div>
     <div class="prop-co-info">james@maximumclosets.com<br>Proposal #${d.propNum}<br>${d.today}</div></div>
-    <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${d.job.name}${d.addr?'<br>'+d.addr:''}${d.job.phone?'<br>'+d.job.phone:''}${d.job.email?'<br>'+d.job.email:''}</p></div></div>
+    <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${d.job.name}${d.addr?'<br>'+d.addr:''}${d.job.phone?'<br>'+d.job.phone:''}${d.job.email?'<br>'+d.job.email:''}</p></div>
+    <div class="prop-meta-box"><h4>Installation Details</h4><p>Est. Install Time: ${d.hrs} hours${d.melColor?'<br>Melamine Color: '+d.melColor:''}</p></div></div>
     <p class="prop-title">Line Items</p>
-    <table class="prop-table"><thead><tr><th>What's Included</th></tr></thead><tbody>${rowsHtml||'<tr><td style="color:#aaa;font-style:italic">No line items</td></tr>'}</tbody></table>
+    <table class="prop-table"><thead><tr><th>What's Included</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="2" style="color:#aaa;font-style:italic">No line items</td></tr>'}</tbody></table>
     <div class="prop-totals"><div class="prop-trow"><span>Subtotal</span><span>$${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>${discRow}${taxRow}
     <div class="prop-trow"><span><strong>Total</strong></span><span><strong>$${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span></div></div>
     <div class="prop-deposit"><div class="dl">50% Deposit Required to Schedule</div><div class="da">$${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
@@ -1250,7 +1254,7 @@ function sendProposalEmail(){
   const copied=copyFormattedProposal(d);
   let url=`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}`;
   if(!copied){
-    const lines=d.lines.map(l=>'  • '+l).join('\n');
+    const lines=d.lines.map(l=>`  • ${l.label} (${l.qty})`).join('\n');
     const body=encodeURIComponent(`Hi ${d.job.name.split(' ')[0]},\n\nThank you for choosing Maximum Closets!\n\nWHAT'S INCLUDED:\n${lines||'  Custom closet installation'}\n\nPRICING:\nSubtotal: $${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}${d.disc>0?'\nDiscount: -$'+d.disc.toFixed(2):''}${d.tax>0?'\nTax: $'+d.tax.toFixed(2):''}\nTotal: $${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}\n50% Deposit Due: $${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}\n${d.notes?'\n'+d.notes:''}\n\nTERMS:\nA 50% deposit is required before scheduling. The remaining balance is due upon completion. This proposal is valid for 30 days.\n\nMaximum Closets\njames@maximumclosets.com`);
     url+=`&body=${body}`;
   }
