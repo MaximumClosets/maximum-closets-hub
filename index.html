@@ -1398,7 +1398,7 @@ function saveCard(){
   if(job)document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
   document.getElementById('mtitle').textContent=data.name;
 }
-function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){job.stage=si;saveData();render();closeModal();}}
+function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){job.stage=si;document.getElementById('f-stage').value=si;saveData();render();closeModal();}}
 function deleteJob(){
   if(!editId||!confirm('Delete this job?'))return;
   jobs=jobs.filter(j=>j.id!==editId);delete clSt[editId];delete pricingData[editId];
