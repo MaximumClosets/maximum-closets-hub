@@ -953,24 +953,27 @@ function addDoor(){
   const div=document.createElement('div');div.className='item-block';div.id=id;
   div.innerHTML=`<div class="ititle">Door ${doorIdx}</div><button class="rm" onclick="rmItem('${id}','door')">×</button>
     <div class="f"><label>Style</label><select onchange="calcDoors()">${opts}</select></div>
-    <div class="f g2"><div><label>Sq Ft</label><input type="number" class="dsqft" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div>
-    <div><label>Markup ×</label><input type="number" class="dmu" value="${P.dMu}" step=".05" oninput="calcDoors()" inputmode="decimal"/></div></div>
-    <div class="f g2"><div><label>Door Count</label><input type="number" class="dcount" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div>
+    <div class="f g2"><div><label>Sq Ft (each)</label><input type="number" class="dsqft" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div>
+    <div><label>Door Count</label><input type="number" class="dcount" placeholder="1" value="1" oninput="calcDoors()" inputmode="decimal"/></div></div>
+    <div class="f g2"><div><label>Markup ×</label><input type="number" class="dmu" value="${P.dMu}" step=".05" oninput="calcDoors()" inputmode="decimal"/></div>
     <div><label>Height (in)</label><input type="number" class="dheight" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div></div>
     <div class="f"><label>Hardware</label><select class="dhw" onchange="calcDoors()">
       <option value="handle">Handle</option><option value="none">No Handle</option><option value="latch">Push Latch (Concealed)</option>
     </select></div>
-    <div class="result"><span>Cost → Sale</span><strong class="dres">$0 → $0</strong></div>`;
+    <div class="result"><span>Cost → Sale <span class="dres-sqft" style="color:var(--muted);font-weight:400"></span></span><strong class="dres">$0 → $0</strong></div>`;
   document.getElementById('door-items').appendChild(div);calcDoors();
 }
 function calcDoors(){
   const styles=getDoorStyles();doorC=0;doorSl=0;
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
+    const count=parseFloat(b.querySelector('.dcount')?.value)||1;
     const mu=parseFloat(b.querySelector('.dmu')?.value)||P.dMu;
     const st=styles.find(s=>s.v===sel?.value)||styles[0];
-    const c=sqft*st.c,sl=c*mu;doorC+=c;doorSl+=sl;
+    const totalSqft=sqft*count;
+    const c=totalSqft*st.c,sl=c*mu;doorC+=c;doorSl+=sl;
     const r=b.querySelector('.dres');if(r)r.textContent=fmt(c)+' → '+fmt(sl);
+    const rs=b.querySelector('.dres-sqft');if(rs)rs.textContent=totalSqft?`(${totalSqft} total sq ft)`:'';
   });
   document.getElementById('doors-badge').textContent=fmt(doorSl);calcAll();calcOrderList();
 }
@@ -1062,10 +1065,11 @@ function calcOrderList(){
   const slidePairs={};
   const hamperFronts={};
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
-    const count=parseFloat(b.querySelector('.dcount')?.value)||0;
+    const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
+    const count=parseFloat(b.querySelector('.dcount')?.value)||1;
     const height=parseFloat(b.querySelector('.dheight')?.value)||0;
     const hw=b.querySelector('.dhw')?.value||'handle';
-    if(count>0){
+    if(sqft>0&&count>0){
       hinges+=count*hingesForHeight(height);
       if(hw==='handle')handles+=count;else if(hw==='latch')latches+=count;
     }
@@ -1149,7 +1153,7 @@ function snapshotInputs(){
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');
     doors.push({style:sel?.value||'white-flat',sqft:parseFloat(b.querySelector('.dsqft')?.value)||0,mu:parseFloat(b.querySelector('.dmu')?.value)||P.dMu,
-      count:parseFloat(b.querySelector('.dcount')?.value)||0,height:parseFloat(b.querySelector('.dheight')?.value)||0,hw:b.querySelector('.dhw')?.value||'handle'});
+      count:parseFloat(b.querySelector('.dcount')?.value)||1,height:parseFloat(b.querySelector('.dheight')?.value)||0,hw:b.querySelector('.dhw')?.value||'handle'});
   });
   const drawers=[];
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
@@ -1414,7 +1418,7 @@ function loadPricingForJob(jid){
   if(inp.melQty)document.getElementById('mel-qty').value=inp.melQty;
   if(inp.melCost)document.getElementById('mel-cost').value=inp.melCost;
   if(inp.melSell)document.getElementById('mel-sell').value=inp.melSell;
-  (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl)muEl.value=d.mu;const countEl=b.querySelector('.dcount');if(countEl)countEl.value=d.count||'';const heightEl=b.querySelector('.dheight');if(heightEl)heightEl.value=d.height||'';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
+  (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl)muEl.value=d.mu;const countEl=b.querySelector('.dcount');if(countEl)countEl.value=d.count||1;const heightEl=b.querySelector('.dheight');if(heightEl)heightEl.value=d.height||'';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
   (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;const depthEl=b.querySelector('.ddepth');if(depthEl)depthEl.value=d.depth||14;const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
   (inp.hardware||[]).forEach(h=>{addHw();const bid='hw-'+hwIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=h.preset;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=h.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=h.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=h.sell;});
   if(inp.hlpHrs!==undefined){const e=document.getElementById('hlp-hrs');if(e)e.value=inp.hlpHrs;}
