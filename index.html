@@ -369,6 +369,13 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
       <div class="pcard-bd hide" id="special-bd"><div id="special-items"></div><button class="add-line" onclick="addSpecial()">+ Add Special Item</button></div>
     </div>
     <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('order')"><h4>Order List</h4><span id="order-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">0 items</span></div>
+      <div class="pcard-bd hide" id="order-bd">
+        <div id="order-list-content"><p style="font-size:12px;color:var(--muted)">Nothing to order yet — add doors, drawers, hardware, or special items above.</p></div>
+        <p class="tip">Auto-calculated from your entries above (handles, hinges by door height, drawer slides, hamper door fronts, rod flanges). Double-check before ordering.</p>
+      </div>
+    </div>
+    <div class="pcard">
       <div class="pcard-hd" onclick="toggleP('labor')"><h4>Labor</h4><span id="labor-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
       <div class="pcard-bd hide" id="labor-bd">
         <div class="f g2">
@@ -948,6 +955,11 @@ function addDoor(){
     <div class="f"><label>Style</label><select onchange="calcDoors()">${opts}</select></div>
     <div class="f g2"><div><label>Sq Ft</label><input type="number" class="dsqft" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div>
     <div><label>Markup ×</label><input type="number" class="dmu" value="${P.dMu}" step=".05" oninput="calcDoors()" inputmode="decimal"/></div></div>
+    <div class="f g2"><div><label>Door Count</label><input type="number" class="dcount" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div>
+    <div><label>Height (in)</label><input type="number" class="dheight" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div></div>
+    <div class="f"><label>Hardware</label><select class="dhw" onchange="calcDoors()">
+      <option value="handle">Handle</option><option value="none">No Handle</option><option value="latch">Push Latch (Concealed)</option>
+    </select></div>
     <div class="result"><span>Cost → Sale</span><strong class="dres">$0 → $0</strong></div>`;
   document.getElementById('door-items').appendChild(div);calcDoors();
 }
@@ -960,7 +972,7 @@ function calcDoors(){
     const c=sqft*st.c,sl=c*mu;doorC+=c;doorSl+=sl;
     const r=b.querySelector('.dres');if(r)r.textContent=fmt(c)+' → '+fmt(sl);
   });
-  document.getElementById('doors-badge').textContent=fmt(doorSl);calcAll();
+  document.getElementById('doors-badge').textContent=fmt(doorSl);calcAll();calcOrderList();
 }
 function addDrawer(){
   drwIdx++;const id='drw-'+drwIdx;const div=document.createElement('div');div.className='item-block';div.id=id;
@@ -969,6 +981,10 @@ function addDrawer(){
       <option value="wf">White Flat ($${P.drwWC}→$${P.drwWS})</option>
       <option value="sh">Shaker ($${P.drwSC}→$${P.drwSS})</option></select></div>
     <div><label>Qty</label><input type="number" class="dqty" placeholder="0" oninput="calcDrawers()" inputmode="decimal"/></div></div>
+    <div class="f g2"><div><label>Slide Depth (in)</label><input type="number" class="ddepth" value="14" step="2" oninput="calcDrawers()" inputmode="decimal"/></div>
+    <div><label>Hardware</label><select class="dhw" onchange="calcDrawers()">
+      <option value="handle">Handle</option><option value="none">No Handle</option><option value="latch">Push Latch (Concealed)</option>
+    </select></div></div>
     <div class="result"><span>Cost → Sale</span><strong class="drres">$0 → $0</strong></div>`;
   document.getElementById('drawer-items').appendChild(div);calcDrawers();
 }
@@ -979,7 +995,7 @@ function calcDrawers(){
     const c=(t==='sh'?P.drwSC:P.drwWC)*q,sl=(t==='sh'?P.drwSS:P.drwWS)*q;
     drwC+=c;drwSl+=sl;const r=b.querySelector('.drres');if(r)r.textContent=fmt(c)+' → '+fmt(sl);
   });
-  document.getElementById('drawers-badge').textContent=fmt(drwSl);calcAll();
+  document.getElementById('drawers-badge').textContent=fmt(drwSl);calcAll();calcOrderList();
 }
 function getHWPresets(){return[{v:'hg',l:'Soft-Close Hinges',c:P.hgC,s:P.hgS},{v:'hn',l:'Handles 96MM Nickel',c:P.hnC,s:P.hnS},{v:'hb',l:'Handles 96MM Black',c:P.hbC,s:P.hbS},{v:'sl',l:'Drawer Slides SC',c:P.slC,s:P.slS},{v:'rd',l:'Closet Rod Chrome',c:P.rdC,s:P.rdS},{v:'cu',l:'Custom Item',c:0,s:0}]}
 function addHw(){
@@ -1006,7 +1022,7 @@ function calcHw(){
     const c=parseFloat(document.getElementById(bid+'-c')?.value)||0,s=parseFloat(document.getElementById(bid+'-s')?.value)||0;
     hwC+=q*c;hwSl+=q*s;const r=document.getElementById(bid+'-r');if(r)r.textContent=fmt(q*c)+' → '+fmt(q*s);
   });
-  document.getElementById('hw-badge').textContent=fmt(hwSl);calcAll();
+  document.getElementById('hw-badge').textContent=fmt(hwSl);calcAll();calcOrderList();
 }
 function addSpecial(){
   spIdx++;const id='sp-'+spIdx;
@@ -1017,6 +1033,8 @@ function addSpecial(){
     <div class="f g3"><div><label>Qty</label><input type="number" id="${id}-q" placeholder="1" value="1" oninput="calcSpecial()" inputmode="decimal"/></div>
     <div><label>Cost $</label><input type="number" id="${id}-c" step=".01" oninput="calcSpecial()" inputmode="decimal"/></div>
     <div><label>Sell $</label><input type="number" id="${id}-s" step=".01" oninput="calcSpecial()" inputmode="decimal"/></div></div>
+    <div class="f" id="${id}-hamper" style="display:none"><label>Section Width (for door front)</label>
+    <select id="${id}-w" onchange="calcSpecial()"><option value="18">18"</option><option value="24" selected>24"</option><option value="30">30"</option></select></div>
     <div class="result"><span>Cost → Sale</span><strong id="${id}-r">$0 → $0</strong></div>`;
   document.getElementById('special-items').appendChild(div);spPre(id);
 }
@@ -1024,7 +1042,10 @@ function spPre(id){
   const idx=parseInt(document.getElementById(id+'-t')?.value)||0;
   const p=SPECIAL_ITEMS[idx]||SPECIAL_ITEMS[0];
   const cEl=document.getElementById(id+'-c');const sEl=document.getElementById(id+'-s');
-  if(cEl)cEl.value=p.c.toFixed(2);if(sEl)sEl.value=(p.c*2).toFixed(2);calcSpecial();
+  if(cEl)cEl.value=p.c.toFixed(2);if(sEl)sEl.value=(p.c*2).toFixed(2);
+  const hamperRow=document.getElementById(id+'-hamper');
+  if(hamperRow)hamperRow.style.display=/hamper/i.test(p.l)?'':'none';
+  calcSpecial();
 }
 function calcSpecial(){
   spC=0;spSl=0;
@@ -1033,7 +1054,67 @@ function calcSpecial(){
     const c=parseFloat(document.getElementById(bid+'-c')?.value)||0,s=parseFloat(document.getElementById(bid+'-s')?.value)||0;
     spC+=q*c;spSl+=q*s;const r=document.getElementById(bid+'-r');if(r)r.textContent=fmt(q*c)+' → '+fmt(q*s);
   });
-  document.getElementById('special-badge').textContent=fmt(spSl);calcAll();
+  document.getElementById('special-badge').textContent=fmt(spSl);calcAll();calcOrderList();
+}
+function hingesForHeight(h){if(!h||h<=0)return 0;if(h<=50)return 2;if(h<=75)return 3;return 4;}
+function calcOrderList(){
+  let hinges=0,handles=0,latches=0,flanges=0;
+  const slidePairs={};
+  const hamperFronts={};
+  document.querySelectorAll('#door-items .item-block').forEach(b=>{
+    const count=parseFloat(b.querySelector('.dcount')?.value)||0;
+    const height=parseFloat(b.querySelector('.dheight')?.value)||0;
+    const hw=b.querySelector('.dhw')?.value||'handle';
+    if(count>0){
+      hinges+=count*hingesForHeight(height);
+      if(hw==='handle')handles+=count;else if(hw==='latch')latches+=count;
+    }
+  });
+  document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
+    const q=parseFloat(b.querySelector('.dqty')?.value)||0;
+    const depth=parseFloat(b.querySelector('.ddepth')?.value)||14;
+    const hw=b.querySelector('.dhw')?.value||'handle';
+    if(q>0){
+      slidePairs[depth]=(slidePairs[depth]||0)+q;
+      if(hw==='handle')handles+=q;else if(hw==='latch')latches+=q;
+    }
+  });
+  document.querySelectorAll('#special-items .item-block').forEach(b=>{
+    const bid=b.id;
+    const idx=parseInt(document.getElementById(bid+'-t')?.value)||0;
+    const q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
+    const label=SPECIAL_ITEMS[idx]?.l||'';
+    if(/hamper/i.test(label)&&q>0){
+      const w=document.getElementById(bid+'-w')?.value||'24';
+      hamperFronts[w]=(hamperFronts[w]||0)+q;
+    }
+  });
+  document.querySelectorAll('#hw-items .item-block').forEach(b=>{
+    const bid=b.id;
+    const preset=document.getElementById(bid+'-t')?.value;
+    const q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
+    if(preset==='rd')flanges+=q*2;
+  });
+  const rows=[];
+  if(handles>0)rows.push(['Handles',handles]);
+  if(latches>0)rows.push(['Push Latches (Concealed)',latches]);
+  if(hinges>0)rows.push(['Hinges',hinges]);
+  Object.keys(slidePairs).sort((a,b)=>a-b).forEach(d=>{
+    rows.push([`${d}" Drawer Slide Pairs`,slidePairs[d]]);
+  });
+  if(flanges>0)rows.push(['Chrome Rod Flanges',flanges]);
+  Object.keys(hamperFronts).sort().forEach(w=>{
+    const qty=hamperFronts[w];
+    const width=(parseFloat(w)+0.625).toFixed(3).replace(/\.?0+$/,'');
+    rows.push([`Hamper Door Front — ${width}"W × 26⅛"H (${w}" section)`,qty]);
+  });
+  const el=document.getElementById('order-list-content');
+  const badge=document.getElementById('order-badge');
+  if(!el||!badge)return;
+  const total=rows.reduce((s,r)=>s+r[1],0);
+  badge.textContent=total+' item'+(total===1?'':'s');
+  if(!rows.length){el.innerHTML='<p style="font-size:12px;color:var(--muted)">Nothing to order yet — add doors, drawers, hardware, or special items above.</p>';return;}
+  el.innerHTML=rows.map(r=>`<div class="brow"><span>${r[0]}</span><span class="cv">${r[1]}</span></div>`).join('');
 }
 function calcLabor(){
   const hrsEl=document.getElementById('hlp-hrs');
@@ -1067,11 +1148,13 @@ function snapshotInputs(){
   const doors=[];
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');
-    doors.push({style:sel?.value||'white-flat',sqft:parseFloat(b.querySelector('.dsqft')?.value)||0,mu:parseFloat(b.querySelector('.dmu')?.value)||P.dMu});
+    doors.push({style:sel?.value||'white-flat',sqft:parseFloat(b.querySelector('.dsqft')?.value)||0,mu:parseFloat(b.querySelector('.dmu')?.value)||P.dMu,
+      count:parseFloat(b.querySelector('.dcount')?.value)||0,height:parseFloat(b.querySelector('.dheight')?.value)||0,hw:b.querySelector('.dhw')?.value||'handle'});
   });
   const drawers=[];
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
-    drawers.push({type:b.querySelector('select')?.value||'wf',qty:parseFloat(b.querySelector('.dqty')?.value)||0});
+    drawers.push({type:b.querySelector('select')?.value||'wf',qty:parseFloat(b.querySelector('.dqty')?.value)||0,
+      depth:parseFloat(b.querySelector('.ddepth')?.value)||14,hw:b.querySelector('.dhw')?.value||'handle'});
   });
   const hardware=[];
   document.querySelectorAll('#hw-items .item-block').forEach(b=>{
@@ -1081,7 +1164,7 @@ function snapshotInputs(){
   const specialItems=[];
   document.querySelectorAll('#special-items .item-block').forEach(b=>{
     const bid=b.id;
-    specialItems.push({itemIdx:parseInt(document.getElementById(bid+'-t')?.value)||0,qty:parseFloat(document.getElementById(bid+'-q')?.value)||1,cost:parseFloat(document.getElementById(bid+'-c')?.value)||0,sell:parseFloat(document.getElementById(bid+'-s')?.value)||0});
+    specialItems.push({itemIdx:parseInt(document.getElementById(bid+'-t')?.value)||0,qty:parseFloat(document.getElementById(bid+'-q')?.value)||1,cost:parseFloat(document.getElementById(bid+'-c')?.value)||0,sell:parseFloat(document.getElementById(bid+'-s')?.value)||0,hamperWidth:document.getElementById(bid+'-w')?.value||'24'});
   });
   pricingData[editId].inputs={
     melType:document.getElementById('mel-type')?.value||'white',melMethod:document.getElementById('mel-method')?.value||'sqft',
@@ -1315,6 +1398,8 @@ function resetPricing(){
   document.getElementById('hlp-rate').value=P.hlpRate;document.getElementById('lead-pct').value=P.leadPct;document.getElementById('owner-pct').value=0;
   document.getElementById('mel-type').value='white';document.getElementById('mel-method').value='sqft';melTypeChange();
   ['mel-badge','doors-badge','drawers-badge','hw-badge','labor-badge'].forEach(id=>document.getElementById(id).textContent='$0');
+  document.getElementById('order-badge').textContent='0 items';
+  document.getElementById('order-list-content').innerHTML='<p style="font-size:12px;color:var(--muted)">Nothing to order yet — add doors, drawers, hardware, or special items above.</p>';
   ['profit-amt','s-kcd','s-cost','s-mel','s-doors','s-drawers','s-hw','s-hlp','s-lead','s-owner','s-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='$0';});
   document.getElementById('profit-badge').textContent='$0 profit';
   const pm=document.getElementById('profit-marg');if(pm)pm.textContent='0% margin';
@@ -1329,8 +1414,8 @@ function loadPricingForJob(jid){
   if(inp.melQty)document.getElementById('mel-qty').value=inp.melQty;
   if(inp.melCost)document.getElementById('mel-cost').value=inp.melCost;
   if(inp.melSell)document.getElementById('mel-sell').value=inp.melSell;
-  (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl)muEl.value=d.mu;}});
-  (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;}});
+  (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl)muEl.value=d.mu;const countEl=b.querySelector('.dcount');if(countEl)countEl.value=d.count||'';const heightEl=b.querySelector('.dheight');if(heightEl)heightEl.value=d.height||'';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
+  (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;const depthEl=b.querySelector('.ddepth');if(depthEl)depthEl.value=d.depth||14;const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
   (inp.hardware||[]).forEach(h=>{addHw();const bid='hw-'+hwIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=h.preset;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=h.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=h.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=h.sell;});
   if(inp.hlpHrs!==undefined){const e=document.getElementById('hlp-hrs');if(e)e.value=inp.hlpHrs;}
   if(inp.hlpRate!==undefined){const e=document.getElementById('hlp-rate');if(e)e.value=inp.hlpRate;}
@@ -1344,8 +1429,8 @@ function loadPricingForJob(jid){
   const plansEl=document.getElementById('p-plans');if(plansEl)plansEl.checked=inp.pPlans||false;
   proposalImages=pricingData[jid]?.proposalImages||[];renderProposalImagePreview();
   proposalPlansPdf=pricingData[jid]?.proposalPlansPdf||null;renderPlansPdfPreview();
-  (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=si.itemIdx;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;});
-  isRestoring=false;calcMel();calcDoors();calcDrawers();calcHw();calcSpecial();calcLabor();
+  (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=si.itemIdx;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;const wEl=document.getElementById(bid+'-w');if(wEl)wEl.value=si.hamperWidth||'24';const hamperRow=document.getElementById(bid+'-hamper');if(hamperRow)hamperRow.style.display=/hamper/i.test(SPECIAL_ITEMS[si.itemIdx]?.l||'')?'':'none';});
+  isRestoring=false;calcMel();calcDoors();calcDrawers();calcHw();calcSpecial();calcLabor();calcOrderList();
 }
 function openAdd(stage=0){
   editId=null;selLbls=[];document.getElementById('mtitle').textContent='New Job';
