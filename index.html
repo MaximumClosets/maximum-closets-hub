@@ -454,12 +454,19 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
     </div>
     <div class="f"><label>Message to Customer</label><textarea id="p-notes" class="prop-inp" rows="2" placeholder="Thank you for choosing Maximum Closets!" oninput="savePropFields()"></textarea></div>
     <div class="f">
-      <label>3D Renders / Photos</label>
+      <label>📂 Pull from Drive</label>
+      <button class="add-line" style="margin-top:0" onclick="refreshDriveMedia()">🔄 Find recent 3Ds &amp; PDF for this customer</button>
+      <div id="p-drive-status" style="font-size:11px;color:var(--muted);margin-top:5px"></div>
+      <div id="p-drive-3ds" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
+      <div id="p-drive-pdf" style="display:flex;flex-direction:column;gap:4px;margin-top:4px"></div>
+    </div>
+    <div class="f">
+      <label>3D Renders / Photos <span style="text-transform:none;font-weight:400;color:var(--muted)">(or upload manually)</span></label>
       <input type="file" id="p-imgs" multiple accept="image/*" onchange="addProposalImages(this)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:13px;cursor:pointer"/>
       <div id="p-img-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
     <div class="f">
-      <label>Plans / Drawings (PDF)</label>
+      <label>Plans / Drawings (PDF) <span style="text-transform:none;font-weight:400;color:var(--muted)">(or upload manually)</span></label>
       <input type="file" id="p-plans-pdf" accept="application/pdf" onchange="addPlansPdf(this)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:13px;cursor:pointer"/>
       <div id="p-plans-pdf-preview" style="margin-top:8px"></div>
     </div>
@@ -547,6 +554,15 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
         <div class="srow"><span class="sl">Default helper hours</span><input type="number" id="sl-hlh" step="1" inputmode="decimal"/><span class="su">hrs</span></div>
         <div class="srow"><span class="sl">Helper rate</span><input type="number" id="sl-hr" step="1" inputmode="decimal"/><span class="su">$/hr</span></div>
         <div class="srow"><span class="sl">Lead installer %</span><input type="number" id="sl-lp" step=".5" inputmode="decimal"/><span class="su">%</span></div>
+      </div>
+    </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-int')">Integrations<span>▾</span></div>
+      <div class="set-bd" id="s-int">
+        <div class="f"><label>Backend Script URL</label>
+          <input type="text" id="sl-scripturl" placeholder="https://script.google.com/macros/s/…/exec"/>
+        </div>
+        <p class="tip">From the Apps Script Web app deployment (see apps-script/README.md). Powers recent 3D/PDF pull on job cards. <span id="scripturl-status" style="font-weight:700"></span></p>
+        <button class="add-line" style="margin-top:0" onclick="testScriptUrl()">🔌 Test Connection</button>
       </div>
     </div>
     <button class="save-p" onclick="saveSettings()">💾 Save Prices</button>
@@ -1339,6 +1355,77 @@ function renderPlansPdfPreview(){
     <button onclick="removePlansPdf()" style="background:#e74c3c;border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:13px;line-height:1;font-weight:bold;flex-shrink:0">×</button>
   </div>`;
 }
+
+// ── PULL FROM DRIVE (Proposal tab) ──
+// Selected checkboxes fetch the actual file bytes through the backend script and embed them
+// as data: URLs into the same proposalImages/proposalPlansPdf the manual-upload flow uses —
+// a live Drive link would 403 for a customer with no access to the shared drive, so anything
+// going into an emailed/printed proposal has to be self-contained.
+let driveMediaFound={threeDs:[],pdf:[]};
+async function refreshDriveMedia(){
+  const job=jobs.find(j=>j.id===editId);
+  const status=document.getElementById('p-drive-status');
+  if(!job){status.textContent='';return;}
+  if(!getScriptUrl()){status.textContent='No backend script configured yet — see ⚙️ Settings → Integrations.';status.style.color='var(--muted)';return;}
+  status.textContent='Searching Drive for "'+job.name+'"…';status.style.color='var(--muted)';
+  const [threeDs,pdf]=await Promise.all([
+    backendGet({action:'recentFiles',customer:job.name,kind:'3Ds',limit:5}),
+    backendGet({action:'recentFiles',customer:job.name,kind:'PDFs',limit:1}),
+  ]);
+  if(!threeDs&&!pdf){status.textContent='✗ Could not reach the backend script. Check the URL in Settings.';status.style.color='var(--red)';return;}
+  driveMediaFound.threeDs=(threeDs&&threeDs.files)||[];
+  driveMediaFound.pdf=(pdf&&pdf.files)||[];
+  const total=driveMediaFound.threeDs.length+driveMediaFound.pdf.length;
+  status.textContent=total?`Found ${driveMediaFound.threeDs.length} render(s) and ${driveMediaFound.pdf.length} PDF — check the ones to include.`
+    :`No files found under Maximum Closets Jobs for "${job.name}". If this job's Drive folder uses a different name, upload manually below.`;
+  status.style.color=total?'var(--green)':'var(--muted)';
+  renderDriveMediaLists();
+}
+function renderDriveMediaLists(){
+  const fmtDate=iso=>new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const el3d=document.getElementById('p-drive-3ds');
+  el3d.innerHTML=driveMediaFound.threeDs.map(f=>{
+    const checked=proposalImages.some(im=>im.driveId===f.id);
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;padding:4px 0">
+      <input type="checkbox" data-fid="${f.id}" ${checked?'checked':''} onchange="toggleDriveImage('${f.id}',this.checked,this)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer;flex-shrink:0"/>
+      🖼 ${f.name} <span style="color:var(--muted)">· ${fmtDate(f.modified)}</span>
+    </label>`;
+  }).join('');
+  const elPdf=document.getElementById('p-drive-pdf');
+  elPdf.innerHTML=driveMediaFound.pdf.map(f=>{
+    const checked=proposalPlansPdf&&proposalPlansPdf.driveId===f.id;
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;padding:4px 0">
+      <input type="checkbox" data-fid="${f.id}" ${checked?'checked':''} onchange="toggleDrivePdf('${f.id}',this.checked,this)" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer;flex-shrink:0"/>
+      📄 ${f.name} <span style="color:var(--muted)">· ${fmtDate(f.modified)}</span>
+    </label>`;
+  }).join('');
+}
+async function toggleDriveImage(fileId,checked,cbEl){
+  if(!checked){
+    const idx=proposalImages.findIndex(im=>im.driveId===fileId);
+    if(idx>=0){proposalImages.splice(idx,1);renderProposalImagePreview();savePropFields();}
+    return;
+  }
+  if(cbEl)cbEl.disabled=true;
+  const data=await backendGet({action:'fileData',id:fileId});
+  if(cbEl)cbEl.disabled=false;
+  if(!data||data.error||!data.base64){alert('Could not pull that file from Drive'+(data&&data.error?': '+data.error:'')+'.');if(cbEl)cbEl.checked=false;return;}
+  proposalImages.push({name:data.name,dataUrl:`data:${data.mimeType};base64,${data.base64}`,driveId:fileId});
+  renderProposalImagePreview();savePropFields();
+}
+async function toggleDrivePdf(fileId,checked,cbEl){
+  if(!checked){
+    if(proposalPlansPdf&&proposalPlansPdf.driveId===fileId){proposalPlansPdf=null;renderPlansPdfPreview();savePropFields();}
+    return;
+  }
+  if(cbEl)cbEl.disabled=true;
+  const data=await backendGet({action:'fileData',id:fileId});
+  if(cbEl)cbEl.disabled=false;
+  if(!data||data.error||!data.base64){alert('Could not pull that file from Drive'+(data&&data.error?': '+data.error:'')+'.');if(cbEl)cbEl.checked=false;return;}
+  proposalPlansPdf={name:data.name,dataUrl:`data:${data.mimeType};base64,${data.base64}`,driveId:fileId};
+  renderPlansPdfPreview();savePropFields();
+}
+
 function renderProposalImagePreview(){
   const el=document.getElementById('p-img-preview');if(!el)return;
   el.innerHTML=proposalImages.map((img,i)=>`<div style="position:relative;width:80px;height:80px"><img src="${img.dataUrl}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border)"><button onclick="removeProposalImage(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e74c3c;border:none;color:#fff;font-size:13px;cursor:pointer;line-height:1;font-weight:bold">×</button></div>`).join('');
@@ -1532,6 +1619,8 @@ function openEdit(id){
   document.querySelectorAll('.lopt').forEach(el=>el.classList.toggle('on',selLbls.includes(el.dataset.v)));
   document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
   document.getElementById('p-notes').value='';document.getElementById('p-addr').value='';document.getElementById('p-disc').value='';
+  driveMediaFound={threeDs:[],pdf:[]};
+  document.getElementById('p-drive-3ds').innerHTML='';document.getElementById('p-drive-pdf').innerHTML='';document.getElementById('p-drive-status').textContent='';
   resetPricing();loadPricingForJob(id);renderSchedList(id);mTab('info');
   if(job.addr)document.getElementById('p-addr').value=job.addr;
   document.getElementById('overlay').classList.add('open');
@@ -1601,7 +1690,37 @@ document.getElementById('overlay').addEventListener('click',e=>{if(e.target===do
 function openSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
+  document.getElementById('sl-scripturl').value=getScriptUrl();
+  document.getElementById('scripturl-status').textContent='';
   document.getElementById('set-overlay').classList.add('open');
+}
+
+// ── BACKEND SCRIPT URL (Apps Script Web App — see apps-script/README.md) ──
+function getScriptUrl(){try{return localStorage.getItem('mc-script-url')||'';}catch(e){return '';}}
+function saveScriptUrl(url){try{localStorage.setItem('mc-script-url',url.trim());}catch(e){}}
+async function testScriptUrl(){
+  const url=document.getElementById('sl-scripturl').value.trim();
+  const st=document.getElementById('scripturl-status');
+  if(!url){st.textContent='— enter a URL first';st.style.color='var(--muted)';return;}
+  st.textContent='checking…';st.style.color='var(--muted)';
+  try{
+    const res=await fetch(url+(url.includes('?')?'&':'?')+'action=ping');
+    const data=await res.json();
+    if(data&&data.ok){st.textContent='✓ connected';st.style.color='var(--green)';}
+    else{st.textContent='✗ reachable but unexpected response';st.style.color='var(--red)';}
+  }catch(e){st.textContent='✗ could not reach (check URL / deployment access)';st.style.color='var(--red)';}
+}
+// Small JSON GET helper against the configured backend; resolves to null (not throws) if
+// unconfigured or unreachable, so callers can just render an empty/"not connected" state.
+async function backendGet(params){
+  const url=getScriptUrl();
+  if(!url)return null;
+  try{
+    const qs=new URLSearchParams(params).toString();
+    const res=await fetch(url+(url.includes('?')?'&':'?')+qs);
+    if(!res.ok)return null;
+    return await res.json();
+  }catch(e){return null;}
 }
 function closeSettings(){document.getElementById('set-overlay').classList.remove('open');}
 document.getElementById('set-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('set-overlay'))closeSettings();});
@@ -1609,6 +1728,7 @@ function saveSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
   saveP(P);if(window.fbSave)window.fbSave();
+  saveScriptUrl(document.getElementById('sl-scripturl').value);
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
 }
 function toggleSet(id){document.getElementById(id).classList.toggle('hide');}

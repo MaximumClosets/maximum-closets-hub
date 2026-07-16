@@ -339,6 +339,7 @@ function doGet(e) {
   const action = e.parameter.action;
   try {
     if (action === 'recentFiles') return jsonOut(apiRecentFiles(e.parameter.customer, e.parameter.kind, Number(e.parameter.limit) || 5));
+    if (action === 'fileData') return jsonOut(apiFileData(e.parameter.id));
     if (action === 'jobs') return jsonOut(apiListJobs());
     if (action === 'ping') return jsonOut({ ok: true, time: nowStr() });
     return jsonOut({ error: 'Unknown action: ' + action }, 400);
@@ -366,14 +367,19 @@ function apiRecentFiles(customerName, kind, limit) {
   if (!customerName || !kind) return { error: 'customer and kind are required' };
   const root = DriveApp.getFolderById(CONFIG.DRIVE_ROOT_ID);
   const jobsRoot = getOrCreateSubfolder(root, CONFIG.JOBS_ROOT_NAME);
+  const target = customerName.toLowerCase().trim();
   const matches = [];
+  // Case-insensitive folder-name match rather than exact getFoldersByName: the Hub's job
+  // name and the auto-parsed Drive folder name won't always agree on capitalization/spacing.
   const years = jobsRoot.getFolders();
   while (years.hasNext()) {
     const months = years.next().getFolders();
     while (months.hasNext()) {
-      const custFolders = months.next().getFoldersByName(customerName);
+      const custFolders = months.next().getFolders();
       while (custFolders.hasNext()) {
-        const kindFolders = custFolders.next().getFoldersByName(kind);
+        const custFolder = custFolders.next();
+        if (custFolder.getName().toLowerCase().trim() !== target) continue;
+        const kindFolders = custFolder.getFoldersByName(kind);
         while (kindFolders.hasNext()) {
           const files = kindFolders.next().getFiles();
           while (files.hasNext()) {
@@ -386,6 +392,24 @@ function apiRecentFiles(customerName, kind, limit) {
   }
   matches.sort((a, b) => b.modified.localeCompare(a.modified));
   return { customer: customerName, kind, files: matches.slice(0, limit) };
+}
+
+// Returns a file's bytes as base64 so the Hub can embed it directly into a proposal
+// (data: URL) — a live Drive link would 403 for a customer who has no access to the
+// shared drive, so anything going into an emailed/printed proposal needs to be self-contained.
+// Capped at 8MB to keep the Web App response reasonable; the Hub should show an error for
+// anything larger rather than let this hang.
+function apiFileData(fileId) {
+  if (!fileId) return { error: 'id is required' };
+  const file = DriveApp.getFileById(fileId);
+  if (file.getSize() > 8 * 1024 * 1024) return { error: 'File too large to inline (>8MB): ' + file.getName() };
+  const blob = file.getBlob();
+  return {
+    id: fileId,
+    name: file.getName(),
+    mimeType: blob.getContentType(),
+    base64: Utilities.base64Encode(blob.getBytes()),
+  };
 }
 
 function apiListJobs() {
