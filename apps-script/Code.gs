@@ -124,6 +124,7 @@ function runReorg() {
       if (Date.now() - startTime > CONFIG.MAX_RUNTIME_MS) { timedOut = true; break outer; }
       const file = files.next();
       const fid = file.getId();
+      if (fid === CONFIG.JOB_DATA_SHEET_ID) continue; // never touch the Hub's own database sheet
       if (alreadyDone.has(fid)) { skippedDone++; continue; }
 
       try {
