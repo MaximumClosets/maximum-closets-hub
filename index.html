@@ -291,6 +291,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
     <div class="mtab" onclick="mTab('pricing')">💰 Pricing</div>
     <div class="mtab" onclick="mTab('checklist')">✓ Checklist</div>
     <div class="mtab" onclick="mTab('proposal')">📄 Proposal</div>
+    <div class="mtab" onclick="mTab('export')">📤 Export</div>
     <div class="mtab" onclick="mTab('move')">Move</div>
   </div>
 
@@ -481,6 +482,13 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
     <button class="gen-btn" onclick="previewProposal()">👁 Preview Proposal</button>
     <button class="gen-btn" style="background:#444;margin-top:8px" onclick="printProposal()">🖨 Print / Save as PDF</button>
     <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:7px">No internet needed — generates instantly from your pricing data</p>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="mtpane" id="mp-export">
+    <p class="tip" style="margin-bottom:12px">Draft format for Bestmate — nobody's confirmed the real spec yet, so treat this as a starting point to react to, not a finished integration.</p>
+    <button class="add-line" style="margin-top:0" onclick="renderBestmateExport()">🔄 Build Export Preview</button>
+    <div id="export-preview" style="margin-top:10px"></div>
   </div>
 
   <!-- MOVE -->
@@ -1477,6 +1485,54 @@ function getProposalData(){
   const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
   const melColor=melQty>0?(document.getElementById('mel-type')?.value==='white'?'White':'Color'):'';
   return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,plansPdf:proposalPlansPdf,subtotal,afterDisc,total,deposit,today,hrs,melColor,propNum:'MC-'+Date.now().toString().slice(-6),lines:buildProposalLines()};
+}
+// ── BESTMATE EXPORT (draft format — iterate once the real spec is known) ──
+function getBestmateExportData(){
+  const job=jobs.find(j=>j.id===editId);if(!job)return null;
+  const addr=job.addr||document.getElementById('p-addr')?.value||'';
+  const lines=(typeof melC!=='undefined')?buildProposalLines():[];
+  return{
+    _format:'draft-1 — Maximum Closets Hub, unconfirmed against Bestmate\'s actual spec',
+    exportedAt:new Date().toISOString(),
+    customer:{name:job.name,phone:job.phone||'',email:job.email||'',address:addr},
+    job:{id:job.id,stage:STAGES[job.stage],source:job.source||'',dateVisited:job.date||'',notes:job.notes||''},
+    pricing:{salePrice:job.sale||0,cost:job.cost||0,profit:(job.sale||0)-(job.cost||0),depositDue:job.sale?Math.round(job.sale/2):0},
+    lineItems:lines.map(l=>({description:l.label,qty:l.qty})),
+    attachments:{
+      renders:proposalImages.map(i=>i.name),
+      plansPdf:proposalPlansPdf?proposalPlansPdf.name:null,
+    },
+  };
+}
+function renderBestmateExport(){
+  const data=getBestmateExportData();
+  const el=document.getElementById('export-preview');
+  if(!data){el.innerHTML='<p class="tip">No job open.</p>';return;}
+  const json=JSON.stringify(data,null,2);
+  const csvRow=[data.customer.name,data.customer.phone,data.customer.email,data.customer.address,data.job.stage,data.pricing.salePrice,data.pricing.cost,data.pricing.profit,data.pricing.depositDue,data.job.dateVisited].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',');
+  window._bestmateExport={json,csvRow};
+  el.innerHTML=`
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="add-line" style="margin:0;flex:1;min-width:120px" onclick="copyBestmateExport('json')">📋 Copy JSON</button>
+      <button class="add-line" style="margin:0;flex:1;min-width:120px" onclick="downloadBestmateExport('json')">⬇ Download JSON</button>
+      <button class="add-line" style="margin:0;flex:1;min-width:120px" onclick="downloadBestmateExport('csv')">⬇ Download CSV row</button>
+    </div>
+    <pre style="background:#0d1016;border:1.5px solid var(--border);border-radius:8px;padding:12px;font-size:11px;color:#b8bccb;overflow-x:auto;white-space:pre-wrap;word-break:break-word">${json.replace(/</g,'&lt;')}</pre>`;
+}
+function copyBestmateExport(kind){
+  const text=kind==='json'?window._bestmateExport.json:window._bestmateExport.csvRow;
+  navigator.clipboard?.writeText(text).then(()=>alert('Copied to clipboard.')).catch(()=>alert('Could not copy — select the text manually.'));
+}
+function downloadBestmateExport(kind){
+  const job=jobs.find(j=>j.id===editId);
+  const isJson=kind==='json';
+  const text=isJson?window._bestmateExport.json:'Name,Phone,Email,Address,Stage,Sale,Cost,Profit,Deposit,DateVisited\n'+window._bestmateExport.csvRow;
+  const blob=new Blob([text],{type:isJson?'application/json':'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${(job?.name||'job').replace(/[^a-z0-9]+/gi,'-')}-bestmate.${kind}`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 function buildProposalHTML(d){
   const rowsHtml=d.lines.map(l=>`<tr><td>${l.label}</td><td style="text-align:right;white-space:nowrap">${l.qty}</td></tr>`).join('');
