@@ -39,6 +39,20 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .ag-item.tmrw{background:rgba(242,165,0,0.75)}
 .ag-item.soon{background:rgba(0,121,191,0.55)}
 .ag-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.7);flex-shrink:0}
+.hot-bar{background:linear-gradient(90deg,rgba(192,57,43,0.16),rgba(208,138,10,0.10));border-bottom:1px solid rgba(208,138,10,0.25)}
+.hot-hd{display:flex;align-items:center;justify-content:space-between;padding:6px 14px 2px;font-size:11px;font-weight:800;letter-spacing:.3px;color:#e8a978;cursor:pointer;user-select:none}
+.hot-toggle{color:var(--muted);font-size:10px;transition:transform .15s}
+.hot-bar.collapsed .hot-strip{display:none}
+.hot-bar.collapsed .hot-toggle{transform:rotate(-90deg)}
+.hot-strip{padding:2px 14px 8px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;display:flex;gap:7px}
+.hot-strip::-webkit-scrollbar{display:none}
+.hot-empty{color:rgba(255,255,255,0.4);font-size:11px;font-style:italic;padding:2px 0}
+.hot-item{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(208,138,10,0.3);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:11.5px;color:#f0d9c6;white-space:nowrap;flex-shrink:0}
+.hot-item b{color:#fff;font-weight:700}
+.hot-item .hot-rank{color:var(--muted);font-weight:700;font-size:10px}
+.hot-item .hot-days{background:rgba(192,57,43,0.85);color:#fff;font-weight:700;padding:1px 6px;border-radius:20px;font-size:9.5px}
+.hot-item.flare{border-color:rgba(235,90,70,0.65);background:rgba(192,57,43,0.16)}
+.hot-item.flare .hot-days{background:#eb5a46}
 .board{display:flex;gap:10px;padding:10px;overflow-x:auto;align-items:flex-start;min-height:calc(100vh - 80px)}
 .board::-webkit-scrollbar{height:6px}
 .board::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.25);border-radius:3px}
@@ -259,6 +273,10 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 </header>
 
 <div class="agenda" id="agenda"><span class="agenda-empty">No upcoming tasks</span></div>
+<div class="hot-bar" id="hotbar-wrap">
+  <div class="hot-hd" onclick="toggleHot()"><span>🔥 What's Hot</span><span class="hot-toggle" id="hot-toggle">▾</span></div>
+  <div class="hot-strip" id="hotbar"></div>
+</div>
 <div class="board" id="board"></div>
 
 <!-- JOB MODAL -->
@@ -704,6 +722,47 @@ function saveP(obj){try{localStorage.setItem('mc-p',JSON.stringify(obj));}catch(
 const STAGES=['Lead / Customer','Measure / Consult','Estimate Sent','Deposit Paid','Install Scheduled','Install','Done'];
 const SCOLS=['#6b778c','#f2a500','#eb5a46','#61bd4f','#00c2e0','#0079bf','#1a5c38'];
 const LBLS={new:{c:'l-new',t:'New Lead'},plans:{c:'l-plans',t:'Need Plans Sent'},followup:{c:'l-followup',t:'Follow Up Soon'},ontrack:{c:'l-ontrack',t:'On Track'},design:{c:'l-design',t:'Design & Send'},inprog:{c:'l-inprog',t:'In Progress'},finalpay:{c:'l-finalpay',t:'Final Payment Due'},done:{c:'l-done',t:'Done'}};
+
+// ── WHAT'S HOT: priority = stage weight + days pending. Estimate Sent (money on the table,
+// waiting on the customer) ranks highest; Done jobs are excluded entirely. ──
+const HOT_WEIGHT=[20,35,60,45,30,10,-1]; // indexed by STAGES; -1 = excluded from Hot
+function jobRefDate(job){
+  if(job.date){const d=new Date(job.date+'T12:00:00');if(!isNaN(d))return d;}
+  const t=parseInt((job.id||'').slice(0,8),36);
+  return isNaN(t)?new Date():new Date(t);
+}
+function daysPending(job){
+  const today=new Date();today.setHours(0,0,0,0);
+  const ref=jobRefDate(job);ref.setHours(0,0,0,0);
+  return Math.max(0,Math.round((today-ref)/86400000));
+}
+function hotScore(job){
+  const w=HOT_WEIGHT[job.stage];
+  if(w===undefined||w<0)return -1;
+  return w+daysPending(job);
+}
+function hotList(limit=8){
+  return jobs.map(j=>({job:j,score:hotScore(j),dp:daysPending(j)}))
+    .filter(x=>x.score>=0)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,limit);
+}
+function toggleHot(){
+  const w=document.getElementById('hotbar-wrap');if(!w)return;
+  w.classList.toggle('collapsed');
+  try{localStorage.setItem('mc-hot-collapsed',w.classList.contains('collapsed')?'1':'');}catch(e){}
+}
+function renderHot(){
+  const el=document.getElementById('hotbar');if(!el)return;
+  const ranked=hotList(8);
+  if(!ranked.length){el.innerHTML='<span class="hot-empty">Nothing hot right now — no open Estimate Sent / pending jobs</span>';return;}
+  el.innerHTML=ranked.map((r,i)=>{
+    const j=r.job;
+    const flare=r.dp>=14||j.stage===2;
+    return `<span class="hot-item ${flare?'flare':''}" data-jid="${j.id}"><span class="hot-rank">#${i+1}</span>🔥 <b>${j.name}</b> · ${STAGES[j.stage]}<span class="hot-days">${r.dp}d</span>${j.sale>0?' · $'+j.sale.toLocaleString():''}</span>`;
+  }).join('');
+  el.querySelectorAll('.hot-item').forEach(elm=>attachTap(elm,()=>openEdit(elm.dataset.jid)));
+}
 const CL={
   0:[{n:'New Lead',items:['Get full name, phone & email','Understand scope (rooms, style, timeline)','Schedule measure / consult']}],
   1:[{n:'Measure & Design',items:['Measure all spaces + take photos','Note client preferences (color, style, hardware)','Draft design in KCD','Price job in pricing tab','Send estimate to client']}],
@@ -1396,6 +1455,7 @@ function render(){
   const com=jobs.filter(j=>j.stage>=3&&j.stage<6).reduce((s,j)=>s+(j.sale||0),0);
   const cl=jobs.filter(j=>j.stage===6).reduce((s,j)=>s+(j.sale||0),0);
   document.getElementById('hstats').textContent=`${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
+  renderHot();
 }
 
 function mTab(name){
@@ -1554,6 +1614,7 @@ function saveSettings(){
 function toggleSet(id){document.getElementById(id).classList.toggle('hide');}
 
 loadP();
+try{if(localStorage.getItem('mc-hot-collapsed'))document.getElementById('hotbar-wrap').classList.add('collapsed');}catch(e){}
 render();renderAgenda();
 </script>
 </body>
