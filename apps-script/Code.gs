@@ -309,12 +309,15 @@ function getMigrationLogSheet() {
   }
   return sheet;
 }
+// Bug fix (2026-07-16): this used to only recognize the live-mode action names, so in
+// DRY_RUN every trigger fire re-planned the same files from scratch instead of resuming —
+// it must also recognize the dry-run action names or resumability silently does nothing.
+const HANDLED_ACTIONS = new Set(['MOVED', 'ARCHIVED', 'FLAGGED-DUP', 'PLAN', 'PLAN-ARCHIVE', 'PLAN-DUP']);
 function getAlreadyLoggedFileIds(logSheet) {
   const values = logSheet.getDataRange().getValues();
   const ids = new Set();
   for (let i = 1; i < values.length; i++) {
-    const action = values[i][1];
-    if (action === 'MOVED' || action === 'ARCHIVED' || action === 'FLAGGED-DUP') ids.add(values[i][4]);
+    if (HANDLED_ACTIONS.has(values[i][1])) ids.add(values[i][4]);
   }
   return ids;
 }
