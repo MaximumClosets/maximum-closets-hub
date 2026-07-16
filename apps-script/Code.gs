@@ -1,0 +1,422 @@
+/**
+ * Maximum Closets Hub — Drive reorg + backend bridge
+ * ====================================================
+ * Two jobs live in this one script, because both need to run as YOUR
+ * Google account (the Hub is a static page with no server of its own):
+ *
+ *   1. runReorg()  — one-time migration of the shared drive into
+ *      /Maximum Closets Jobs/YYYY/MM/Customer-Name/{3Ds,PDFs,Contracts,Other}/
+ *      Safe by default: DRY_RUN below starts as true, which only WRITES A
+ *      PLAN to the "Migration Log" sheet tab and moves nothing. Review that
+ *      log, then flip DRY_RUN to false and run again to actually move files.
+ *      Large batches: Apps Script kills any single run after ~6 minutes, so
+ *      this function time-boxes itself and is safe to just re-run repeatedly
+ *      (or trigger on a timer) until the log shows everything done.
+ *
+ *   2. doGet(e) / doPost(e) — a small JSON API, deployed as a Web App, that
+ *      the Hub (index.html) calls to: list the most recent 3D renders / PDFs
+ *      for a customer, and read/write rows in the Job Data sheet.
+ *
+ * SETUP
+ * -----
+ *  1. Go to https://script.google.com → New project.
+ *  2. Delete the default Code.gs contents, paste this whole file in.
+ *  3. Update the CONFIG block below if any IDs changed.
+ *  4. Run `runReorg` once from the editor toolbar (function dropdown →
+ *     runReorg → Run). First run will ask you to authorize — that's
+ *     expected, it needs Drive + Sheets access under your account.
+ *  5. Open the Job Data sheet, check the new "Migration Log" tab. Review it.
+ *  6. When it looks right, set DRY_RUN = false below, save, run again.
+ *     Keep running it (it picks up where it left off) until the log's
+ *     "Remaining" count in the toast/log hits 0.
+ *  7. Deploy ▸ New deployment ▸ type "Web app" ▸ Execute as "Me" ▸
+ *     Who has access "Only myself" (or "Anyone with the link" if you want
+ *     the Hub reachable without you being logged in) ▸ Deploy.
+ *  8. Copy the Web app URL, paste it into the Hub's Settings panel
+ *     (⚙️ → "Backend Script URL").
+ */
+
+// ─────────────────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────────────────
+const CONFIG = {
+  DRIVE_ROOT_ID: '0ACfFVWmN5VhLUk9PVA',       // Maximum Closets shared drive
+  JOB_DATA_SHEET_ID: '1bA4oWF9-oQ6V4FzvNyYQ0IQhmIDI9vETtRLALen0mKE',
+  JOBS_ROOT_NAME: 'Maximum Closets Jobs',
+  ARCHIVE_FOLDER_NAME: '_Archive',             // where non-job ops files (Maximum Pipe, inventory sheets) land
+  DRY_RUN: true,                               // ALWAYS leave true for the first run. See SETUP above.
+  DELETE_EMPTY_JUNK: false,                    // flip true to actually delete the empty/junk folders the audit flagged
+  MAX_RUNTIME_MS: 5 * 60 * 1000,               // stop this invocation before Apps Script's ~6min hard limit
+};
+
+// Folders that are 100% empty or junk per the audit — only acted on when DELETE_EMPTY_JUNK=true.
+const JUNK_FOLDER_IDS = [
+  '1RsYbaw99k8CZ5NbwRJsM3MNRPX6T4ZgK', // Receipts (new, empty, created 7/11/26)
+  '1gJ0j3uy6i7qNNayJII79fQckhLck0IRM', // CncPrintouts (empty)
+  '1QgoarA-aVFyFdE0cGUJ1wlytTNFnYl8l', // 1_3Ds_MAX/New folder (empty)
+];
+// Path (by name, from drive root) to the Facebook browser-scrape junk folder.
+const JUNK_FOLDER_PATHS = [
+  ['Finished_Pics_4Investors', 'Facebook_files'],
+];
+// The stale full-mirror folder found inside 1_PDF_MAX. NOT auto-deleted — flagged only.
+// Review it yourself once the top-level 1_PDF_MAX migration is done: if everything in here
+// really is a duplicate of something now filed under Maximum Closets Jobs, trash it by hand.
+const FLAG_FOR_MANUAL_REVIEW_ID = '1HMNxYwuI-m2FfBTwvRyhRal66OsXKovz'; // 1_PDF_MAX/1_PDF_MAX
+
+// Files that are business-ops, not job files, even though they sit at the drive root
+// alongside job files. These get moved to _Archive instead of into the job structure.
+const ROOT_ARCHIVE_TITLES = [
+  /^maximum pipe$/i,               // already imported into the Job Data sheet — see runReorg's seed import
+  /^\s*inventory list\s*$/i,
+  /^inventory list - special items$/i,
+];
+// Files/folders to leave completely alone (not job content, not safe to touch automatically).
+const ROOT_SKIP_TITLES = [
+  /^gggg$/i,                       // unresolved shortcut, flagged for James in the audit
+];
+
+// Each entry describes one source location to migrate. `path` is a list of folder names
+// walked from the drive root (or from `New Contacts` etc for nested ones). `topLevelFilesOnly`
+// = true means don't recurse into subfolders of that source (used where a subfolder is known
+// to be a stale mirror, an unrelated utility export, or a mixed bag needing a human look).
+const SOURCES = [
+  { path: [], name: 'Drive root (loose files)', topLevelFilesOnly: true, defaultKind: 'Other', isRoot: true },
+  { path: ['1_DOTJ_JOBS'], name: '1_DOTJ_JOBS', defaultKind: 'Other' },
+  { path: ['1_PDF_MAX'], name: '1_PDF_MAX (top level)', defaultKind: 'PDFs', topLevelFilesOnly: true },
+  { path: ['1_3Ds_MAX'], name: '1_3Ds_MAX (top level)', defaultKind: '3Ds', topLevelFilesOnly: true },
+  { path: ['Proposals'], name: 'Proposals', defaultKind: 'Contracts',
+    skipTitles: [/^maximum contract/i, /^copy of maximum contract/i, /web.?redesign.?seo/i, /^proposal_template/i, /^proposal_contracttemp/i] },
+  { path: ['Cost per job '], name: 'Cost per job', defaultKind: 'Other' },
+  { path: ['Max_Cut_optimizer'], name: 'Max_Cut_optimizer', defaultKind: 'PDFs' },
+  { path: ['Cutlist_ExportKCD'], name: 'Cutlist_ExportKCD', defaultKind: 'PDFs' },
+  { path: ['To Miguel'], name: 'To Miguel (top level)', defaultKind: 'PDFs', topLevelFilesOnly: true },
+  { path: ['Invoices'], name: 'Invoices', defaultKind: 'Contracts' },
+  { path: ['New Contacts', 'MaxMarketingMaterial', 'Finished closets pics'], name: 'New Contacts / Finished closets pics', defaultKind: 'Other' },
+  { path: ['New Contacts', 'Proposals_Contracts_Invoice'], name: 'New Contacts / Proposals_Contracts_Invoice', defaultKind: 'Contracts' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────
+// REORG
+// ─────────────────────────────────────────────────────────────────────────
+function runReorg() {
+  const startTime = Date.now();
+  const root = DriveApp.getFolderById(CONFIG.DRIVE_ROOT_ID);
+  const jobsRoot = getOrCreateSubfolder(root, CONFIG.JOBS_ROOT_NAME);
+  const archiveRoot = getOrCreateSubfolder(root, CONFIG.ARCHIVE_FOLDER_NAME);
+  const log = getMigrationLogSheet();
+  const alreadyDone = getAlreadyLoggedFileIds(log);
+  const overrides = getManualOverrides(log);
+
+  let planned = 0, moved = 0, skippedDup = 0, skippedDone = 0, archived = 0, errors = 0;
+  let timedOut = false;
+
+  outer:
+  for (const src of SOURCES) {
+    const folder = src.isRoot ? root : getFolderByPath(root, src.path);
+    if (!folder) {
+      log.appendRow([nowStr(), 'ERROR', src.name, '', '', '', '', 'Source folder not found — check the path/name']);
+      errors++;
+      continue;
+    }
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      if (Date.now() - startTime > CONFIG.MAX_RUNTIME_MS) { timedOut = true; break outer; }
+      const file = files.next();
+      const fid = file.getId();
+      if (alreadyDone.has(fid)) { skippedDone++; continue; }
+
+      try {
+        const title = file.getName();
+
+        // Root-level non-job business files → archive, don't treat as a customer job.
+        if (src.isRoot) {
+          if (ROOT_SKIP_TITLES.some(rx => rx.test(title))) continue;
+          if (ROOT_ARCHIVE_TITLES.some(rx => rx.test(title))) {
+            if (!CONFIG.DRY_RUN) file.moveTo(archiveRoot);
+            log.appendRow([nowStr(), CONFIG.DRY_RUN ? 'PLAN-ARCHIVE' : 'ARCHIVED', src.name, title, fid, '', '_Archive/' + title, '']);
+            archived++; planned++;
+            continue;
+          }
+        }
+        if (src.skipTitles && src.skipTitles.some(rx => rx.test(title))) {
+          log.appendRow([nowStr(), 'SKIPPED (admin/template, not a job file)', src.name, title, fid, '', '', '']);
+          continue;
+        }
+
+        const override = overrides[fid] || overrides[title.toLowerCase()];
+        const customerParts = override ? override.split('/').map(s => s.trim()).filter(Boolean) : extractCustomerPath(title);
+        const kind = classifyKind(title, src.defaultKind);
+        const modDate = file.getLastUpdated();
+        const destMap = getOrCreateJobFolders(jobsRoot, customerParts, modDate);
+        const destFolder = destMap[kind];
+
+        const dup = findDuplicateInFolder(destFolder, title, file.getSize());
+        const newPath = `${CONFIG.JOBS_ROOT_NAME}/${modDate.getFullYear()}/${pad2(modDate.getMonth() + 1)}/${customerParts.join('/')}/${kind}/${title}`;
+
+        if (dup) {
+          log.appendRow([nowStr(), CONFIG.DRY_RUN ? 'PLAN-DUP' : 'FLAGGED-DUP', src.name, title, fid, oldPathOf(file), newPath,
+            'Possible duplicate of existing file in destination (' + dup.getId() + ') — left in source for manual review']);
+          skippedDup++;
+          continue;
+        }
+
+        if (!CONFIG.DRY_RUN) file.moveTo(destFolder);
+        log.appendRow([nowStr(), CONFIG.DRY_RUN ? 'PLAN' : 'MOVED', src.name, title, fid, oldPathOf(file), newPath, '']);
+        moved++; planned++;
+      } catch (err) {
+        log.appendRow([nowStr(), 'ERROR', src.name, file.getName(), fid, '', '', String(err)]);
+        errors++;
+      }
+    }
+  }
+
+  if (CONFIG.DELETE_EMPTY_JUNK) cleanupJunk(root, log);
+
+  const msg = `Reorg pass ${CONFIG.DRY_RUN ? '(DRY RUN — nothing moved)' : ''} done.\n` +
+    `${CONFIG.DRY_RUN ? 'Planned' : 'Moved'}: ${moved}, Archived: ${archived}, Flagged dup: ${skippedDup}, ` +
+    `Already done (skipped): ${skippedDone}, Errors: ${errors}.${timedOut ? '\nHit the time box — run runReorg() again to continue where it left off.' : '\nAll sources fully processed this pass.'}`;
+  Logger.log(msg);
+  log.appendRow([nowStr(), 'RUN SUMMARY', '', '', '', '', '', msg.replace(/\n/g, ' | ')]);
+}
+
+// Deletes the folders/paths flagged as junk in the audit. Only runs when
+// CONFIG.DELETE_EMPTY_JUNK is explicitly set to true — double-checks emptiness first.
+function cleanupJunk(root, log) {
+  JUNK_FOLDER_IDS.forEach(id => {
+    try {
+      const f = DriveApp.getFolderById(id);
+      if (f.getFiles().hasNext() || f.getFolders().hasNext()) {
+        log.appendRow([nowStr(), 'SKIP-JUNK (not empty, re-check manually)', '', f.getName(), id, '', '', '']);
+        return;
+      }
+      f.setTrashed(true);
+      log.appendRow([nowStr(), 'DELETED-JUNK', '', f.getName(), id, '', '', 'Confirmed empty, trashed']);
+    } catch (err) {
+      log.appendRow([nowStr(), 'ERROR', '', '', id, '', '', String(err)]);
+    }
+  });
+  JUNK_FOLDER_PATHS.forEach(path => {
+    const f = getFolderByPath(root, path);
+    if (!f) return;
+    f.setTrashed(true);
+    log.appendRow([nowStr(), 'DELETED-JUNK', '', path.join('/'), f.getId(), '', '', 'Browser-scrape junk folder']);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// NAME / KIND / PATH HELPERS
+// ─────────────────────────────────────────────────────────────────────────
+
+// Best-effort customer name → folder path segments. Wrong guesses are exactly
+// why the Migration Log + Manual Overrides tab exist: fix the name there and
+// re-run rather than fighting the regex further.
+function extractCustomerPath(rawTitle) {
+  let base = rawTitle;
+  // strip chained extensions, e.g. "KCD Drawings - X.Job.pdf" -> "KCD Drawings - X"
+  while (/\.(pdf|job|jpe?g|png|heic|webp|csv|xlsx?|docx?|zip|tmp)$/i.test(base)) {
+    base = base.replace(/\.(pdf|job|jpe?g|png|heic|webp|csv|xlsx?|docx?|zip|tmp)$/i, '');
+  }
+  base = base.replace(/^KCD Drawings - /i, '');
+  // split camelCase runs ("TeddyDianeVitt" / "GardenCity") — most source filenames have
+  // no separators at all, so this is the difference between a readable folder name and not.
+  base = base.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+
+  // Plain \b treats "_" as a word char, so it wouldn't catch "Inder_9Delaware" — match on
+  // non-letter boundaries instead (still correctly rejects "Arvinder", which has a letter before it).
+  if (/(^|[^a-z])inder([^a-z]|$)/i.test(base)) {
+    let addr = base.replace(/inder/ig, ' ').replace(/[_-]+/g, ' ').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
+    return ['Inder', titleCase(addr) || 'General'];
+  }
+
+  const name = titleCase(base.replace(/[_]+/g, ' ').trim()) || 'Unsorted';
+  return [sanitizeFolderName(name)];
+}
+
+function classifyKind(title, defaultKind) {
+  const ext = (title.match(/\.([a-z0-9]+)$/i) || [, ''])[1].toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'heic', 'webp'].includes(ext)) return '3Ds';
+  if (['job'].includes(ext)) return 'Other';
+  if (ext === 'pdf' && !defaultKind) return 'PDFs';
+  return defaultKind || 'Other';
+}
+
+function titleCase(s) {
+  return s.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.substr(1).toLowerCase());
+}
+function sanitizeFolderName(name) {
+  return name.replace(/[\/\\:*?"<>|]/g, '-').trim().slice(0, 100) || 'Unsorted';
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function nowStr() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'); }
+function oldPathOf(file) {
+  const parents = file.getParents();
+  return parents.hasNext() ? parents.next().getName() + '/' + file.getName() : file.getName();
+}
+
+function getFolderByPath(startFolder, pathParts) {
+  let f = startFolder;
+  for (const part of pathParts) {
+    const it = f.getFoldersByName(part);
+    if (!it.hasNext()) return null;
+    f = it.next();
+  }
+  return f;
+}
+function getOrCreateSubfolder(parent, name) {
+  const it = parent.getFoldersByName(name);
+  if (it.hasNext()) return it.next();
+  return parent.createFolder(name);
+}
+function getOrCreateJobFolders(jobsRoot, customerParts, date) {
+  let cust = getOrCreateSubfolder(jobsRoot, String(date.getFullYear()));
+  cust = getOrCreateSubfolder(cust, pad2(date.getMonth() + 1));
+  customerParts.forEach(part => { cust = getOrCreateSubfolder(cust, part); });
+  return {
+    root: cust,
+    '3Ds': getOrCreateSubfolder(cust, '3Ds'),
+    'PDFs': getOrCreateSubfolder(cust, 'PDFs'),
+    'Contracts': getOrCreateSubfolder(cust, 'Contracts'),
+    'Other': getOrCreateSubfolder(cust, 'Other'),
+  };
+}
+function findDuplicateInFolder(folder, title, size) {
+  const it = folder.getFilesByName(title);
+  while (it.hasNext()) {
+    const f = it.next();
+    if (f.getSize() === size) return f;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// MIGRATION LOG / MANUAL OVERRIDES (tabs inside the Job Data sheet)
+// ─────────────────────────────────────────────────────────────────────────
+function getMigrationLogSheet() {
+  const ss = SpreadsheetApp.openById(CONFIG.JOB_DATA_SHEET_ID);
+  let sheet = ss.getSheetByName('Migration Log');
+  if (!sheet) {
+    sheet = ss.insertSheet('Migration Log');
+    sheet.appendRow(['Timestamp', 'Action', 'Source', 'File Name', 'File ID', 'Old Path', 'New Path', 'Note']);
+    sheet.setFrozenRows(1);
+  }
+  let overrides = ss.getSheetByName('Manual Overrides');
+  if (!overrides) {
+    overrides = ss.insertSheet('Manual Overrides');
+    overrides.appendRow(['File ID or exact File Name', 'Correct Customer Path (e.g. "Inder/9 Delaware" or "Smith")']);
+    overrides.appendRow(['# Fill this in BEFORE flipping DRY_RUN to false if the log shows a misparsed name.', '']);
+    overrides.setFrozenRows(1);
+  }
+  return sheet;
+}
+function getAlreadyLoggedFileIds(logSheet) {
+  const values = logSheet.getDataRange().getValues();
+  const ids = new Set();
+  for (let i = 1; i < values.length; i++) {
+    const action = values[i][1];
+    if (action === 'MOVED' || action === 'ARCHIVED' || action === 'FLAGGED-DUP') ids.add(values[i][4]);
+  }
+  return ids;
+}
+function getManualOverrides(logSheet) {
+  const ss = logSheet.getParent();
+  const sheet = ss.getSheetByName('Manual Overrides');
+  const map = {};
+  if (!sheet) return map;
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    const key = String(values[i][0] || '').trim();
+    const val = String(values[i][1] || '').trim();
+    if (key && val && !key.startsWith('#')) map[key.toLowerCase()] = val;
+  }
+  return map;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// WEB APP API — called by the Hub (index.html)
+// ─────────────────────────────────────────────────────────────────────────
+function doGet(e) {
+  const action = e.parameter.action;
+  try {
+    if (action === 'recentFiles') return jsonOut(apiRecentFiles(e.parameter.customer, e.parameter.kind, Number(e.parameter.limit) || 5));
+    if (action === 'jobs') return jsonOut(apiListJobs());
+    if (action === 'ping') return jsonOut({ ok: true, time: nowStr() });
+    return jsonOut({ error: 'Unknown action: ' + action }, 400);
+  } catch (err) {
+    return jsonOut({ error: String(err) }, 500);
+  }
+}
+function doPost(e) {
+  try {
+    const body = JSON.parse(e.postData.contents || '{}');
+    if (body.action === 'upsertJob') return jsonOut(apiUpsertJob(body.job));
+    return jsonOut({ error: 'Unknown action: ' + body.action }, 400);
+  } catch (err) {
+    return jsonOut({ error: String(err) }, 500);
+  }
+}
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Finds /Maximum Closets Jobs/*/*/<customer>/<3Ds|PDFs>/ across all year/month folders
+// (customer folders repeat per month, so this walks the tree — fine at this drive's scale)
+// and returns the `limit` most-recently-modified files, newest first.
+function apiRecentFiles(customerName, kind, limit) {
+  if (!customerName || !kind) return { error: 'customer and kind are required' };
+  const root = DriveApp.getFolderById(CONFIG.DRIVE_ROOT_ID);
+  const jobsRoot = getOrCreateSubfolder(root, CONFIG.JOBS_ROOT_NAME);
+  const matches = [];
+  const years = jobsRoot.getFolders();
+  while (years.hasNext()) {
+    const months = years.next().getFolders();
+    while (months.hasNext()) {
+      const custFolders = months.next().getFoldersByName(customerName);
+      while (custFolders.hasNext()) {
+        const kindFolders = custFolders.next().getFoldersByName(kind);
+        while (kindFolders.hasNext()) {
+          const files = kindFolders.next().getFiles();
+          while (files.hasNext()) {
+            const f = files.next();
+            matches.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), modified: f.getLastUpdated().toISOString(), size: f.getSize() });
+          }
+        }
+      }
+    }
+  }
+  matches.sort((a, b) => b.modified.localeCompare(a.modified));
+  return { customer: customerName, kind, files: matches.slice(0, limit) };
+}
+
+function apiListJobs() {
+  const ss = SpreadsheetApp.openById(CONFIG.JOB_DATA_SHEET_ID);
+  const sheet = ss.getSheets()[0];
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  return values.slice(1).filter(r => r.some(c => c !== '')).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = row[i]; });
+    return obj;
+  });
+}
+
+// Upserts a job by "Job ID" — updates the row if it exists, appends if not.
+function apiUpsertJob(job) {
+  if (!job || !job['Job ID']) return { error: 'job.Job ID is required' };
+  const ss = SpreadsheetApp.openById(CONFIG.JOB_DATA_SHEET_ID);
+  const sheet = ss.getSheets()[0];
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const idCol = headers.indexOf('Job ID');
+  let rowIndex = -1;
+  for (let i = 1; i < values.length; i++) {
+    if (values[i][idCol] === job['Job ID']) { rowIndex = i; break; }
+  }
+  const row = headers.map(h => (h in job ? job[h] : (rowIndex >= 0 ? values[rowIndex][headers.indexOf(h)] : '')));
+  if (rowIndex >= 0) {
+    sheet.getRange(rowIndex + 1, 1, 1, row.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+  return { ok: true, jobId: job['Job ID'] };
+}
