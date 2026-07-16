@@ -47,6 +47,8 @@ const CONFIG = {
   DRY_RUN: true,                               // ALWAYS leave true for the first run. See SETUP above.
   DELETE_EMPTY_JUNK: false,                    // flip true to actually delete the empty/junk folders the audit flagged
   MAX_RUNTIME_MS: 5 * 60 * 1000,               // stop this invocation before Apps Script's ~6min hard limit
+  OLD_CUTOFF_MONTHS: 18,                       // files older than this (by modified date) are left exactly where they are, not organized
+  MAX_3DS_PER_CUSTOMER: 5,                     // only migrate the N most recent 3D renders per customer; the rest stay in 1_3Ds_MAX untouched
 };
 
 // Folders that are 100% empty or junk per the audit — only acted on when DELETE_EMPTY_JUNK=true.
@@ -84,7 +86,7 @@ const SOURCES = [
   { path: [], name: 'Drive root (loose files)', topLevelFilesOnly: true, defaultKind: 'Other', isRoot: true },
   { path: ['1_DOTJ_JOBS'], name: '1_DOTJ_JOBS', defaultKind: 'Other' },
   { path: ['1_PDF_MAX'], name: '1_PDF_MAX (top level)', defaultKind: 'PDFs', topLevelFilesOnly: true },
-  { path: ['1_3Ds_MAX'], name: '1_3Ds_MAX (top level)', defaultKind: '3Ds', topLevelFilesOnly: true },
+  { path: ['1_3Ds_MAX'], name: '1_3Ds_MAX (top level)', defaultKind: '3Ds', topLevelFilesOnly: true, capRecentPerCustomer: true },
   { path: ['Proposals'], name: 'Proposals', defaultKind: 'Contracts',
     skipTitles: [/^maximum contract/i, /^copy of maximum contract/i, /web.?redesign.?seo/i, /^proposal_template/i, /^proposal_contracttemp/i] },
   { path: ['Cost per job '], name: 'Cost per job', defaultKind: 'Other' },
@@ -109,6 +111,7 @@ function runReorg() {
   const overrides = getManualOverrides(log);
 
   let planned = 0, moved = 0, skippedDup = 0, skippedDone = 0, archived = 0, errors = 0;
+  let skippedOld = 0, skippedExcess3D = 0;
   let timedOut = false;
 
   outer:
@@ -119,6 +122,12 @@ function runReorg() {
       errors++;
       continue;
     }
+    // For 1_3Ds_MAX: figure out up front which files are among the N most recent per
+    // customer. Cheap metadata-only scan (no folder-creation calls), so redoing it every
+    // run is fine — it's the actual move/create-folder calls that are expensive, and this
+    // keeps that part limited to a handful of files per customer instead of everything.
+    const keep3DsIds = src.capRecentPerCustomer ? computeKeep3DsIds(folder) : null;
+
     const files = folder.getFiles();
     while (files.hasNext()) {
       if (Date.now() - startTime > CONFIG.MAX_RUNTIME_MS) { timedOut = true; break outer; }
@@ -144,6 +153,12 @@ function runReorg() {
           log.appendRow([nowStr(), 'SKIPPED (admin/template, not a job file)', src.name, title, fid, '', '', '']);
           continue;
         }
+
+        // Not logged per-file (would be thousands of Sheets writes) — just left exactly
+        // where they are and counted. Anything genuinely wanted later is a manual look,
+        // not something this pass needs to spend hours individually filing.
+        if (isTooOld(file.getLastUpdated())) { skippedOld++; continue; }
+        if (keep3DsIds && !keep3DsIds.has(fid)) { skippedExcess3D++; continue; }
 
         const override = overrides[fid] || overrides[title.toLowerCase()];
         const customerParts = override ? override.split('/').map(s => s.trim()).filter(Boolean) : extractCustomerPath(title);
@@ -176,6 +191,8 @@ function runReorg() {
 
   const msg = `Reorg pass ${CONFIG.DRY_RUN ? '(DRY RUN — nothing moved)' : ''} done.\n` +
     `${CONFIG.DRY_RUN ? 'Planned' : 'Moved'}: ${moved}, Archived: ${archived}, Flagged dup: ${skippedDup}, ` +
+    `Left in place (too old, >${CONFIG.OLD_CUTOFF_MONTHS}mo): ${skippedOld}, ` +
+    `Left in place (excess 3D renders, kept top ${CONFIG.MAX_3DS_PER_CUSTOMER}/customer): ${skippedExcess3D}, ` +
     `Already done (skipped): ${skippedDone}, Errors: ${errors}.${timedOut ? '\nHit the time box — run runReorg() again to continue where it left off.' : '\nAll sources fully processed this pass.'}`;
   Logger.log(msg);
   log.appendRow([nowStr(), 'RUN SUMMARY', '', '', '', '', '', msg.replace(/\n/g, ' | ')]);
@@ -208,6 +225,35 @@ function cleanupJunk(root, log) {
 // ─────────────────────────────────────────────────────────────────────────
 // NAME / KIND / PATH HELPERS
 // ─────────────────────────────────────────────────────────────────────────
+
+// Anything modified before this cutoff is left exactly where it already is —
+// not moved, not deleted, just skipped. Revisit manually later if truly unwanted.
+function isTooOld(date) {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - CONFIG.OLD_CUTOFF_MONTHS);
+  return date < cutoff;
+}
+
+// Scans a folder's files (metadata only — no writes, so cheap even at thousands of
+// files) and returns the set of file IDs that are among the MAX_3DS_PER_CUSTOMER most
+// recent renders for their customer. Everything else in that folder gets left alone.
+function computeKeep3DsIds(folder) {
+  const groups = {};
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const f = files.next();
+    const modDate = f.getLastUpdated();
+    if (isTooOld(modDate)) continue;
+    const key = extractCustomerPath(f.getName()).join('/');
+    (groups[key] = groups[key] || []).push({ id: f.getId(), modDate });
+  }
+  const keep = new Set();
+  Object.keys(groups).forEach(key => {
+    groups[key].sort((a, b) => b.modDate - a.modDate);
+    groups[key].slice(0, CONFIG.MAX_3DS_PER_CUSTOMER).forEach(x => keep.add(x.id));
+  });
+  return keep;
+}
 
 // Best-effort customer name → folder path segments. Wrong guesses are exactly
 // why the Migration Log + Manual Overrides tab exist: fix the name there and
