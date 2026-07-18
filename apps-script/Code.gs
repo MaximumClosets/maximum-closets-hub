@@ -44,7 +44,7 @@ const CONFIG = {
   JOB_DATA_SHEET_ID: '1bA4oWF9-oQ6V4FzvNyYQ0IQhmIDI9vETtRLALen0mKE',
   JOBS_ROOT_NAME: 'Maximum Closets Jobs',
   ARCHIVE_FOLDER_NAME: '_Archive',             // where non-job ops files (Maximum Pipe, inventory sheets) land
-  DRY_RUN: true,                               // ALWAYS leave true for the first run. See SETUP above.
+  DRY_RUN: false,                              // flipped false 2026-07-18 — tested clean all day, existing time trigger can now do real moves
   DELETE_EMPTY_JUNK: false,                    // flip true to actually delete the empty/junk folders the audit flagged
   MAX_RUNTIME_MS: 5 * 60 * 1000,               // stop this invocation before Apps Script's ~6min hard limit
   OLD_CUTOFF_MONTHS: 18,                       // files older than this (by modified date) are left exactly where they are, not organized
