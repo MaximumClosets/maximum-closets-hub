@@ -49,6 +49,7 @@ const CONFIG = {
   MAX_RUNTIME_MS: 5 * 60 * 1000,               // stop this invocation before Apps Script's ~6min hard limit
   OLD_CUTOFF_MONTHS: 18,                       // files older than this (by modified date) are left exactly where they are, not organized
   MAX_3DS_PER_CUSTOMER: 5,                     // only migrate the N most recent 3D renders per customer; the rest stay in 1_3Ds_MAX untouched
+  CONSOLIDATE_DRY_RUN: true,                   // ALWAYS leave true for the first consolidateFragments() run — see that function's comment
 };
 
 // Folders that are 100% empty or junk per the audit — only acted on when DELETE_EMPTY_JUNK=true.
@@ -213,6 +214,153 @@ function runReorgInner() {
     `Already done (skipped): ${skippedDone}, Errors: ${errors}.${timedOut ? '\nHit the time box — run runReorg() again to continue where it left off.' : '\nAll sources fully processed this pass.'}`;
   Logger.log(msg);
   log.appendRow([nowStr(), 'RUN SUMMARY', '', '', '', '', '', msg.replace(/\n/g, ' | ')]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CONSOLIDATE — one-time cleanup for the folder fragmentation caused by the
+// old extractCustomerPath bug + the overlapping-run race condition (2026-07-17).
+// Walks every Year/Month folder, groups sibling customer folders that the FIXED
+// extractCustomerPath would now treat as the same customer, and merges them into
+// one canonical folder (merging their 3Ds/PDFs/Contracts/Other subfolders too,
+// including de-duplicating repeat subfolders created by the race condition).
+// Never deletes a file — only moves, and only trashes folders once confirmed empty.
+// Safe to run repeatedly: once a customer's folders are merged down to one, that
+// group is a no-op on the next pass, so it doubles as its own resumability.
+//
+// CONFIG.CONSOLIDATE_DRY_RUN starts true: first run only logs what WOULD merge,
+// nothing actually moves. Review the Migration Log for CONSOLIDATE-PLAN rows,
+// then flip to false and run again to actually do it.
+// ─────────────────────────────────────────────────────────────────────────
+function consolidateFragments() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    Logger.log('Another run is already in progress — skipping this invocation.');
+    return;
+  }
+  try {
+    consolidateFragmentsInner();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function consolidateFragmentsInner() {
+  const startTime = Date.now();
+  const root = DriveApp.getFolderById(CONFIG.DRIVE_ROOT_ID);
+  const jobsRoot = getOrCreateSubfolder(root, CONFIG.JOBS_ROOT_NAME);
+  const log = getMigrationLogSheet();
+  const dry = CONFIG.CONSOLIDATE_DRY_RUN;
+
+  let groupsMerged = 0, filesMoved = 0, foldersRemoved = 0, dupsFlagged = 0, errors = 0;
+  let timedOut = false;
+
+  try {
+    const years = jobsRoot.getFolders();
+    while (years.hasNext()) {
+      const yearFolder = years.next();
+      const months = yearFolder.getFolders();
+      while (months.hasNext()) {
+        if (Date.now() - startTime > CONFIG.MAX_RUNTIME_MS) { timedOut = true; throw { __timeout: true }; }
+        const monthFolder = months.next();
+
+        const custFolders = [];
+        const cf = monthFolder.getFolders();
+        while (cf.hasNext()) custFolders.push(cf.next());
+        if (custFolders.length < 2) continue;
+
+        const groups = {};
+        custFolders.forEach(folder => {
+          const canonical = extractCustomerPath(folder.getName()).join('/');
+          (groups[canonical] = groups[canonical] || []).push(folder);
+        });
+
+        for (const canonical of Object.keys(groups)) {
+          const list = groups[canonical];
+          if (list.length < 2) continue; // this customer is already a single folder — nothing to merge
+
+          let primary = list.find(f => f.getName() === canonical) || list[0];
+          const rest = list.filter(f => f.getId() !== primary.getId());
+
+          if (dry) {
+            log.appendRow([nowStr(), 'CONSOLIDATE-PLAN', '', canonical, primary.getId(), '',
+              `${monthFolder.getParent().getName()}/${monthFolder.getName()}`,
+              `Would merge ${rest.length} folder(s) into "${primary.getName()}": ${rest.map(f => f.getName()).join(', ')}`]);
+            groupsMerged++;
+            continue;
+          }
+
+          const result = mergeFoldersInto(rest, primary, log);
+          filesMoved += result.filesMoved;
+          foldersRemoved += result.foldersRemoved;
+          dupsFlagged += result.dupsFlagged;
+          groupsMerged++;
+        }
+      }
+    }
+  } catch (err) {
+    if (!err || !err.__timeout) {
+      log.appendRow([nowStr(), 'ERROR', 'consolidateFragments', '', '', '', '', String(err)]);
+      errors++;
+    }
+  }
+
+  const msg = `Consolidate pass ${dry ? '(DRY RUN — nothing merged)' : ''} done.\n` +
+    `Customer groups ${dry ? 'that would be ' : ''}merged: ${groupsMerged}, Files ${dry ? '(n/a in dry run)' : 'moved'}: ${filesMoved}, ` +
+    `Folders removed: ${foldersRemoved}, Dup conflicts flagged: ${dupsFlagged}, Errors: ${errors}.` +
+    `${timedOut ? '\nHit the time box — run consolidateFragments() again to continue where it left off.' : '\nFully processed this pass.'}`;
+  Logger.log(msg);
+  log.appendRow([nowStr(), 'CONSOLIDATE SUMMARY', '', '', '', '', '', msg.replace(/\n/g, ' | ')]);
+}
+
+// Merges each folder in `fragments` into `primary`: for every subfolder inside a
+// fragment (3Ds/PDFs/Contracts/Other, possibly repeated due to the race condition),
+// finds-or-creates the matching subfolder under primary and moves the files across.
+// Duplicate filenames at the destination are left in place and flagged, never
+// silently overwritten or dropped. Empty fragment folders get trashed at the end.
+function mergeFoldersInto(fragments, primary, log) {
+  let filesMoved = 0, foldersRemoved = 0, dupsFlagged = 0;
+  fragments.forEach(fragment => {
+    const subfolders = fragment.getFolders();
+    while (subfolders.hasNext()) {
+      const sub = subfolders.next();
+      const destSub = getOrCreateSubfolder(primary, sub.getName());
+      const r = mergeFilesInto(sub, destSub, log);
+      filesMoved += r.filesMoved;
+      dupsFlagged += r.dupsFlagged;
+      if (!sub.getFiles().hasNext() && !sub.getFolders().hasNext()) {
+        sub.setTrashed(true);
+        foldersRemoved++;
+      }
+    }
+    // Loose files directly in the fragment folder (shouldn't normally happen, but safe to handle).
+    const r = mergeFilesInto(fragment, primary, log);
+    filesMoved += r.filesMoved;
+    dupsFlagged += r.dupsFlagged;
+    if (!fragment.getFiles().hasNext() && !fragment.getFolders().hasNext()) {
+      fragment.setTrashed(true);
+      foldersRemoved++;
+    }
+  });
+  return { filesMoved, foldersRemoved, dupsFlagged };
+}
+
+function mergeFilesInto(srcFolder, destFolder, log) {
+  let filesMoved = 0, dupsFlagged = 0;
+  const files = srcFolder.getFiles();
+  while (files.hasNext()) {
+    const f = files.next();
+    const dup = findDuplicateInFolder(destFolder, f.getName(), f.getSize());
+    if (dup) {
+      log.appendRow([nowStr(), 'CONSOLIDATE-DUP', '', f.getName(), f.getId(), '', destFolder.getName(),
+        `Same name+size already in target (${dup.getId()}) — left in fragment folder for manual review`]);
+      dupsFlagged++;
+      continue;
+    }
+    f.moveTo(destFolder);
+    log.appendRow([nowStr(), 'CONSOLIDATED', '', f.getName(), f.getId(), '', destFolder.getName(), 'Merged from a fragmented customer folder']);
+    filesMoved++;
+  }
+  return { filesMoved, dupsFlagged };
 }
 
 // Deletes the folders/paths flagged as junk in the audit. Only runs when
