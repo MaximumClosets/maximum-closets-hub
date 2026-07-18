@@ -310,6 +310,35 @@ function consolidateFragmentsInner() {
     `${timedOut ? '\nHit the time box — run consolidateFragments() again to continue where it left off.' : '\nFully processed this pass.'}`;
   Logger.log(msg);
   log.appendRow([nowStr(), 'CONSOLIDATE SUMMARY', '', '', '', '', '', msg.replace(/\n/g, ' | ')]);
+
+  // A real (non-dry) pass that finished without hitting the time box means every
+  // customer group is now down to one folder — nothing left to do. Stop the
+  // recurring trigger set up by setupConsolidateTrigger() and let James know by
+  // email, so nobody has to keep clicking Run or babysitting the Execution log.
+  if (!dry && !timedOut) {
+    ScriptApp.getProjectTriggers().forEach(t => {
+      if (t.getHandlerFunction() === 'consolidateFragments') ScriptApp.deleteTrigger(t);
+    });
+    try {
+      MailApp.sendEmail(Session.getEffectiveUser().getEmail(),
+        'Maximum Closets Hub: folder consolidation finished',
+        `The automatic folder cleanup is done — no more duplicate customer folders left to merge.\n\n${msg}\n\nThe recurring trigger has been switched off automatically.`);
+    } catch (err) {
+      Logger.log('Could not send completion email: ' + err);
+    }
+  }
+}
+
+// Run this once (from the function dropdown, same as any other function here) to make
+// consolidateFragments() run on its own every 7 minutes until every customer group is
+// down to one folder. Safe to run again later — it clears out any previous trigger for
+// consolidateFragments first, so you never end up with two overlapping schedules.
+function setupConsolidateTrigger() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'consolidateFragments') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('consolidateFragments').timeBased().everyMinutes(7).create();
+  Logger.log('Trigger created — consolidateFragments will now run automatically every 7 minutes until the whole Drive is consolidated, then switch itself off and email you.');
 }
 
 // Merges each folder in `fragments` into `primary`: for every subfolder inside a
