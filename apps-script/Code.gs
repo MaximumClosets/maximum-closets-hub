@@ -465,6 +465,7 @@ const DESCRIPTOR_STOPWORDS = [
   'large', 'main', 'guest', 'kids', 'child', 'nursery', 'den', 'library', 'foyer',
   'drawer', 'shelf', 'shelve', 'cabinet', 'door', 'unit', 'wardrobe', 'reach',
   'walkin', 'linen', 'dining', 'living', 'attic', 'loft', 'porch', 'deck', 'outdoor',
+  'right', 'left', 'birdseye', 'noxtra',
 ];
 const MAX_NAME_WORDS = 4; // safety cap even if no stopword/digit is ever hit
 
