@@ -439,6 +439,21 @@ const DESCRIPTOR_STOPWORDS = [
 ];
 const MAX_NAME_WORDS = 4; // safety cap even if no stopword/digit is ever hit
 
+// Filenames with no real customer name in them at all — generic camera/screenshot
+// exports like "IMG_9740.jpg", "DSC_0021.jpg", or "Screenshot 2026-06-01.png" — would
+// otherwise get a fabricated "customer" name (e.g. "Img 9740") from the first word +
+// digits. Route these into one shared bucket instead so a human can look at them,
+// rather than spraying one-off junk customer folders across the Jobs tree.
+const GENERIC_FILENAME_PATTERNS = [
+  /^img[-_ ]?\d+$/i,
+  /^dsc[-_ ]?\d+$/i,
+  /^dcim[-_ ]?\d+$/i,
+  /^photo[-_ ]?\d+$/i,
+  /^screenshot/i,
+  /^untitled/i,
+  /^\d+$/, // bare numbers, e.g. a phone's auto-generated filename
+];
+
 // Best-effort customer name → folder path segments. Wrong guesses are exactly
 // why the Migration Log + Manual Overrides tab exist: fix the name there and
 // re-run rather than fighting the regex further.
@@ -447,6 +462,9 @@ function extractCustomerPath(rawTitle) {
   // strip chained extensions, e.g. "KCD Drawings - X.Job.pdf" -> "KCD Drawings - X"
   while (/\.(pdf|job|jpe?g|png|heic|webp|csv|xlsx?|docx?|zip|tmp)$/i.test(base)) {
     base = base.replace(/\.(pdf|job|jpe?g|png|heic|webp|csv|xlsx?|docx?|zip|tmp)$/i, '');
+  }
+  if (GENERIC_FILENAME_PATTERNS.some(rx => rx.test(base.trim()))) {
+    return ['Unsorted - Needs Review'];
   }
   base = base.replace(/^KCD Drawings - /i, '');
   // split camelCase runs ("TeddyDianeVitt" / "GardenCity") — most source filenames have
