@@ -337,8 +337,8 @@ function setupConsolidateTrigger() {
   ScriptApp.getProjectTriggers().forEach(t => {
     if (t.getHandlerFunction() === 'consolidateFragments') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('consolidateFragments').timeBased().everyMinutes(7).create();
-  Logger.log('Trigger created — consolidateFragments will now run automatically every 7 minutes until the whole Drive is consolidated, then switch itself off and email you.');
+  ScriptApp.newTrigger('consolidateFragments').timeBased().everyMinutes(10).create();
+  Logger.log('Trigger created — consolidateFragments will now run automatically every 10 minutes until the whole Drive is consolidated, then switch itself off and email you.');
 }
 
 // Merges each folder in `fragments` into `primary`: for every subfolder inside a
