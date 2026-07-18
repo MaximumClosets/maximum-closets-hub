@@ -283,7 +283,7 @@ function consolidateFragmentsInner() {
 
           if (dry) {
             log.appendRow([nowStr(), 'CONSOLIDATE-PLAN', '', canonical, primary.getId(), '',
-              `${monthFolder.getParent().getName()}/${monthFolder.getName()}`,
+              `${yearFolder.getName()}/${monthFolder.getName()}`,
               `Would merge ${rest.length} folder(s) into "${primary.getName()}": ${rest.map(f => f.getName()).join(', ')}`]);
             groupsMerged++;
             continue;
