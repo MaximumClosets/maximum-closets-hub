@@ -101,7 +101,24 @@ const SOURCES = [
 // ─────────────────────────────────────────────────────────────────────────
 // REORG
 // ─────────────────────────────────────────────────────────────────────────
+// Thin wrapper: a 5-minute time-driven trigger can overlap the previous invocation if
+// that one ran close to its full time box, and overlapping executions racing on the same
+// getFoldersByName-then-create check is exactly what produced duplicate Other/PDFs/
+// Contracts folders under the same customer. The lock makes overlap a no-op skip instead.
 function runReorg() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    Logger.log('Another runReorg() is already running — skipping this invocation to avoid racing it.');
+    return;
+  }
+  try {
+    runReorgInner();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function runReorgInner() {
   const startTime = Date.now();
   const root = DriveApp.getFolderById(CONFIG.DRIVE_ROOT_ID);
   const jobsRoot = getOrCreateSubfolder(root, CONFIG.JOBS_ROOT_NAME);
@@ -255,6 +272,25 @@ function computeKeep3DsIds(folder) {
   return keep;
 }
 
+// Words that mark "the customer name part is over, this is a room/revision/descriptor
+// now" — e.g. "TeddyDianeVitt_BasementR", "TeddyDianeVitt_Media", "TeddyDianeVitt_New"
+// must all fold into ONE "Teddy Diane Vitt" folder, not three separate ones. Matched as
+// a prefix (case-insensitive) against each word, so "Basementsmall" still catches on
+// "basement". Extend this list from the Migration Log rather than fighting individual
+// filenames — a missed word here just means one over-long folder name, not lost data.
+const DESCRIPTOR_STOPWORDS = [
+  'basement', 'media', 'pic', 'new', 'master', 'kitchen', 'bath', 'bed', 'closet',
+  'garage', 'laundry', 'office', 'pantry', 'mudroom', 'entry', 'hall', 'stair',
+  'storage', 'safe', 'floor', 'wall', 'room', 'rev', 'revision', 'final', 'copy',
+  'draft', 'old', 'update', 'layout', 'design', 'print', 'drawing', 'cutlist',
+  'estimate', 'proposal', 'invoice', 'quote', 'plan', 'wing', 'side', 'level',
+  'upstairs', 'downstairs', 'addition', 'back', 'front', 'top', 'bottom', 'small',
+  'large', 'main', 'guest', 'kids', 'child', 'nursery', 'den', 'library', 'foyer',
+  'drawer', 'shelf', 'shelve', 'cabinet', 'door', 'unit', 'wardrobe', 'reach',
+  'walkin', 'linen', 'dining', 'living', 'attic', 'loft', 'porch', 'deck', 'outdoor',
+];
+const MAX_NAME_WORDS = 4; // safety cap even if no stopword/digit is ever hit
+
 // Best-effort customer name → folder path segments. Wrong guesses are exactly
 // why the Migration Log + Manual Overrides tab exist: fix the name there and
 // re-run rather than fighting the regex further.
@@ -273,11 +309,30 @@ function extractCustomerPath(rawTitle) {
   // non-letter boundaries instead (still correctly rejects "Arvinder", which has a letter before it).
   if (/(^|[^a-z])inder([^a-z]|$)/i.test(base)) {
     let addr = base.replace(/inder/ig, ' ').replace(/[_-]+/g, ' ').replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
-    return ['Inder', titleCase(addr) || 'General'];
+    return ['Inder', titleCase(truncateToName(addr.split(/\s+/))) || 'General'];
   }
 
-  const name = titleCase(base.replace(/[_]+/g, ' ').trim()) || 'Unsorted';
+  const words = base.replace(/[_-]+/g, ' ').replace(/\(.*?\)/g, '').trim().split(/\s+/).filter(Boolean);
+  const name = titleCase(truncateToName(words)) || 'Unsorted';
   return [sanitizeFolderName(name)];
+}
+
+// Keeps leading words until a descriptor stopword, a digit-bearing word (except the very
+// first — addresses like "112 Luquor" or "9 Delaware" legitimately start with a number),
+// or the word cap is hit. Whichever comes first wins.
+function truncateToName(words) {
+  const kept = [];
+  for (let i = 0; i < words.length && i < MAX_NAME_WORDS; i++) {
+    const w = words[i];
+    if (i > 0 && /\d/.test(w)) break;
+    // Short stopwords ("den", "bed", "top") need an exact match — a prefix match on those
+    // collides with real first names ("Denise", "Dennis"). Longer ones ("basement",
+    // "storage") are safe as prefixes, which is what catches "Basementsmall" too.
+    const wl = w.toLowerCase();
+    if (DESCRIPTOR_STOPWORDS.some(sw => sw.length >= 5 ? wl.startsWith(sw) : wl === sw)) break;
+    kept.push(w);
+  }
+  return (kept.length ? kept : words.slice(0, 1)).join(' ');
 }
 
 function classifyKind(title, defaultKind) {
