@@ -150,7 +150,7 @@ function runReorg() {
           }
         }
         if (src.skipTitles && src.skipTitles.some(rx => rx.test(title))) {
-          log.appendRow([nowStr(), 'SKIPPED (admin/template, not a job file)', src.name, title, fid, '', '', '']);
+          log.appendRow([nowStr(), 'SKIPPED-ADMIN', src.name, title, fid, '', '', 'Admin/template file, not a job — left in place']);
           continue;
         }
 
@@ -359,12 +359,19 @@ function getMigrationLogSheet() {
 // Bug fix (2026-07-16): this used to only recognize the live-mode action names, so in
 // DRY_RUN every trigger fire re-planned the same files from scratch instead of resuming —
 // it must also recognize the dry-run action names or resumability silently does nothing.
-const HANDLED_ACTIONS = new Set(['MOVED', 'ARCHIVED', 'FLAGGED-DUP', 'PLAN', 'PLAN-ARCHIVE', 'PLAN-DUP']);
+//
+// Bug fix (2026-07-17): "done" has to mean "done in the CURRENT mode." A file logged as
+// PLAN during the dry run is NOT actually moved — so once DRY_RUN flips to false, PLAN
+// rows must not count as handled, or the live run would see everything as "already done"
+// (from dry-run planning) and skip every file without ever really moving anything.
+const LIVE_DONE_ACTIONS = new Set(['MOVED', 'ARCHIVED', 'FLAGGED-DUP', 'SKIPPED-ADMIN']);
+const DRY_RUN_DONE_ACTIONS = new Set(['MOVED', 'ARCHIVED', 'FLAGGED-DUP', 'PLAN', 'PLAN-ARCHIVE', 'PLAN-DUP', 'SKIPPED-ADMIN']);
 function getAlreadyLoggedFileIds(logSheet) {
+  const handled = CONFIG.DRY_RUN ? DRY_RUN_DONE_ACTIONS : LIVE_DONE_ACTIONS;
   const values = logSheet.getDataRange().getValues();
   const ids = new Set();
   for (let i = 1; i < values.length; i++) {
-    if (HANDLED_ACTIONS.has(values[i][1])) ids.add(values[i][4]);
+    if (handled.has(values[i][1])) ids.add(values[i][4]);
   }
   return ids;
 }
