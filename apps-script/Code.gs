@@ -49,7 +49,7 @@ const CONFIG = {
   MAX_RUNTIME_MS: 5 * 60 * 1000,               // stop this invocation before Apps Script's ~6min hard limit
   OLD_CUTOFF_MONTHS: 18,                       // files older than this (by modified date) are left exactly where they are, not organized
   MAX_3DS_PER_CUSTOMER: 5,                     // only migrate the N most recent 3D renders per customer; the rest stay in 1_3Ds_MAX untouched
-  CONSOLIDATE_DRY_RUN: true,                   // ALWAYS leave true for the first consolidateFragments() run — see that function's comment
+  CONSOLIDATE_DRY_RUN: false,                  // flipped false 2026-07-18 — dry run confirmed clean (708 groups, 0 errors) twice in a row
 };
 
 // Folders that are 100% empty or junk per the audit — only acted on when DELETE_EMPTY_JUNK=true.
