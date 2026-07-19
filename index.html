@@ -1377,8 +1377,8 @@ async function refreshDriveMedia(){
   if(!getScriptUrl()){status.textContent='No backend script configured yet — see ⚙️ Settings → Integrations.';status.style.color='var(--muted)';return;}
   status.textContent='Searching Drive for "'+job.name+'"…';status.style.color='var(--muted)';
   const [threeDs,pdf]=await Promise.all([
-    backendGet({action:'recentFiles',customer:job.name,kind:'3Ds',limit:5}),
-    backendGet({action:'recentFiles',customer:job.name,kind:'PDFs',limit:1}),
+    backendGet({action:'recentFiles',customer:job.name,kind:'3Ds',limit:5,jobDate:job.date||''}),
+    backendGet({action:'recentFiles',customer:job.name,kind:'PDFs',limit:1,jobDate:job.date||''}),
   ]);
   if(!threeDs&&!pdf){status.textContent='✗ Could not reach the backend script. Check the URL in Settings.';status.style.color='var(--red)';return;}
   driveMediaFound.threeDs=(threeDs&&threeDs.files)||[];

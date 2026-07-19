@@ -759,7 +759,7 @@ function getManualOverrides(logSheet) {
 function doGet(e) {
   const action = e.parameter.action;
   try {
-    if (action === 'recentFiles') return jsonOut(apiRecentFiles(e.parameter.customer, e.parameter.kind, Number(e.parameter.limit) || 5));
+    if (action === 'recentFiles') return jsonOut(apiRecentFiles(e.parameter.customer, e.parameter.kind, Number(e.parameter.limit) || 5, e.parameter.jobDate));
     if (action === 'fileData') return jsonOut(apiFileData(e.parameter.id));
     if (action === 'jobs') return jsonOut(apiListJobs());
     if (action === 'ping') return jsonOut({ ok: true, time: nowStr() });
@@ -792,11 +792,19 @@ function jsonOut(obj) {
 // so searching on the customer's last name catches "Joe_Grosetto_LeftX1.jpg" no matter
 // which of a dozen folders it's currently sitting in.
 //
-// Sorted by DATE CREATED, not last-modified: every file's "modified" timestamp gets bumped
+// Matched by NAME (surname) and, when the calling job card has a date, disambiguated by
+// DATE too: repeat customers get a separate job card per project (e.g. "Joe Gresetto
+// (Laundry)" vs a later closet job), and matching on surname alone can't tell those
+// apart — it would return every job Joe's ever had. Passing this job's own "Date
+// Created" lets us rank matches by how close their creation date is to THIS job's date,
+// so each job card surfaces its own files instead of the whole customer's history.
+//
+// Uses DATE CREATED, not last-modified: every file's "modified" timestamp gets bumped
 // to today the moment runReorg/consolidateFragments touches it, which silently made old
 // renders look like the newest ones. Created date is untouched by moves, so it's the only
-// reliable signal for "which version did James actually make most recently."
-function apiRecentFiles(customerName, kind, limit) {
+// reliable signal for "which version did James actually make most recently" (or, with a
+// jobDate given, "which files were actually made around the time of this job").
+function apiRecentFiles(customerName, kind, limit, jobDate) {
   if (!customerName || !kind) return { error: 'customer and kind are required' };
   // Strip "(Laundry)"/"(2nd job)" style room/job tags before picking the surname — James
   // tags repeat customers' additional jobs this way, and without stripping it first, the
@@ -816,7 +824,13 @@ function apiRecentFiles(customerName, kind, limit) {
     if (!isUnderJobsRoot(parent)) continue; // ignore anything outside Maximum Closets Jobs that happens to share the word
     matches.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), modified: f.getDateCreated().toISOString(), size: f.getSize() });
   }
-  matches.sort((a, b) => b.modified.localeCompare(a.modified));
+  const jobTime = jobDate ? new Date(jobDate + 'T12:00:00').getTime() : NaN;
+  if (!isNaN(jobTime)) {
+    // Closest-to-the-job's-date first, so a repeat customer's other jobs sort to the bottom.
+    matches.sort((a, b) => Math.abs(new Date(a.modified).getTime() - jobTime) - Math.abs(new Date(b.modified).getTime() - jobTime));
+  } else {
+    matches.sort((a, b) => b.modified.localeCompare(a.modified)); // no job date given — fall back to plain most-recent-first
+  }
   return { customer: customerName, kind, files: matches.slice(0, limit) };
 }
 
