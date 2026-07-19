@@ -64,8 +64,10 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .cards{padding:0 7px;overflow-y:auto;flex:1}
 .cards::-webkit-scrollbar{width:3px}
 .cards::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.1);border-radius:2px}
-.card{background:var(--card-bg);border-radius:8px;padding:9px 10px;margin-bottom:7px;box-shadow:var(--shadow);cursor:pointer}
+.card{background:var(--card-bg);border-radius:8px;padding:9px 10px;margin-bottom:7px;box-shadow:var(--shadow);cursor:pointer;border-left:4px solid transparent}
 .card:hover{box-shadow:0 3px 10px rgba(0,0,0,0.18)}
+.card.hot{border-left-color:#d08a0a}
+.card.hot-flare{border-left-color:#eb5a46;background:rgba(192,57,43,0.08)}
 .card-lbls{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px}
 .lbl{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase}
 .l-new{background:#0d2b1a;border:1.5px solid #1a5c38;color:#4aad78}
@@ -779,7 +781,7 @@ function toggleHot(){
 }
 function renderHot(){
   const el=document.getElementById('hotbar');if(!el)return;
-  const ranked=hotList(8);
+  const ranked=hotList(3);
   if(!ranked.length){el.innerHTML='<span class="hot-empty">Nothing hot right now — no open Estimate Sent / pending jobs</span>';return;}
   el.innerHTML=ranked.map((r,i)=>{
     const j=r.job;
@@ -1569,6 +1571,8 @@ document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target
 
 function render(){
   const board=document.getElementById('board');board.innerHTML='';
+  const hotMap={};
+  hotList(Infinity).forEach(r=>{hotMap[r.job.id]=r.dp>=14||r.job.stage===2?'hot-flare':'hot';});
   STAGES.forEach((stage,si)=>{
     const sj=jobs.filter(j=>j.stage===si);
     const col=document.createElement('div');col.className='col';
@@ -1577,7 +1581,7 @@ function render(){
     board.appendChild(col);
     const ce=col.querySelector(`#col-${si}`);
     sj.forEach(job=>{
-      const card=document.createElement('div');card.className='card';attachTap(card,()=>openEdit(job.id));
+      const card=document.createElement('div');card.className='card'+(hotMap[job.id]?' '+hotMap[job.id]:'');attachTap(card,()=>openEdit(job.id));
       const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
