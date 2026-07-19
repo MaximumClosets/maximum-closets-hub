@@ -1561,10 +1561,9 @@ function closePropPreview(){document.getElementById('prop-overlay').classList.re
 function sendProposalEmail(){
   const job=jobs.find(j=>j.id===editId);if(!job)return;const d=getProposalData();if(!d)return;
   const to=encodeURIComponent(job.email||''),subject=encodeURIComponent('Your Custom Closet Proposal — Maximum Closets');
-  const lines=d.lines.map(l=>`  • ${l.label} (${l.qty})`).join('\n');
-  const body=encodeURIComponent(`Hi ${d.job.name.split(' ')[0]},\n\nThank you for choosing Maximum Closets!\n\nWHAT'S INCLUDED:\n${lines||'  Custom closet installation'}\n\nPRICING:\nSubtotal: $${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}${d.disc>0?'\nDiscount: -$'+d.disc.toFixed(2):''}${d.tax>0?'\nTax: $'+d.tax.toFixed(2):''}\nTotal: $${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}\n50% Deposit Due: $${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}\n${d.notes?'\n'+d.notes:''}\n\nTERMS:\nA 50% deposit is required before scheduling. The remaining balance is due upon completion. This proposal is valid for 30 days.\n\nMaximum Closets\njames@maximumclosets.com`);
+  const body=encodeURIComponent(`Hi ${d.job.name.split(' ')[0]},\n\nThank you for choosing Maximum Closets! Your proposal is attached${d.plansPdf?' along with the design plans':''}.\n\nLet me know if you have any questions.\n\nMaximum Closets\njames@maximumclosets.com`);
   window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`,'_blank');
-  if(d.plansPdf)setTimeout(()=>alert('Reminder: this app can\'t auto-attach the plans PDF to an email. Use the "Download" link on the Proposal tab (or the link in the printed proposal) to grab "'+d.plansPdf.name+'" and attach it yourself before sending.'),300);
+  setTimeout(()=>alert('Reminder: this app can\'t auto-attach files to an email. Use the "Print / PDF" button to get the proposal as a PDF'+(d.plansPdf?', and the "Download" link on the Proposal tab to grab "'+d.plansPdf.name+'"':'')+' — then attach them yourself before sending.'),300);
 }
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
 
