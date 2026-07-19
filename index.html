@@ -536,7 +536,8 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
         <div class="srow"><span class="sl">White Flat</span><input type="number" id="sd-wf" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
         <div class="srow"><span class="sl">White Shaker</span><input type="number" id="sd-ws" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
         <div class="srow"><span class="sl">Color Flat</span><input type="number" id="sd-cf" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
-        <div class="srow"><span class="sl">Color Shaker/Glass</span><input type="number" id="sd-cs" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">Color Shaker</span><input type="number" id="sd-cs" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">Color Glass</span><input type="number" id="sd-cg" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
         <div class="srow"><span class="sl">Default markup</span><input type="number" id="sd-mu" step=".05" inputmode="decimal"/><span class="su">×</span></div>
       </div>
     </div>
@@ -734,7 +735,7 @@ const LOGO_DATA_URL='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMC
 const DEF = {
   wSqftC:5.50, wSqftS:6.46, wShtC:264, wShtS:310,
   cSqftC:3.33, cSqftS:8.33, cShtC:160, cShtS:400,
-  dWF:7, dWS:15, dCF:10, dCS:15, dMu:2.25,
+  dWF:7, dWS:15, dCF:10, dCS:15, dCG:15, dMu:2.25,
   drwWC:55, drwWS:120, drwSC:65, drwSS:140,
   hgC:3.30, hgS:10, hnC:1.57, hnS:10, hbC:4.26, hbS:10, slC:5.06, slS:12, rdC:5.30, rdS:16,
   hlpRate:20, leadPct:8, hlpHrs:8
@@ -1029,7 +1030,7 @@ function calcMel(){
   document.getElementById('mel-res').textContent=fmt(melC)+' → '+fmt(melSl);
   document.getElementById('mel-badge').textContent=fmt(melSl);calcAll();
 }
-function getDoorStyles(){return[{v:'white-flat',l:'White Flat',c:P.dWF},{v:'white-shaker',l:'White Shaker',c:P.dWS},{v:'color-flat',l:'Color Flat',c:P.dCF},{v:'color-shaker',l:'Color Shaker/Glass',c:P.dCS}]}
+function getDoorStyles(){return[{v:'white-flat',l:'White Flat',c:P.dWF},{v:'white-shaker',l:'White Shaker',c:P.dWS},{v:'color-flat',l:'Color Flat',c:P.dCF},{v:'color-shaker',l:'Color Shaker',c:P.dCS},{v:'color-glass',l:'Color Glass',c:P.dCG}]}
 function addDoor(){
   doorIdx++;const id='dr-'+doorIdx;const styles=getDoorStyles();
   const opts=styles.map(s=>`<option value="${s.v}">${s.l} — $${s.c}/sqft</option>`).join('');
@@ -1744,7 +1745,7 @@ function closeModal(){
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
 
 function openSettings(){
-  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-cg':'dCG','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
   document.getElementById('sl-scripturl').value=getScriptUrl();
   document.getElementById('scripturl-status').textContent='';
@@ -1781,7 +1782,7 @@ async function backendGet(params){
 function closeSettings(){document.getElementById('set-overlay').classList.remove('open');}
 document.getElementById('set-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('set-overlay'))closeSettings();});
 function saveSettings(){
-  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-cg':'dCG','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
   saveP(P);if(window.fbSave)window.fbSave();
   saveScriptUrl(document.getElementById('sl-scripturl').value);
