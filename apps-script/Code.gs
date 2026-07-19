@@ -798,7 +798,11 @@ function jsonOut(obj) {
 // reliable signal for "which version did James actually make most recently."
 function apiRecentFiles(customerName, kind, limit) {
   if (!customerName || !kind) return { error: 'customer and kind are required' };
-  const words = customerName.trim().split(/\s+/).filter(w => w.length > 1);
+  // Strip "(Laundry)"/"(2nd job)" style room/job tags before picking the surname — James
+  // tags repeat customers' additional jobs this way, and without stripping it first, the
+  // tag itself ends up as the "last word" search key, pulling in every OTHER customer's
+  // files that happen to mention the same room instead of this customer's files at all.
+  const words = customerName.replace(/\([^)]*\)/g, '').trim().split(/\s+/).filter(w => w.length > 1);
   if (!words.length) return { customer: customerName, kind, files: [] };
   const key = words[words.length - 1].replace(/'/g, "\\'"); // last word = surname, usually the most distinctive token
   const query = `title contains '${key}' and trashed = false and mimeType != '${MimeType.FOLDER}'`;
