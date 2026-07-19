@@ -172,6 +172,12 @@ function runReorgInner() {
           continue;
         }
 
+        // .Job files are KCD's own native project files, and KCD can only browse/open them
+        // when they're all sitting together in ONE shared folder (1_DOTJ_JOBS) — filing them
+        // into each customer's own subfolder like every other file type breaks KCD's ability
+        // to open them at all. Never move these; leave them exactly where KCD expects them.
+        if (/\.job$/i.test(title)) { continue; }
+
         // Not logged per-file (would be thousands of Sheets writes) — just left exactly
         // where they are and counted. Anything genuinely wanted later is a manual look,
         // not something this pass needs to spend hours individually filing.
@@ -339,6 +345,113 @@ function setupConsolidateTrigger() {
   });
   ScriptApp.newTrigger('consolidateFragments').timeBased().everyMinutes(10).create();
   Logger.log('Trigger created — consolidateFragments will now run automatically every 10 minutes until the whole Drive is consolidated, then switch itself off and email you.');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RESTORE .JOB FILES — KCD (the cabinet design software) can only browse/open its
+// native .Job project files when they're all sitting together in ONE shared folder
+// (1_DOTJ_JOBS). runReorg used to file .Job files into each customer's own subfolder
+// like every other file type, which broke KCD's ability to open them. runReorg no
+// longer does that (see the .job skip in runReorgInner), but this repairs the ones
+// it already moved before that fix, putting them back in 1_DOTJ_JOBS where KCD
+// expects them. Never deletes — a name+size match already in 1_DOTJ_JOBS is flagged
+// for manual review, not overwritten. Time-boxes itself and is safe to re-run.
+// ─────────────────────────────────────────────────────────────────────────
+function restoreDotJobFiles() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) { Logger.log('Another run is already in progress — skipping.'); return; }
+  try {
+    restoreDotJobFilesInner();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function restoreDotJobFilesInner() {
+  const startTime = Date.now();
+  const root = DriveApp.getFolderById(CONFIG.DRIVE_ROOT_ID);
+  const jobsRoot = getOrCreateSubfolder(root, CONFIG.JOBS_ROOT_NAME);
+  const dotjFolder = getOrCreateSubfolder(root, '1_DOTJ_JOBS');
+  const log = getMigrationLogSheet();
+
+  let restored = 0, dupsFlagged = 0, errors = 0, timedOut = false;
+
+  try {
+    const years = jobsRoot.getFolders();
+    outer:
+    while (years.hasNext()) {
+      const monthsIt = years.next().getFolders();
+      while (monthsIt.hasNext()) {
+        const custIt = monthsIt.next().getFolders();
+        while (custIt.hasNext()) {
+          // Walk every subfolder under this customer folder (Other/PDFs/3Ds/Contracts,
+          // and any race-condition duplicates of those) looking for .Job files.
+          const queue = [custIt.next()];
+          while (queue.length) {
+            if (Date.now() - startTime > CONFIG.MAX_RUNTIME_MS) { timedOut = true; break outer; }
+            const folder = queue.shift();
+            const subIt = folder.getFolders();
+            while (subIt.hasNext()) queue.push(subIt.next());
+            const filesIt = folder.getFiles();
+            while (filesIt.hasNext()) {
+              const f = filesIt.next();
+              if (!/\.job$/i.test(f.getName())) continue;
+              try {
+                const dup = findDuplicateInFolder(dotjFolder, f.getName(), f.getSize());
+                if (dup) {
+                  log.appendRow([nowStr(), 'RESTORE-DUP', '', f.getName(), f.getId(), oldPathOf(f), '1_DOTJ_JOBS',
+                    'Same name+size already in 1_DOTJ_JOBS (' + dup.getId() + ') — left in place for manual review']);
+                  dupsFlagged++;
+                  continue;
+                }
+                const oldPath = oldPathOf(f);
+                f.moveTo(dotjFolder);
+                log.appendRow([nowStr(), 'RESTORED', '', f.getName(), f.getId(), oldPath, '1_DOTJ_JOBS', 'Moved back so KCD can find it']);
+                restored++;
+              } catch (err) {
+                log.appendRow([nowStr(), 'ERROR', 'restoreDotJobFiles', f.getName(), f.getId(), '', '', String(err)]);
+                errors++;
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    if (!err || !err.__timeout) {
+      log.appendRow([nowStr(), 'ERROR', 'restoreDotJobFiles', '', '', '', '', String(err)]);
+      errors++;
+    }
+  }
+
+  const msg = `Restore .Job pass done. Files restored to 1_DOTJ_JOBS: ${restored}, Dup conflicts flagged: ${dupsFlagged}, Errors: ${errors}.` +
+    `${timedOut ? '\nHit the time box — run restoreDotJobFiles() again to continue where it left off.' : '\nFully processed this pass.'}`;
+  Logger.log(msg);
+  log.appendRow([nowStr(), 'RESTORE SUMMARY', '', '', '', '', '', msg.replace(/\n/g, ' | ')]);
+
+  if (!timedOut) {
+    ScriptApp.getProjectTriggers().forEach(t => {
+      if (t.getHandlerFunction() === 'restoreDotJobFiles') ScriptApp.deleteTrigger(t);
+    });
+    try {
+      MailApp.sendEmail(Session.getEffectiveUser().getEmail(),
+        'Maximum Closets Hub: .Job files restored for KCD',
+        `All .Job files are back in 1_DOTJ_JOBS so KCD can open them again.\n\n${msg}`);
+    } catch (err) {
+      Logger.log('Could not send completion email: ' + err);
+    }
+  }
+}
+
+// Run this once (from the function dropdown) to make restoreDotJobFiles() run on its
+// own every 5 minutes until every .Job file is back in 1_DOTJ_JOBS, then switch itself
+// off and email you. Safe to run again later.
+function setupRestoreDotJobTrigger() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'restoreDotJobFiles') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('restoreDotJobFiles').timeBased().everyMinutes(5).create();
+  Logger.log('Trigger created — restoreDotJobFiles will now run automatically every 5 minutes until every .Job file is back where KCD can see it, then switch itself off and email you.');
 }
 
 // Merges each folder in `fragments` into `primary`: for every subfolder inside a
