@@ -671,35 +671,47 @@ function jsonOut(obj) {
 // Finds /Maximum Closets Jobs/*/*/<customer>/<3Ds|PDFs>/ across all year/month folders
 // (customer folders repeat per month, so this walks the tree — fine at this drive's scale)
 // and returns the `limit` most-recently-modified files, newest first.
+// Matches by FILE NAME, not by walking to one exact customer folder: the same customer's
+// files are often still scattered across several near-duplicate folders (see
+// consolidateFragments), so requiring an exact folder-name match was returning "no files
+// found" for real customers just because their files hadn't been merged into one folder
+// yet. Drive's `contains` operator matches whole tokens (it splits on _, -, ., and spaces),
+// so searching on the customer's last name catches "Joe_Grosetto_LeftX1.jpg" no matter
+// which of a dozen folders it's currently sitting in.
+//
+// Sorted by DATE CREATED, not last-modified: every file's "modified" timestamp gets bumped
+// to today the moment runReorg/consolidateFragments touches it, which silently made old
+// renders look like the newest ones. Created date is untouched by moves, so it's the only
+// reliable signal for "which version did James actually make most recently."
 function apiRecentFiles(customerName, kind, limit) {
   if (!customerName || !kind) return { error: 'customer and kind are required' };
-  const root = DriveApp.getFolderById(CONFIG.DRIVE_ROOT_ID);
-  const jobsRoot = getOrCreateSubfolder(root, CONFIG.JOBS_ROOT_NAME);
-  const target = customerName.toLowerCase().trim();
+  const words = customerName.trim().split(/\s+/).filter(w => w.length > 1);
+  if (!words.length) return { customer: customerName, kind, files: [] };
+  const key = words[words.length - 1].replace(/'/g, "\\'"); // last word = surname, usually the most distinctive token
+  const query = `title contains '${key}' and trashed = false and mimeType != '${MimeType.FOLDER}'`;
+  const it = DriveApp.searchFiles(query);
   const matches = [];
-  // Case-insensitive folder-name match rather than exact getFoldersByName: the Hub's job
-  // name and the auto-parsed Drive folder name won't always agree on capitalization/spacing.
-  const years = jobsRoot.getFolders();
-  while (years.hasNext()) {
-    const months = years.next().getFolders();
-    while (months.hasNext()) {
-      const custFolders = months.next().getFolders();
-      while (custFolders.hasNext()) {
-        const custFolder = custFolders.next();
-        if (custFolder.getName().toLowerCase().trim() !== target) continue;
-        const kindFolders = custFolder.getFoldersByName(kind);
-        while (kindFolders.hasNext()) {
-          const files = kindFolders.next().getFiles();
-          while (files.hasNext()) {
-            const f = files.next();
-            matches.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), modified: f.getLastUpdated().toISOString(), size: f.getSize() });
-          }
-        }
-      }
-    }
+  while (it.hasNext()) {
+    const f = it.next();
+    const parents = f.getParents();
+    const parent = parents.hasNext() ? parents.next() : null;
+    if (!parent || parent.getName() !== kind) continue; // only files actually filed under the requested kind subfolder (3Ds/PDFs)
+    if (!isUnderJobsRoot(parent)) continue; // ignore anything outside Maximum Closets Jobs that happens to share the word
+    matches.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), modified: f.getDateCreated().toISOString(), size: f.getSize() });
   }
   matches.sort((a, b) => b.modified.localeCompare(a.modified));
   return { customer: customerName, kind, files: matches.slice(0, limit) };
+}
+
+function isUnderJobsRoot(folder) {
+  let f = folder, depth = 0;
+  while (f && depth < 8) {
+    if (f.getName() === CONFIG.JOBS_ROOT_NAME) return true;
+    const parents = f.getParents();
+    f = parents.hasNext() ? parents.next() : null;
+    depth++;
+  }
+  return false;
 }
 
 // Returns a file's bytes as base64 so the Hub can embed it directly into a proposal
