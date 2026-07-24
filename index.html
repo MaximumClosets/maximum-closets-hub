@@ -253,6 +253,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
     <span style="font-size:9px;color:rgba(255,255,255,0.4);font-weight:700">v2.1</span>
     <span title="Sync status"><span class="sync-dot syncing" id="sync-dot"></span></span>
     <button class="hadd" onclick="lockDevice()" title="Lock this device" style="background:rgba(255,255,255,0.15)">🔒</button>
+    <button class="hadd" onclick="openArchive()" title="Archived jobs" style="background:rgba(255,255,255,0.15)">📦 <span id="arch-count">0</span></button>
     <button class="hadd" onclick="openSettings()" style="background:rgba(255,255,255,0.15)">⚙️</button>
     <button class="hadd" onclick="openAdd()">+ Job</button>
   </div>
@@ -307,7 +308,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
         <div class="lopt plans" data-v="plans" onclick="toggleLbl(this)">Need Plans Sent</div>
         <div class="lopt followup" data-v="followup" onclick="toggleLbl(this)">Follow Up Soon</div>
         <div class="lopt ontrack" data-v="ontrack" onclick="toggleLbl(this)">On Track</div>
-        <div class="lopt design" data-v="design" onclick="toggleLbl(this)">Design & Send</div>
+        <div class="lopt design" data-v="design" onclick="toggleLbl(this)">Needs go back</div>
         <div class="lopt inprog" data-v="inprog" onclick="toggleLbl(this)">In Progress</div>
         <div class="lopt finalpay" data-v="finalpay" onclick="toggleLbl(this)">Final Payment Due</div>
       </div>
@@ -530,6 +531,14 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 </div>
 </div>
 
+<!-- ARCHIVED JOBS -->
+<div class="set-overlay" id="arch-overlay">
+<div class="set-modal">
+  <div class="mh"><h3>📦 Archived Jobs</h3><button class="mclose" onclick="closeArchive()">×</button></div>
+  <div style="padding:14px 15px" id="arch-list"></div>
+</div>
+</div>
+
 <!-- Firebase SDK + lock/sync -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -696,7 +705,7 @@ function saveP(obj){try{localStorage.setItem('mc-p',JSON.stringify(obj));}catch(
 
 const STAGES=['Lead / Customer','Measure / Consult','Estimate Sent','Deposit Paid','Install Scheduled','Install','Done'];
 const SCOLS=['#6b778c','#f2a500','#eb5a46','#61bd4f','#00c2e0','#0079bf','#1a5c38'];
-const LBLS={new:{c:'l-new',t:'New Lead'},plans:{c:'l-plans',t:'Need Plans Sent'},followup:{c:'l-followup',t:'Follow Up Soon'},ontrack:{c:'l-ontrack',t:'On Track'},design:{c:'l-design',t:'Design & Send'},inprog:{c:'l-inprog',t:'In Progress'},finalpay:{c:'l-finalpay',t:'Final Payment Due'},done:{c:'l-done',t:'Done'}};
+const LBLS={new:{c:'l-new',t:'New Lead'},plans:{c:'l-plans',t:'Need Plans Sent'},followup:{c:'l-followup',t:'Follow Up Soon'},ontrack:{c:'l-ontrack',t:'On Track'},design:{c:'l-design',t:'Needs go back'},inprog:{c:'l-inprog',t:'In Progress'},finalpay:{c:'l-finalpay',t:'Final Payment Due'},done:{c:'l-done',t:'Done'}};
 const CL={
   0:[{n:'New Lead',items:['Get full name, phone & email','Understand scope (rooms, style, timeline)','Schedule measure / consult']}],
   1:[{n:'Measure & Design',items:['Measure all spaces + take photos','Note client preferences (color, style, hardware)','Draft design in KCD','Price job in pricing tab','Send estimate to client']}],
@@ -1266,10 +1275,34 @@ function sendProposalEmail(){
 }
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
 
+const ARCHIVE_MS=14*24*60*60*1000;
+function sweepJobs(){
+  const now=Date.now();let changed=false;
+  jobs.forEach(j=>{
+    if(j.stage===6){
+      if(!j.doneAt){j.doneAt=now;changed=true;}
+      else if(!j.archived&&!(j.labels||[]).includes('finalpay')&&(now-j.doneAt)>ARCHIVE_MS){j.archived=true;changed=true;}
+    }else if(j.doneAt||j.archived){delete j.doneAt;j.archived=false;changed=true;}
+  });
+  return changed;
+}
+function openArchive(){
+  const list=jobs.filter(j=>j.archived);
+  const el=document.getElementById('arch-list');
+  el.innerHTML=list.length?list.map(j=>`<div class="srow" style="align-items:center"><span class="sl" style="flex:1;text-align:left">${j.name}${j.sale>0?' — $'+j.sale.toLocaleString():''}</span><button class="mv-btn" onclick="restoreJob('${j.id}')">Restore</button></div>`).join(''):'<p style="font-size:12px;color:#aaa">No archived jobs. Jobs auto-archive 2 weeks after being marked Done, unless still labeled "Final Payment Due".</p>';
+  document.getElementById('arch-overlay').classList.add('open');
+}
+function closeArchive(){document.getElementById('arch-overlay').classList.remove('open');}
+function restoreJob(id){
+  const job=jobs.find(j=>j.id===id);if(!job)return;
+  job.archived=false;job.doneAt=Date.now();
+  saveData();render();openArchive();
+}
 function render(){
+  if(sweepJobs())saveData();
   const board=document.getElementById('board');board.innerHTML='';
   STAGES.forEach((stage,si)=>{
-    const sj=jobs.filter(j=>j.stage===si);
+    const sj=jobs.filter(j=>j.stage===si&&!j.archived);
     const col=document.createElement('div');col.className='col';
     col.innerHTML=`<div class="col-hd"><div class="col-dot" style="background:${SCOLS[si]}"></div><h2>${stage}</h2><span class="col-cnt">${sj.length}</span></div>
       <div class="cards" id="col-${si}"></div><div class="col-add" onclick="openAdd(${si})">＋ Add a card</div>`;
@@ -1295,8 +1328,9 @@ function render(){
   const active=jobs.filter(j=>j.stage<6);
   const pip=active.reduce((s,j)=>s+(j.sale||0),0);
   const com=jobs.filter(j=>j.stage>=3&&j.stage<6).reduce((s,j)=>s+(j.sale||0),0);
-  const cl=jobs.filter(j=>j.stage===6).reduce((s,j)=>s+(j.sale||0),0);
+  const cl=jobs.filter(j=>j.stage===6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   document.getElementById('hstats').textContent=`${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
+  const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
 }
 
 function mTab(name){
@@ -1434,6 +1468,7 @@ function openSettings(){
 }
 function closeSettings(){document.getElementById('set-overlay').classList.remove('open');}
 document.getElementById('set-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('set-overlay'))closeSettings();});
+document.getElementById('arch-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('arch-overlay'))closeArchive();});
 function saveSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
