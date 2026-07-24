@@ -307,7 +307,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
         <div class="lopt new" data-v="new" onclick="toggleLbl(this)">New Lead</div>
         <div class="lopt plans" data-v="plans" onclick="toggleLbl(this)">Need Plans Sent</div>
         <div class="lopt followup" data-v="followup" onclick="toggleLbl(this)">Follow Up Soon</div>
-        <div class="lopt ontrack" data-v="ontrack" onclick="toggleLbl(this)">On Track</div>
+        <div class="lopt ontrack" data-v="ontrack" onclick="toggleLbl(this)">Final Payment Received</div>
         <div class="lopt design" data-v="design" onclick="toggleLbl(this)">Needs go back</div>
         <div class="lopt inprog" data-v="inprog" onclick="toggleLbl(this)">In Progress</div>
         <div class="lopt finalpay" data-v="finalpay" onclick="toggleLbl(this)">Final Payment Due</div>
@@ -705,7 +705,7 @@ function saveP(obj){try{localStorage.setItem('mc-p',JSON.stringify(obj));}catch(
 
 const STAGES=['Lead / Customer','Measure / Consult','Estimate Sent','Deposit Paid','Install Scheduled','Install','Done'];
 const SCOLS=['#6b778c','#f2a500','#eb5a46','#61bd4f','#00c2e0','#0079bf','#1a5c38'];
-const LBLS={new:{c:'l-new',t:'New Lead'},plans:{c:'l-plans',t:'Need Plans Sent'},followup:{c:'l-followup',t:'Follow Up Soon'},ontrack:{c:'l-ontrack',t:'On Track'},design:{c:'l-design',t:'Needs go back'},inprog:{c:'l-inprog',t:'In Progress'},finalpay:{c:'l-finalpay',t:'Final Payment Due'},done:{c:'l-done',t:'Done'}};
+const LBLS={new:{c:'l-new',t:'New Lead'},plans:{c:'l-plans',t:'Need Plans Sent'},followup:{c:'l-followup',t:'Follow Up Soon'},ontrack:{c:'l-ontrack',t:'Final Payment Received'},design:{c:'l-design',t:'Needs go back'},inprog:{c:'l-inprog',t:'In Progress'},finalpay:{c:'l-finalpay',t:'Final Payment Due'},done:{c:'l-done',t:'Done'}};
 const CL={
   0:[{n:'New Lead',items:['Get full name, phone & email','Understand scope (rooms, style, timeline)','Schedule measure / consult']}],
   1:[{n:'Measure & Design',items:['Measure all spaces + take photos','Note client preferences (color, style, hardware)','Draft design in KCD','Price job in pricing tab','Send estimate to client']}],
