@@ -17,6 +17,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Max Closets">
+<script>(function(){try{if(localStorage.getItem('mc-theme')==='light')document.documentElement.dataset.theme='light';}catch(e){}})();</script>
 <style>
 :root {
   color-scheme: dark;
@@ -240,6 +241,40 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 #lock button:disabled{opacity:.5}
 #lock .lerr{color:#ff6b6b;font-size:12px;font-weight:600;min-height:16px}
 #lock .lver{color:#3a3f55;font-size:10px;position:absolute;bottom:14px}
+
+/* ── LIGHT THEME (toggled per-device via ☀️/🌙 button) ── */
+html[data-theme="light"]{
+  color-scheme:light;
+  --green-bg:#e8f5ee; --green-border:#b8ddc8;
+  --board-bg:#eceff4; --col-bg:#ffffff; --card-bg:#ffffff;
+  --text:#2b2f3d; --muted:#6b7182; --border:#dce0ea; --input-bg:#ffffff;
+  --shadow:0 1px 3px rgba(20,30,50,0.10);
+}
+html[data-theme="light"] header{background:#1a5c38}
+html[data-theme="light"] .agenda{background:#e4e8f0}
+html[data-theme="light"] .agenda-empty{color:#8890a3}
+html[data-theme="light"] .col-cnt{background:rgba(0,0,0,0.05)}
+html[data-theme="light"] .col-hd h2{color:#2b2f3d}
+html[data-theme="light"] .modal,
+html[data-theme="light"] .set-modal{background:#ffffff}
+html[data-theme="light"] .f input,
+html[data-theme="light"] .f select,
+html[data-theme="light"] .f textarea,
+html[data-theme="light"] .srow input,
+html[data-theme="light"] .sch-add input,
+html[data-theme="light"] .sch-add select{color:#2b2f3d}
+html[data-theme="light"] .f input:focus,
+html[data-theme="light"] .f select:focus,
+html[data-theme="light"] .f textarea:focus,
+html[data-theme="light"] .srow input:focus,
+html[data-theme="light"] .sch-add input:focus,
+html[data-theme="light"] .sch-add select:focus{background:#ffffff;color:#1a1d27}
+html[data-theme="light"] .sch-item{background:#eef1f6}
+html[data-theme="light"] .sch-item.tmrw-item{background:#fdf4e0}
+html[data-theme="light"] .sch-del{color:#9aa0af}
+html[data-theme="light"] #lock h1{color:#1a5c38}
+html[data-theme="light"] #lock input{color:#2b2f3d}
+html[data-theme="light"] #lock .lver{color:#aab0bf}
 </style>
 </head>
 <body>
@@ -264,6 +299,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
     <span title="Sync status"><span class="sync-dot syncing" id="sync-dot"></span></span>
     <button class="hadd" onclick="lockDevice()" title="Lock this device" style="background:rgba(255,255,255,0.15)">🔒</button>
     <button class="hadd" onclick="openArchive()" title="Archived jobs" style="background:rgba(255,255,255,0.15)">📦 <span id="arch-count">0</span></button>
+    <button class="hadd" id="theme-btn" onclick="toggleTheme()" title="Switch to light theme" style="background:rgba(255,255,255,0.15)">☀️</button>
     <button class="hadd" onclick="openSettings()" style="background:rgba(255,255,255,0.15)">⚙️</button>
     <button class="hadd" onclick="openAdd()">+ Job</button>
   </div>
@@ -1615,6 +1651,24 @@ function saveSettings(){
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
 }
 function toggleSet(id){document.getElementById(id).classList.toggle('hide');}
+
+// ── THEME TOGGLE (light / dark, remembered per device) ──
+function applyThemeUI(){
+  const light=document.documentElement.dataset.theme==='light';
+  const mt=document.querySelector('meta[name="theme-color"]');
+  if(mt)mt.setAttribute('content',light?'#1a5c38':'#0d1016');
+  const b=document.getElementById('theme-btn');
+  if(b){b.textContent=light?'🌙':'☀️';b.title=light?'Switch to dark theme':'Switch to light theme';}
+}
+window.toggleTheme=function(){
+  const light=document.documentElement.dataset.theme==='light';
+  if(light){delete document.documentElement.dataset.theme;}
+  else{document.documentElement.dataset.theme='light';}
+  const now=document.documentElement.dataset.theme==='light'?'light':'dark';
+  try{localStorage.setItem('mc-theme',now);}catch(e){}
+  applyThemeUI();
+};
+applyThemeUI();
 
 loadP();
 render();renderAgenda();
