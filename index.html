@@ -566,8 +566,8 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <div class="srow"><span class="sl">White Flat</span><input type="number" id="sd-wf" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
         <div class="srow"><span class="sl">White Shaker</span><input type="number" id="sd-ws" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
         <div class="srow"><span class="sl">Color Flat</span><input type="number" id="sd-cf" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
-        <div class="srow"><span class="sl">Color Shaker/Glass</span><input type="number" id="sd-cs" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
-        <div class="srow"><span class="sl">Default markup</span><input type="number" id="sd-mu" step=".05" inputmode="decimal"/><span class="su">×</span></div>
+        <div class="srow"><span class="sl">Color Shaker</span><input type="number" id="sd-cs" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div>
+        <div class="srow"><span class="sl">Glass / Mirror</span><input type="number" id="sd-gm" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div><div class="srow"><span class="sl">Glass / Mirror Shaker</span><input type="number" id="sd-gms" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div><div class="srow"><span class="sl">Default markup</span><input type="number" id="sd-mu" step=".05" inputmode="decimal"/><span class="su">×</span></div>
       </div>
     </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-drw')">Drawer Boxes<span>▾</span></div>
@@ -770,7 +770,7 @@ const LOGO_DATA_URL='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMC
 const DEF = {
   wSqftC:5.50, wSqftS:6.46, wShtC:264, wShtS:310,
   cSqftC:3.33, cSqftS:8.33, cShtC:160, cShtS:400,
-  dWF:7, dWS:15, dCF:10, dCS:15, dMu:2.25,
+  dWF:8, dWS:15, dCF:11, dCS:18, dGM:30, dGMS:30, dMu:2.25,
   drwWC:55, drwWS:120, drwSC:65, drwSS:140,
   hgC:3.30, hgS:10, hnC:1.57, hnS:10, hbC:4.26, hbS:10, slC:5.06, slS:12, rdC:5.30, rdS:16,
   hlpRate:20, leadPct:8, hlpHrs:8
@@ -1033,7 +1033,7 @@ function calcMel(){
   document.getElementById('mel-res').textContent=fmt(melC)+' → '+fmt(melSl);
   document.getElementById('mel-badge').textContent=fmt(melSl);calcAll();
 }
-function getDoorStyles(){return[{v:'white-flat',l:'White Flat',c:P.dWF},{v:'white-shaker',l:'White Shaker',c:P.dWS},{v:'color-flat',l:'Color Flat',c:P.dCF},{v:'color-shaker',l:'Color Shaker/Glass',c:P.dCS}]}
+function getDoorStyles(){return[{v:'white-flat',l:'White Flat',c:(P.dWF??8)},{v:'color-flat',l:'Color Flat',c:(P.dCF??11)},{v:'white-shaker',l:'White Shaker',c:(P.dWS??15)},{v:'color-shaker',l:'Color Shaker',c:(P.dCS??18)},{v:'glass',l:'Glass / Mirror',c:(P.dGM??30)},{v:'glass-shaker',l:'Glass / Mirror Shaker',c:(P.dGMS??30)}]} function hingesPerDoor(h){h=parseFloat(h)||0;if(h<=0)return 0;if(h>65)return 4;if(h>50)return 3;return 2;}
 function addDoor(){
   doorIdx++;const id='dr-'+doorIdx;const styles=getDoorStyles();
   const opts=styles.map(s=>`<option value="${s.v}">${s.l} — $${s.c}/sqft</option>`).join('');
@@ -1054,7 +1054,7 @@ function addDoor(){
 function calcDoors(){
   const styles=getDoorStyles();doorC=0;doorSl=0;
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
-    const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
+    const sel=b.querySelector('select');const w=parseFloat(b.querySelector('.dwidth')?.value)||0;const hh=parseFloat(b.querySelector('.dheight')?.value)||0;const sqEl=b.querySelector('.dsqft');let sqft=parseFloat(sqEl?.value)||0;if(w>0&&hh>0){sqft=w*hh/144;if(sqEl&&document.activeElement!==sqEl)sqEl.value=sqft.toFixed(2);}
     const count=parseFloat(b.querySelector('.dcount')?.value)||1;
     const height=parseFloat(b.querySelector('.dheight')?.value)||0;
     const mu=parseFloat(b.querySelector('.dmu')?.value)||P.dMu;
@@ -1151,7 +1151,7 @@ function calcSpecial(){
   });
   document.getElementById('special-badge').textContent=fmt(spSl);calcAll();calcOrderList();
 }
-function hingesForHeight(h){if(!h||h<=0)return 0;if(h<=50)return 2;if(h<=75)return 3;return 4;}
+function hingesForHeight(h){if(!h||h<=0)return 0;if(h<=50)return 2;if(h<=65)return 3;return 4;}
 function calcOrderList(){
   let hinges=0,handles=0,latches=0,flanges=0;
   const slidePairs={};
@@ -1308,7 +1308,7 @@ function autoDesc(){
   }
   const doorParts=[];
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
-    const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
+    const sel=b.querySelector('select');const w=parseFloat(b.querySelector('.dwidth')?.value)||0;const hh=parseFloat(b.querySelector('.dheight')?.value)||0;const sqEl=b.querySelector('.dsqft');let sqft=parseFloat(sqEl?.value)||0;if(w>0&&hh>0){sqft=w*hh/144;if(sqEl&&document.activeElement!==sqEl)sqEl.value=sqft.toFixed(2);}
     if(sqft>0){const lbl=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'doors';doorParts.push(`${sqft} sq ft of ${lbl}`);}
   });
   if(doorParts.length)parts.push(doorParts.join(' + ')+' doors');
@@ -1386,7 +1386,7 @@ function buildProposalLines(){
     lines.push({label:melType,qty:`${melQty} ${melUnit}`});
   }
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
-    const sel=b.querySelector('select');const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
+    const sel=b.querySelector('select');const w=parseFloat(b.querySelector('.dwidth')?.value)||0;const hh=parseFloat(b.querySelector('.dheight')?.value)||0;const sqEl=b.querySelector('.dsqft');let sqft=parseFloat(sqEl?.value)||0;if(w>0&&hh>0){sqft=w*hh/144;if(sqEl&&document.activeElement!==sqEl)sqEl.value=sqft.toFixed(2);}
     if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push({label:`${sname} Doors`,qty:`${sqft} sq ft`});}
   });
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
@@ -1653,7 +1653,7 @@ function closeModal(){
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
 
 function openSettings(){
-  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
   document.getElementById('set-overlay').classList.add('open');
 }
@@ -1661,7 +1661,7 @@ function closeSettings(){document.getElementById('set-overlay').classList.remove
 document.getElementById('set-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('set-overlay'))closeSettings();});
 document.getElementById('arch-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('arch-overlay'))closeArchive();});
 function saveSettings(){
-  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
   saveP(P);if(window.fbSave)window.fbSave();
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
