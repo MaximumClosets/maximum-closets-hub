@@ -108,6 +108,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .f input,.f select,.f textarea{width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;color:#d0d4e2;background:var(--input-bg);font-family:inherit}
 .f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--green);background:#1e2336;color:#e2e5f0}
 .f input::placeholder,.f textarea::placeholder{color:#4a4f63}
+.f input.calc,.f input.calc:focus{background:var(--border);color:var(--muted);-webkit-text-fill-color:var(--muted);border-style:dashed;border-color:var(--border);cursor:default;font-weight:600}
 .f textarea{resize:vertical;min-height:52px}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .g3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:7px}
@@ -1080,17 +1081,19 @@ function getDoorStyles(){return[{v:'white-flat',l:'White Flat',c:(P.dWF??8)},{v:
 function addDoor(){
   doorIdx++;const id='dr-'+doorIdx;const styles=getDoorStyles();
   const opts=styles.map(s=>`<option value="${s.v}">${s.l} — $${s.c}/sqft</option>`).join('');
+  const muOpts=[2,2.25,2.5,2.75,3,3.25,3.5].map(v=>`<option value="${v}"${v==P.dMu?' selected':''}>${v}x</option>`).join('');
   const div=document.createElement('div');div.className='item-block';div.id=id;
   div.innerHTML=`<div class="ititle">Door ${doorIdx}</div><button class="rm" onclick="rmItem('${id}','door')">×</button>
     <div class="f"><label>Style</label><select onchange="calcDoors()">${opts}</select></div>
-    <div class="f g2"><div><label>Sq Ft (each)</label><input type="number" class="dsqft" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div>
-    <div><label>Door Count</label><input type="number" class="dcount" placeholder="1" value="1" oninput="calcDoors()" inputmode="decimal"/></div></div>
-    <div class="f g2"><div><label>Markup ×</label><input type="number" class="dmu" value="${P.dMu}" step=".05" oninput="calcDoors()" inputmode="decimal"/></div>
-    <div><label style="color:#ff8a8a">Height (in) *</label><input type="number" class="dheight" placeholder="required" required oninput="calcDoors()" inputmode="decimal"/></div></div>
-    <div class="f g2"><div><label style="color:#ff8a8a">Width (in) *</label><input type="number" class="dwidth" placeholder="required" required oninput="calcDoors()" inputmode="decimal"/></div>
-    <div><label>Hardware</label><select class="dhw" onchange="calcDoors()">
+    <div class="f g2"><div><label>Width (in)</label><input type="number" class="dwidth" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div>
+    <div><label>Height (in)</label><input type="number" class="dheight" placeholder="0" oninput="calcDoors()" inputmode="decimal"/></div></div>
+    <div class="f g2"><div><label>Sq Ft (each)</label><input type="number" class="dsqft calc" placeholder="0" readonly tabindex="-1"/></div>
+    <div><label>Quantity</label><input type="number" class="dcount" placeholder="1" value="1" oninput="calcDoors()" inputmode="decimal"/></div></div>
+    <div class="f g2"><div><label>Total Sq Ft</label><input type="number" class="dtotsqft calc" placeholder="0" readonly tabindex="-1"/></div>
+    <div><label>Markup</label><select class="dmu" onchange="calcDoors()">${muOpts}</select></div></div>
+    <div class="f"><label>Hardware</label><select class="dhw" onchange="calcDoors()">
       <option value="handle">Handle</option><option value="none">No Handle</option><option value="latch">Push Latch (Concealed)</option>
-    </select></div></div>
+    </select></div>
     <div class="result"><span>Cost → Sale <span class="dres-sqft" style="color:var(--muted);font-weight:400"></span></span><strong class="dres">$0 → $0</strong></div>`;
   document.getElementById('door-items').appendChild(div);calcDoors();
 }
@@ -1103,6 +1106,7 @@ function calcDoors(){
     const mu=parseFloat(b.querySelector('.dmu')?.value)||P.dMu;
     const st=styles.find(s=>s.v===sel?.value)||styles[0];
     const totalSqft=sqft*count;
+    const totEl=b.querySelector('.dtotsqft');if(totEl)totEl.value=totalSqft?totalSqft.toFixed(2):'';
     const doorCost=totalSqft*st.c,doorSale=doorCost*mu;
     const hingeCount=(sqft>0&&count>0)?count*hingesForHeight(height):0;
     const hingeCost=hingeCount*P.hgC,hingeSale=hingeCount*P.hgS;
@@ -1597,7 +1601,7 @@ function loadPricingForJob(jid){
   if(inp.melQty)document.getElementById('mel-qty').value=inp.melQty;
   if(inp.melCost)document.getElementById('mel-cost').value=inp.melCost;
   if(inp.melSell)document.getElementById('mel-sell').value=inp.melSell;
-  (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl)muEl.value=d.mu;const countEl=b.querySelector('.dcount');if(countEl)countEl.value=d.count||1;const heightEl=b.querySelector('.dheight');if(heightEl)heightEl.value=d.height||'';const widthEl=b.querySelector('.dwidth');if(widthEl)widthEl.value=d.width||'';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
+  (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl){const mv=String(d.mu||P.dMu);if(![...muEl.options].some(o=>o.value===mv))muEl.add(new Option(d.mu+'x',mv));muEl.value=mv;}const countEl=b.querySelector('.dcount');if(countEl)countEl.value=d.count||1;const heightEl=b.querySelector('.dheight');if(heightEl)heightEl.value=d.height||'';const widthEl=b.querySelector('.dwidth');if(widthEl)widthEl.value=d.width||'';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
   (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;const depthEl=b.querySelector('.ddepth');if(depthEl)depthEl.value=d.depth||14;const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
   (inp.hardware||[]).forEach(h=>{addHw();const bid='hw-'+hwIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=h.preset;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=h.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=h.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=h.sell;});
   if(inp.hlpHrs!==undefined){const e=document.getElementById('hlp-hrs');if(e)e.value=inp.hlpHrs;}
