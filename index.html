@@ -62,7 +62,7 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .card:hover{box-shadow:0 3px 10px rgba(0,0,0,0.18)}
 .card.reviewed{box-shadow:0 0 0 1.5px var(--green) inset,var(--shadow);background:linear-gradient(0deg,rgba(74,173,120,0.1),rgba(74,173,120,0.1)),var(--card-bg)}
 /* Assigned-to owner tint (soft ~9% fill) + full-strength 4px left stripe. Kept AFTER .reviewed so the tint shows; the green reviewed ring is an inset box-shadow and stays visible on top. */
-.card.owner-jed{border-left:4px solid #4a8fbf;padding-left:6px;background:linear-gradient(0deg,rgba(74,143,191,0.09),rgba(74,143,191,0.09)),var(--card-bg)}
+.card.owner-james{border-left:4px solid #4a8fbf;padding-left:6px;background:linear-gradient(0deg,rgba(74,143,191,0.09),rgba(74,143,191,0.09)),var(--card-bg)}
 .card.owner-pete{border-left:4px solid #9b5cc4;padding-left:6px;background:linear-gradient(0deg,rgba(155,92,196,0.09),rgba(155,92,196,0.09)),var(--card-bg)}
 .card-check{position:absolute;top:7px;right:7px;width:19px;height:19px;border-radius:50%;border:1.5px solid var(--border);background:none;color:transparent;font-size:11px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .card-check:hover{border-color:var(--green)}
@@ -360,16 +360,17 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         </select>
       </div>
       <div><label>Job Source</label>
-        <select id="f-source">
-          <option value="">—</option><option>Jed Referral</option><option>Customer Referral</option>
-          <option>Google</option><option>Instagram</option><option>Facebook</option>
-          <option>Repeat Customer</option><option>Other</option>
+        <select id="f-source" onchange="toggleRefBy()">
+          <option value="">—</option>
+          <option>James Referral</option><option>Pete Referral</option>
+          <option>Website</option><option>Other</option>
         </select>
       </div>
     </div>
+    <div class="f" id="f-refby-wrap" style="display:none"><label>Referred by</label><input type="text" id="f-refby" placeholder="e.g. Mike Delaney" /></div>
     <div class="f"><label>Assigned To</label>
       <select id="f-assigned">
-        <option value="Jed">Jed</option><option value="Pete">Pete</option>
+        <option value="James">James</option><option value="Pete">Pete</option>
       </select>
     </div>
     <div class="f"><label>Labels</label>
@@ -607,11 +608,11 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <div class="set-bd" id="s-who">
         <div class="srow"><span class="sl">Who uses this device?</span>
           <select id="set-who" onchange="setWho(this.value)" style="width:auto;padding:6px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:#d0d4e2">
-            <option value="office">Jed or Anne (Office)</option>
+            <option value="james">James</option>
             <option value="pete">Pete</option>
           </select>
         </div>
-        <p style="font-size:11px;color:var(--muted);margin-top:4px">New jobs you create are assigned to <span id="set-who-name">Jed</span>. This only tints cards — everyone can still see and edit every job.</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">New jobs you create are assigned to <span id="set-who-name">James</span>. This only tints cards — everyone can still see and edit every job.</p>
       </div>
     </div>
     <button class="save-p" onclick="saveSettings()">💾 Save Prices</button>
@@ -634,7 +635,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <div class="mh"><h3>Who's using this device?</h3></div>
   <div style="padding:16px 15px">
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">This just tints new job cards by owner. Everyone still sees and can edit every job.</p>
-    <button class="save-p" style="margin-top:0;background:#4a8fbf" onclick="setWho('office')">Jed or Anne (Office)</button>
+    <button class="save-p" style="margin-top:0;background:#4a8fbf" onclick="setWho('james')">James</button>
     <button class="save-p" style="margin-top:10px;background:#9b5cc4" onclick="setWho('pete')">Pete</button>
   </div>
 </div>
@@ -875,11 +876,11 @@ function saveData(){
 // ── WHO IS THIS DEVICE (per-device, localStorage only — NOT synced, NOT a permission) ──
 function getWho(){try{return localStorage.getItem('mc-who')||'';}catch(e){return'';}}
 function setWho(v){
-  const who=v==='pete'?'pete':'office';
+  const who=v==='pete'?'pete':'james';
   try{localStorage.setItem('mc-who',who);}catch(e){}
   const o=document.getElementById('who-overlay');if(o)o.classList.remove('open');
   const sw=document.getElementById('set-who');if(sw)sw.value=who;
-  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=who==='pete'?'Pete':'Jed';
+  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=who==='pete'?'Pete':'James';
 }
 
 function todayStr(){
@@ -1495,9 +1496,18 @@ function sendProposalEmail(){
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
 
 const ARCHIVE_MS=14*24*60*60*1000;
+// Map old Job Source values onto the new list so existing jobs keep working / lose no data
+const MIG_SOURCE={'Jed Referral':'James Referral','Google':'James Referral','Instagram':'James Referral','Facebook':'James Referral','Customer Referral':'Other','Repeat Customer':'Other'};
+function migSource(s){return MIG_SOURCE[s]||s||'';}
+function toggleRefBy(){
+  const w=document.getElementById('f-refby-wrap');if(!w)return;
+  w.style.display=document.getElementById('f-source').value==='Other'?'':'none';
+}
 function sweepJobs(){
   const now=Date.now();let changed=false;
   jobs.forEach(j=>{
+    if(MIG_SOURCE[j.source]){j.source=MIG_SOURCE[j.source];changed=true;}
+    if(j.assignedTo==='Jed'){j.assignedTo='James';changed=true;}
     if(j.stage===6){
       if(!j.doneAt){j.doneAt=now;changed=true;}
       else if(!j.archived&&!(j.labels||[]).includes('finalpay')&&(now-j.doneAt)>ARCHIVE_MS){j.archived=true;changed=true;}
@@ -1529,7 +1539,7 @@ function render(){
     const ce=col.querySelector(`#col-${si}`);
     sj.forEach(job=>{
       const reviewed=job.reviewedDate===todayStr();
-      const owner=job.assignedTo==='Pete'?'pete':'jed';
+      const owner=job.assignedTo==='Pete'?'pete':'james';
       const card=document.createElement('div');card.className=`card owner-${owner}${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
       const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
@@ -1539,7 +1549,7 @@ function render(){
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
         ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
-        ${job.source?`<div class="card-src">📌 ${job.source}</div>`:''}
+        ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
         ${ds||hasL?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
@@ -1609,7 +1619,8 @@ function openAdd(stage=0){
   editId=null;selLbls=[];document.getElementById('mtitle').textContent='New Job';
   ['f-name','f-phone','f-email','f-addr','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-stage').value=stage;document.getElementById('f-source').value='';document.getElementById('f-date').value='';
-  document.getElementById('f-assigned').value=getWho()==='pete'?'Pete':'Jed';
+  document.getElementById('f-refby').value='';toggleRefBy();
+  document.getElementById('f-assigned').value=getWho()==='pete'?'Pete':'James';
   document.querySelectorAll('.lopt').forEach(el=>el.classList.remove('on'));
   document.getElementById('p-addr').value='';document.getElementById('p-notes').value='';document.getElementById('p-disc').value='';
   document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';
@@ -1624,8 +1635,9 @@ function openEdit(id){
   document.getElementById('mtitle').textContent=job.name;
   document.getElementById('f-name').value=job.name;document.getElementById('f-phone').value=job.phone||'';
   document.getElementById('f-email').value=job.email||'';document.getElementById('f-stage').value=job.stage;
-  document.getElementById('f-source').value=job.source||'';document.getElementById('f-date').value=job.date||'';
-  document.getElementById('f-assigned').value=job.assignedTo==='Pete'?'Pete':'Jed';
+  document.getElementById('f-source').value=migSource(job.source)||'';document.getElementById('f-date').value=job.date||'';
+  document.getElementById('f-refby').value=job.refBy||'';toggleRefBy();
+  document.getElementById('f-assigned').value=job.assignedTo==='Pete'?'Pete':'James';
   document.getElementById('f-addr').value=job.addr||'';
   document.getElementById('f-notes').value=job.notes||'';
   document.querySelectorAll('.lopt').forEach(el=>el.classList.toggle('on',selLbls.includes(el.dataset.v)));
@@ -1646,7 +1658,8 @@ function captureInfoFields(){
   return{name:document.getElementById('f-name').value.trim(),labels:[...selLbls],stage:parseInt(document.getElementById('f-stage').value),
     source:document.getElementById('f-source').value,date:document.getElementById('f-date').value,
     phone:document.getElementById('f-phone').value.trim(),email:document.getElementById('f-email').value.trim(),addr:document.getElementById('f-addr').value.trim(),notes:document.getElementById('f-notes').value.trim(),
-    assignedTo:document.getElementById('f-assigned').value==='Pete'?'Pete':'Jed'};
+    refBy:document.getElementById('f-source').value==='Other'?document.getElementById('f-refby').value.trim():'',
+    assignedTo:document.getElementById('f-assigned').value==='Pete'?'Pete':'James'};
 }
 function doorsMissingDims(){
   return[...document.querySelectorAll('#door-items .item-block')].some(b=>{
@@ -1701,9 +1714,9 @@ document.getElementById('overlay').addEventListener('click',e=>{if(e.target===do
 function openSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
-  const w=getWho()||'office';
+  const w=getWho()==='pete'?'pete':'james';
   const sw=document.getElementById('set-who');if(sw)sw.value=w;
-  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=w==='pete'?'Pete':'Jed';
+  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=w==='pete'?'Pete':'James';
   document.getElementById('set-overlay').classList.add('open');
 }
 function closeSettings(){document.getElementById('set-overlay').classList.remove('open');}
