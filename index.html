@@ -541,6 +541,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <div class="prop-overlay" id="prop-overlay">
   <div class="prop-actions">
     <button class="pa-close" onclick="closePropPreview()">✕ Close</button>
+    <button onclick="copyProposalEmail(this)" style="background:#555;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">📋 Copy email text</button>
     <button onclick="sendProposalEmail()" style="background:#0079bf;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">✉️ Send via Gmail</button>
   </div>
   <div class="prop-doc" id="prop-doc"></div>
@@ -1508,7 +1509,7 @@ function buildProposalHTML(d){
     ${d.plans?`<div style="background:#eaf6ef;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1a5c38;font-weight:600">📐 Design plans / drawings are included with this proposal</div>`:''}
     ${d.plansPdf?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><a href="${d.plansPdf.dataUrl}" download="${d.plansPdf.name}" style="color:#1a5c38;font-weight:600;text-decoration:underline">${d.plansPdf.name}</a></div>`:''}
     ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
-    <div class="prop-terms"><strong>Terms & Conditions:</strong> A 50% deposit is required before scheduling. The remaining balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Maximum Closets is not responsible for pre-existing structural issues. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge. This proposal is valid for 30 days.</div>`;
+    <div class="prop-terms"><strong>Terms & Conditions:</strong> A 50% deposit is required before scheduling. The remaining balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Maximum Closets is not responsible for pre-existing structural issues. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge.</div>`;
 }
 function previewProposal(){const d=getProposalData();if(!d)return;document.getElementById('prop-doc').innerHTML=buildProposalHTML(d);document.getElementById('prop-overlay').classList.add('open');}
 function dataUrlToBytes(dataUrl){const b64=dataUrl.split(',')[1]||'';const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return arr;}
@@ -1565,13 +1566,29 @@ async function downloadFullProposalPdf(btn){
   finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
 }
 function closePropPreview(){document.getElementById('prop-overlay').classList.remove('open');}
+function proposalEmailBody(d){
+  const lines=d.lines.map(l=>`${l.label} — ${l.qty}`).join('\n')||'Custom closet installation';
+  const disc=d.disc>0?`Discount: -$${d.disc.toFixed(2)}\n`:'';
+  const tax=d.tax>0?`Tax: $${d.tax.toFixed(2)}\n`:'';
+  return `Hi ${d.job.name.split(' ')[0]},\n\nProposal is attached along with the 3D renders and the drawings.\n\n${lines}\n\n${disc}${tax}Total: $${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}\n50% deposit to schedule: $${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}\n\nAny questions just ask.\n\nThanks,\nJames\nMaximum Closets\n631-339-1303`;
+}
 function sendProposalEmail(){
   const job=jobs.find(j=>j.id===editId);if(!job)return;const d=getProposalData();if(!d)return;
   const to=encodeURIComponent(job.email||''),subject=encodeURIComponent('Your Custom Closet Proposal — Maximum Closets');
-  const lines=d.lines.map(l=>`  • ${l.label} (${l.qty})`).join('\n');
-  const body=encodeURIComponent(`Hi ${d.job.name.split(' ')[0]},\n\nThank you for choosing Maximum Closets!\n\nWHAT'S INCLUDED:\n${lines||'  Custom closet installation'}\n\nPRICING:\nSubtotal: $${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}${d.disc>0?'\nDiscount: -$'+d.disc.toFixed(2):''}${d.tax>0?'\nTax: $'+d.tax.toFixed(2):''}\nTotal: $${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}\n50% Deposit Due: $${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}\n${d.notes?'\n'+d.notes:''}\n\nTERMS:\nA 50% deposit is required before scheduling. The remaining balance is due upon completion. This proposal is valid for 30 days.\n\nMaximum Closets\njames@maximumclosets.com`);
-  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`,'_blank');
+  const body=encodeURIComponent(proposalEmailBody(d));
+  window.open(`https://mail.google.com/mail/u/0/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`,'_blank');
   if(d.plansPdf)setTimeout(()=>alert('Reminder: Gmail can\'t auto-attach files from this app. Click "Download Full Proposal PDF" on the Proposal tab to save one PDF that already includes the proposal, the 3D renders, and the plans pages — then attach that single file to your email.'),300);
+}
+function copyProposalEmail(btn){
+  const d=getProposalData();if(!d)return;
+  const text=proposalEmailBody(d);
+  const done=()=>{if(btn){const o=btn.textContent;btn.textContent='✓ Copied';setTimeout(()=>{btn.textContent=o;},2000);}};
+  const fail=()=>alert('Could not copy automatically. Here is the email text:\n\n'+text);
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopyText(text,done,fail));}
+  else fallbackCopyText(text,done,fail);
+}
+function fallbackCopyText(text,done,fail){
+  try{const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.focus();ta.select();const ok=document.execCommand('copy');ta.remove();ok?done():fail();}catch(e){fail();}
 }
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
 
