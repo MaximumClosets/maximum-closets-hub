@@ -383,6 +383,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       </select>
     </div>
     <div class="f"><label>📐 KCD Job File</label><div id="kcd-box"></div></div>
+    <div class="f"><label>📄 Plans PDF (opens on phone)</label><div id="pdf-box"></div></div>
     <div class="f"><label>Labels</label>
       <div class="lbl-pick">
         <div class="lopt new" data-v="new" onclick="toggleLbl(this)">New Lead</div>
@@ -625,9 +626,9 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <p style="font-size:11px;color:var(--muted);margin-top:4px">New jobs you create are assigned to <span id="set-who-name">James</span>. This only tints cards — everyone can still see and edit every job.</p>
       </div>
     </div>
-    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-gdrive')">Google Drive (KCD files)<span>▾</span></div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-gdrive')">Google Drive (KCD + plans)<span>▾</span></div>
       <div class="set-bd" id="s-gdrive">
-        <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Lets each job card link to its <b>.job</b> file in the shared <b>1_DOTJ_JOBS</b> Drive folder. Paste your Google OAuth Client ID here (one-time), then Save.</p>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Lets each job card link to its <b>.job</b> file in <b>1_DOTJ_JOBS</b> and its plans <b>PDF</b> in <b>1_PDF_MAX</b>. Paste your Google OAuth Client ID here (one-time), then Save.</p>
         <input type="text" id="set-gclient" placeholder="xxxxxxxx.apps.googleusercontent.com" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--input-bg);color:var(--text);font-family:inherit"/>
         <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">To get one: <b>console.cloud.google.com</b> → APIs &amp; Services → enable <b>Google Drive API</b> → Credentials → Create <b>OAuth client ID</b> → type <b>Web application</b> → add <b>https://maximumclosets.github.io</b> under "Authorized JavaScript origins". Copy the Client ID it gives you into the box above.</p>
       </div>
@@ -1683,7 +1684,7 @@ function render(){
         ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
         ${ds||hasL?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''}</div>`:''}
-        ${job.kcdFile&&job.kcdFile.link?`<div class="card-meta" style="margin-top:4px"><span class="chip kcd" title="Open ${kcdEsc(job.kcdFile.name)} in KCD" onclick="event.stopPropagation();window.open('${job.kcdFile.link}','_blank')" ontouchend="event.stopPropagation()">📐 KCD file</span></div>`:''}
+        ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="event.stopPropagation();window.open('${job.kcdFile.link}','_blank')" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
         ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}`;
       ce.appendChild(card);
@@ -1763,7 +1764,7 @@ function openAdd(stage=0){
   document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';
   proposalImages=[];renderProposalImagePreview();
   proposalPlansPdf=null;renderPlansPdfPreview();
-  kcdEditing=false;renderKcdBox();
+  driveState.kcd.editing=false;driveState.pdf.editing=false;driveRenderBox('kcd');driveRenderBox('pdf');
   mTab('info');document.getElementById('overlay').classList.add('open');
   setTimeout(()=>document.getElementById('f-name').focus(),100);
 }
@@ -1783,48 +1784,53 @@ function openEdit(id){
   document.getElementById('p-notes').value='';document.getElementById('p-addr').value='';document.getElementById('p-disc').value='';
   resetPricing();loadPricingForJob(id);renderSchedList(id);mTab('info');
   if(job.addr)document.getElementById('p-addr').value=job.addr;
-  kcdEditing=false;renderKcdBox();
+  driveState.kcd.editing=false;driveState.pdf.editing=false;driveRenderBox('kcd');driveRenderBox('pdf');
   document.getElementById('overlay').classList.add('open');
 }
 function toggleLbl(el){const v=el.dataset.v;el.classList.toggle('on');selLbls=selLbls.includes(v)?selLbls.filter(l=>l!==v):[...selLbls,v];}
 
-// ── KCD JOB FILES — link each job to its .job file in the shared Drive folder 1_DOTJ_JOBS ──
-const KCD_FOLDER_ID='1XJInGfobGJQwI5vTobY6f9OBpaVsEfSG';
-let kcdFiles=null,kcdFilesTime=0,kcdToken='',kcdTokenExp=0,kcdEditing=false;
-function kcdEsc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function kcdClientId(){return (P.gClientId||'').trim();}
-function kcdCurrentJob(){return jobs.find(j=>j.id===editId)||null;}
-function kcdGetToken(){
+// ── DRIVE FILE PICKERS — link each job to files in the shared Drive (KCD .job file + plans PDF) ──
+const DRIVE_CFG={
+  kcd:{folder:'1XJInGfobGJQwI5vTobY6f9OBpaVsEfSG',box:'kcd-box',prop:'kcdFile',name:'1_DOTJ_JOBS',openLabel:'Open in KCD'},
+  pdf:{folder:'1IUkUptM2dhSq7BV0fD3kV5FClEPgnrcr',box:'pdf-box',prop:'pdfFile',name:'1_PDF_MAX',openLabel:'Open PDF'}
+};
+const driveState={kcd:{files:null,time:0,editing:false},pdf:{files:null,time:0,editing:false}};
+let driveToken='',driveTokenExp=0;
+function driveEsc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function driveClientId(){return (P.gClientId||'').trim();}
+function driveCurrentJob(){return jobs.find(j=>j.id===editId)||null;}
+function driveGetToken(){
   return new Promise((resolve,reject)=>{
-    if(kcdToken&&Date.now()<kcdTokenExp-60000)return resolve(kcdToken);
-    const cid=kcdClientId();
+    if(driveToken&&Date.now()<driveTokenExp-60000)return resolve(driveToken);
+    const cid=driveClientId();
     if(!cid)return reject(new Error('no-client-id'));
     if(!(window.google&&google.accounts&&google.accounts.oauth2))return reject(new Error('gis-not-loaded'));
     try{
       const tc=google.accounts.oauth2.initTokenClient({client_id:cid,scope:'https://www.googleapis.com/auth/drive.readonly',
-        callback:(resp)=>{if(resp&&resp.access_token){kcdToken=resp.access_token;kcdTokenExp=Date.now()+((resp.expires_in||3600)*1000);resolve(kcdToken);}else reject(new Error('auth-failed'));},
+        callback:(resp)=>{if(resp&&resp.access_token){driveToken=resp.access_token;driveTokenExp=Date.now()+((resp.expires_in||3600)*1000);resolve(driveToken);}else reject(new Error('auth-failed'));},
         error_callback:(err)=>reject(new Error((err&&err.type)||'auth-cancelled'))});
       tc.requestAccessToken();
     }catch(e){reject(e);}
   });
 }
-async function kcdLoadFiles(force){
-  if(!force&&kcdFiles&&Date.now()-kcdFilesTime<300000)return kcdFiles;
-  const token=await kcdGetToken();
+async function driveLoadFiles(kind,force){
+  const st=driveState[kind],cfg=DRIVE_CFG[kind];
+  if(!force&&st.files&&Date.now()-st.time<300000)return st.files;
+  const token=await driveGetToken();
   const out=[];let pageToken='';
   do{
-    const params=new URLSearchParams({q:`'${KCD_FOLDER_ID}' in parents and trashed=false`,fields:'nextPageToken,files(id,name,webViewLink,modifiedTime)',pageSize:'1000',orderBy:'name_natural',supportsAllDrives:'true',includeItemsFromAllDrives:'true',corpora:'allDrives'});
+    const params=new URLSearchParams({q:`'${cfg.folder}' in parents and trashed=false`,fields:'nextPageToken,files(id,name,webViewLink,modifiedTime)',pageSize:'1000',orderBy:'name_natural',supportsAllDrives:'true',includeItemsFromAllDrives:'true',corpora:'allDrives'});
     if(pageToken)params.set('pageToken',pageToken);
     const r=await fetch('https://www.googleapis.com/drive/v3/files?'+params.toString(),{headers:{Authorization:'Bearer '+token}});
-    if(r.status===401){kcdToken='';throw new Error('reconnect');}
+    if(r.status===401){driveToken='';throw new Error('reconnect');}
     if(!r.ok)throw new Error('drive-'+r.status);
     const j=await r.json();(j.files||[]).forEach(f=>out.push(f));pageToken=j.nextPageToken||'';
   }while(pageToken);
-  kcdFiles=out;kcdFilesTime=Date.now();return out;
+  st.files=out;st.time=Date.now();return out;
 }
 // Fuzzy score: how well a filename matches a customer name (handles first-name, first+last, address-based names)
-function kcdScore(customer,filename){
-  const norm=s=>(s||'').toLowerCase().replace(/\.job$/i,'').replace(/[^a-z0-9]+/g,' ').trim();
+function driveScore(customer,filename){
+  const norm=s=>(s||'').toLowerCase().replace(/\.(job|pdf|jpe?g|png)$/i,'').replace(/[^a-z0-9]+/g,' ').trim();
   const c=norm(customer);if(!c)return 0;
   const ct=c.split(' ').filter(Boolean);if(!ct.length)return 0;
   const fstr=norm(filename),fset=new Set(fstr.split(' ').filter(Boolean));
@@ -1833,74 +1839,77 @@ function kcdScore(customer,filename){
   if(fstr.startsWith(ct[0]))s+=0.35;
   return s;
 }
-function kcdBestMatch(){
-  const job=kcdCurrentJob();if(!job||!kcdFiles)return null;
-  let best=null,bs=0;kcdFiles.forEach(f=>{const s=kcdScore(job.name,f.name);if(s>bs){bs=s;best=f;}});
+function driveBestMatch(kind){
+  const job=driveCurrentJob(),st=driveState[kind];if(!job||!st.files)return null;
+  let best=null,bs=0;st.files.forEach(f=>{const s=driveScore(job.name,f.name);if(s>bs){bs=s;best=f;}});
   return bs>=0.5?best:null;
 }
-function renderKcdBox(){
-  const box=document.getElementById('kcd-box');if(!box)return;
-  if(!kcdClientId()){box.innerHTML=`<p style="font-size:11px;color:var(--muted);margin:0">Turn this on in ⚙️ Settings → Google Drive (paste your Google Client ID once).</p>`;return;}
-  if(!editId){box.innerHTML=`<p style="font-size:11px;color:var(--muted);margin:0">Save the job first, then link its KCD file here.</p>`;return;}
-  const job=kcdCurrentJob();const cur=job&&job.kcdFile;
+function driveRenderBox(kind){
+  const cfg=DRIVE_CFG[kind],st=driveState[kind];
+  const box=document.getElementById(cfg.box);if(!box)return;
+  if(!driveClientId()){box.innerHTML=`<p style="font-size:11px;color:var(--muted);margin:0">Turn this on in ⚙️ Settings → Google Drive (paste your Google Client ID once).</p>`;return;}
+  if(!editId){box.innerHTML=`<p style="font-size:11px;color:var(--muted);margin:0">Save the job first, then link its file here.</p>`;return;}
+  const job=driveCurrentJob();const cur=job&&job[cfg.prop];
   let html='';
-  if(cur&&!kcdEditing){
-    html=`<div class="kcd-cur"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${kcdEsc(cur.name)}</span>
-      <a class="kcd-open" href="${cur.link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open in KCD ↗</a>
-      <button class="kcd-btn" style="width:auto" onclick="kcdStartEdit()">Change</button></div>`;
-  }else if(!kcdFiles){
-    html=`<button class="kcd-btn" onclick="kcdConnect(this)">🔗 Connect Google Drive &amp; load files</button>`;
-    if(cur)html+=`<button class="kcd-btn" style="margin-top:6px" onclick="kcdCancelEdit()">Cancel</button>`;
+  if(cur&&!st.editing){
+    html=`<div class="kcd-cur"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${driveEsc(cur.name)}</span>
+      <a class="kcd-open" href="${cur.link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${cfg.openLabel} ↗</a>
+      <button class="kcd-btn" style="width:auto" onclick="driveStartEdit('${kind}')">Change</button></div>`;
+  }else if(!st.files){
+    html=`<button class="kcd-btn" onclick="driveConnect('${kind}',this)">🔗 Connect Google Drive &amp; load files</button>`;
+    if(cur)html+=`<button class="kcd-btn" style="margin-top:6px" onclick="driveCancel('${kind}')">Cancel</button>`;
   }else{
-    const best=kcdBestMatch();
-    html=`<input type="text" id="kcd-search" placeholder="Search 1_DOTJ_JOBS files…" oninput="kcdRenderList()" autocomplete="off" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--input-bg);color:var(--text);font-family:inherit"/>
-      <div class="kcd-list" id="kcd-list"></div>
+    const best=driveBestMatch(kind);
+    html=`<input type="text" id="${kind}-search" placeholder="Search ${cfg.name} files…" oninput="driveRenderList('${kind}')" autocomplete="off" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--input-bg);color:var(--text);font-family:inherit"/>
+      <div class="kcd-list" id="${kind}-list"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
-        <span style="font-size:10px;color:var(--muted)">${kcdFiles.length} files${best?` · ⭐ suggested match`:` · no obvious match — search above`}</span>
-        <span style="font-size:10px;color:var(--green);cursor:pointer" onclick="kcdRefresh()">↻ Refresh</span></div>`;
-    if(cur)html+=`<button class="kcd-btn" style="margin-top:6px" onclick="kcdCancelEdit()">Cancel</button>`;
+        <span style="font-size:10px;color:var(--muted)">${st.files.length} files${best?` · ⭐ suggested match`:` · no obvious match — search above`}</span>
+        <span style="font-size:10px;color:var(--green);cursor:pointer" onclick="driveRefresh('${kind}')">↻ Refresh</span></div>`;
+    if(cur)html+=`<button class="kcd-btn" style="margin-top:6px" onclick="driveCancel('${kind}')">Cancel</button>`;
   }
   box.innerHTML=html;
-  if(kcdFiles&&!(cur&&!kcdEditing))kcdRenderList();
+  if(st.files&&!(cur&&!st.editing))driveRenderList(kind);
 }
-function kcdRenderList(){
-  const listEl=document.getElementById('kcd-list');if(!listEl||!kcdFiles)return;
-  const job=kcdCurrentJob();
-  const q=(document.getElementById('kcd-search')?.value||'').toLowerCase().trim();
-  let items=kcdFiles.slice();
+function driveRenderList(kind){
+  const st=driveState[kind];
+  const listEl=document.getElementById(kind+'-list');if(!listEl||!st.files)return;
+  const job=driveCurrentJob();
+  const q=(document.getElementById(kind+'-search')?.value||'').toLowerCase().trim();
+  let items=st.files.slice();
   if(q)items=items.filter(f=>f.name.toLowerCase().includes(q));
-  items.sort((a,b)=>{const d=kcdScore(job&&job.name,b.name)-kcdScore(job&&job.name,a.name);return d!==0?d:a.name.localeCompare(b.name);});
-  const best=!q?kcdBestMatch():null;
+  items.sort((a,b)=>{const d=driveScore(job&&job.name,b.name)-driveScore(job&&job.name,a.name);return d!==0?d:a.name.localeCompare(b.name);});
+  const best=!q?driveBestMatch(kind):null;
   if(!items.length){listEl.innerHTML=`<div class="kcd-item" style="cursor:default;color:var(--muted)">No matching files</div>`;return;}
   listEl.innerHTML=items.slice(0,60).map(f=>{
     const isBest=best&&f.id===best.id;
     const mt=f.modifiedTime?new Date(f.modifiedTime).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}):'';
-    return `<div class="kcd-item${isBest?' best':''}" onclick="kcdPick('${f.id}')"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isBest?'⭐ ':''}${kcdEsc(f.name)}</span><span class="mt">${mt}</span></div>`;
+    return `<div class="kcd-item${isBest?' best':''}" onclick="drivePick('${kind}','${f.id}')"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isBest?'⭐ ':''}${driveEsc(f.name)}</span><span class="mt">${mt}</span></div>`;
   }).join('');
 }
-async function kcdConnect(btn){
-  try{if(btn){btn.disabled=true;btn.textContent='Connecting…';}await kcdLoadFiles(false);kcdEditing=true;renderKcdBox();}
-  catch(e){kcdAuthError(e);}
+async function driveConnect(kind,btn){
+  try{if(btn){btn.disabled=true;btn.textContent='Connecting…';}await driveLoadFiles(kind,false);driveState[kind].editing=true;driveRenderBox(kind);}
+  catch(e){driveAuthError(kind,e);}
 }
-async function kcdRefresh(){try{await kcdLoadFiles(true);renderKcdBox();}catch(e){kcdAuthError(e);}}
-function kcdStartEdit(){kcdEditing=true;renderKcdBox();if(!kcdFiles)kcdConnect(null);}
-function kcdCancelEdit(){kcdEditing=false;renderKcdBox();}
-function kcdPick(id){
-  const f=(kcdFiles||[]).find(x=>x.id===id);if(!f)return;
+async function driveRefresh(kind){try{await driveLoadFiles(kind,true);driveRenderBox(kind);}catch(e){driveAuthError(kind,e);}}
+function driveStartEdit(kind){driveState[kind].editing=true;driveRenderBox(kind);if(!driveState[kind].files)driveConnect(kind,null);}
+function driveCancel(kind){driveState[kind].editing=false;driveRenderBox(kind);}
+function drivePick(kind,id){
+  const st=driveState[kind],cfg=DRIVE_CFG[kind];
+  const f=(st.files||[]).find(x=>x.id===id);if(!f)return;
   if(!editId){saveCard();if(!editId)return;}
-  const job=kcdCurrentJob();if(!job)return;
-  job.kcdFile={id:f.id,name:f.name,link:f.webViewLink};
-  kcdEditing=false;saveData();render();renderKcdBox();
+  const job=driveCurrentJob();if(!job)return;
+  job[cfg.prop]={id:f.id,name:f.name,link:f.webViewLink};
+  st.editing=false;saveData();render();driveRenderBox(kind);
 }
-function kcdAuthError(e){
-  const msg=e&&e.message;
+function driveAuthError(kind,e){
+  const nm=DRIVE_CFG[kind].name,msg=e&&e.message;
   if(msg==='no-client-id')alert('Add your Google Client ID in ⚙️ Settings → Google Drive first.');
   else if(msg==='gis-not-loaded')alert('Google sign-in is still loading. Wait a moment and try again.');
   else if(msg==='reconnect')alert('Your Google session expired. Tap Connect again to refresh.');
-  else if(msg&&msg.indexOf('drive-')===0)alert('Google Drive error ('+msg.slice(6)+'). Make sure this Google account can open the 1_DOTJ_JOBS folder.');
+  else if(msg&&msg.indexOf('drive-')===0)alert('Google Drive error ('+msg.slice(6)+'). Make sure this Google account can open the '+nm+' folder.');
   else if(msg==='auth-cancelled'||msg==='auth-failed')alert('Google sign-in was cancelled or blocked. Check that pop-ups are allowed, then try again.');
   else alert('Could not load Drive files: '+(msg||'unknown error'));
-  renderKcdBox();
+  driveRenderBox(kind);
 }
 
 function saveCardAndToast(toastId='info-toast'){
@@ -1982,7 +1991,7 @@ function saveSettings(){
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
   const gc=document.getElementById('set-gclient');if(gc)P.gClientId=gc.value.trim();
   saveP(P);if(window.fbSave)window.fbSave();
-  if(typeof renderKcdBox==='function')renderKcdBox();
+  if(typeof driveRenderBox==='function'){driveRenderBox('kcd');driveRenderBox('pdf');}
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
 }
 function toggleSet(id){document.getElementById(id).classList.toggle('hide');}
