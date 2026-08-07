@@ -1187,10 +1187,11 @@ function calcHw(){
 }
 function addSpecial(){
   spIdx++;const id='sp-'+spIdx;
-  const opts=SPECIAL_ITEMS.map((p,i)=>`<option value="${i}">${p.l} — $${p.c.toFixed(2)}</option>`).join('');
+  const opts=SPECIAL_ITEMS.map((p,i)=>`<option value="${i}">${p.l} — $${p.c.toFixed(2)}</option>`).join('')+`<option value="other">✎ Other (type your own)…</option>`;
   const div=document.createElement('div');div.className='item-block';div.id=id;
   div.innerHTML=`<div class="ititle">Special Item ${spIdx}</div><button class="rm" onclick="rmItem('${id}','special')">×</button>
     <div class="f"><label>Item</label><select id="${id}-t" onchange="spPre('${id}')">${opts}</select></div>
+    <div class="f" id="${id}-name-row" style="display:none"><label>Item name</label><input type="text" id="${id}-name" placeholder="e.g. Custom LED lighting strip" oninput="calcOrderList()"/></div>
     <div class="f g3"><div><label>Qty</label><input type="number" id="${id}-q" placeholder="1" value="1" oninput="calcSpecial()" inputmode="decimal"/></div>
     <div><label>Cost $</label><input type="number" id="${id}-c" step=".01" oninput="calcSpecial()" inputmode="decimal"/></div>
     <div><label>Sell $</label><input type="number" id="${id}-s" step=".01" oninput="calcSpecial()" inputmode="decimal"/></div></div>
@@ -1200,13 +1201,27 @@ function addSpecial(){
   document.getElementById('special-items').appendChild(div);spPre(id);
 }
 function spPre(id){
-  const idx=parseInt(document.getElementById(id+'-t')?.value)||0;
+  const v=document.getElementById(id+'-t')?.value;
+  const nameRow=document.getElementById(id+'-name-row');
+  const hamperRow=document.getElementById(id+'-hamper');
+  if(v==='other'){
+    if(nameRow)nameRow.style.display='';
+    if(hamperRow)hamperRow.style.display='none';
+    calcSpecial();return;   // custom item: leave cost/sell for manual entry
+  }
+  if(nameRow)nameRow.style.display='none';
+  const idx=parseInt(v)||0;
   const p=SPECIAL_ITEMS[idx]||SPECIAL_ITEMS[0];
   const cEl=document.getElementById(id+'-c');const sEl=document.getElementById(id+'-s');
   if(cEl)cEl.value=p.c.toFixed(2);if(sEl)sEl.value=(p.c*2).toFixed(2);
-  const hamperRow=document.getElementById(id+'-hamper');
   if(hamperRow)hamperRow.style.display=/hamper/i.test(p.l)?'':'none';
   calcSpecial();
+}
+// Label for a special-item block — the preset name, or the typed name when "Other" is chosen
+function spLabel(bid){
+  const v=document.getElementById(bid+'-t')?.value;
+  if(v==='other')return (document.getElementById(bid+'-name')?.value||'').trim()||'Special Item';
+  return SPECIAL_ITEMS[parseInt(v)||0]?.l||'Special Item';
 }
 function calcSpecial(){
   spC=0;spSl=0;
@@ -1249,9 +1264,8 @@ function calcOrderList(){
   });
   document.querySelectorAll('#special-items .item-block').forEach(b=>{
     const bid=b.id;
-    const idx=parseInt(document.getElementById(bid+'-t')?.value)||0;
     const q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
-    const label=SPECIAL_ITEMS[idx]?.l||'';
+    const label=spLabel(bid);
     if(/hamper/i.test(label)&&q>0){
       const w=document.getElementById(bid+'-w')?.value||'24';
       hamperFronts[w]=(hamperFronts[w]||0)+q;
@@ -1333,7 +1347,7 @@ function snapshotInputs(){
   const specialItems=[];
   document.querySelectorAll('#special-items .item-block').forEach(b=>{
     const bid=b.id;
-    specialItems.push({itemIdx:parseInt(document.getElementById(bid+'-t')?.value)||0,qty:parseFloat(document.getElementById(bid+'-q')?.value)||1,cost:parseFloat(document.getElementById(bid+'-c')?.value)||0,sell:parseFloat(document.getElementById(bid+'-s')?.value)||0,hamperWidth:document.getElementById(bid+'-w')?.value||'24'});
+    specialItems.push({itemIdx:document.getElementById(bid+'-t')?.value||'0',customName:document.getElementById(bid+'-name')?.value||'',qty:parseFloat(document.getElementById(bid+'-q')?.value)||1,cost:parseFloat(document.getElementById(bid+'-c')?.value)||0,sell:parseFloat(document.getElementById(bid+'-s')?.value)||0,hamperWidth:document.getElementById(bid+'-w')?.value||'24'});
   });
   pricingData[editId].inputs={
     melType:document.getElementById('mel-type')?.value||'white',melMethod:document.getElementById('mel-method')?.value||'sqft',
@@ -1493,8 +1507,7 @@ function buildProposalLines(){
   });
   document.querySelectorAll('#special-items .item-block').forEach(b=>{
     const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
-    const sel=document.getElementById(bid+'-t');const idx=parseInt(sel?.value)||0;
-    const lbl=SPECIAL_ITEMS[idx]?.l||'Special Item';
+    const lbl=spLabel(bid);
     if(q>0)lines.push({label:lbl,qty:q});
   });
   return lines;
@@ -1750,7 +1763,7 @@ function loadPricingForJob(jid){
     if(jid!==editId)return;
     proposalPlansPdf=p||null;renderPlansPdfPreview();
   });
-  (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=si.itemIdx;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;const wEl=document.getElementById(bid+'-w');if(wEl)wEl.value=si.hamperWidth||'24';const hamperRow=document.getElementById(bid+'-hamper');if(hamperRow)hamperRow.style.display=/hamper/i.test(SPECIAL_ITEMS[si.itemIdx]?.l||'')?'':'none';});
+  (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=(si.itemIdx!==undefined&&si.itemIdx!==null?si.itemIdx:'0');const isOther=String(sel?.value)==='other';const nameEl=document.getElementById(bid+'-name');if(nameEl)nameEl.value=si.customName||'';const nameRow=document.getElementById(bid+'-name-row');if(nameRow)nameRow.style.display=isOther?'':'none';const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;const wEl=document.getElementById(bid+'-w');if(wEl)wEl.value=si.hamperWidth||'24';const hamperRow=document.getElementById(bid+'-hamper');if(hamperRow)hamperRow.style.display=(!isOther&&/hamper/i.test(SPECIAL_ITEMS[parseInt(sel?.value)]?.l||''))?'':'none';});
   isRestoring=false;calcMel();calcDoors();calcDrawers();calcHw();calcSpecial();calcLabor();calcOrderList();
 }
 function openAdd(stage=0){
