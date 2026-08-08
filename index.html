@@ -348,6 +348,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <div class="mtab" onclick="mTab('pricing')">💰 Pricing</div>
     <div class="mtab" onclick="mTab('checklist')">✓ Checklist</div>
     <div class="mtab" onclick="mTab('proposal')">📄 Proposal</div>
+    <div class="mtab" onclick="mTab('payments')">💵 Payments</div>
     <div class="mtab" onclick="mTab('move')">Move</div>
   </div>
 
@@ -540,6 +541,24 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <button class="gen-btn" onclick="previewProposal()">👁 Preview Proposal</button>
     <button class="gen-btn" style="background:#0079bf;margin-top:8px" onclick="downloadFullProposalPdf(this)">📄 Download Full Proposal PDF</button>
     <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:7px">No internet needed — generates instantly from your pricing data</p>
+  </div>
+
+  <!-- PAYMENTS -->
+  <div class="mtpane" id="mp-payments">
+    <div id="pay-summary" style="background:var(--card,#f4f5f7);border-radius:9px;padding:12px 14px;margin-bottom:12px"></div>
+    <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Record a payment</p>
+    <div class="f g2"><div><label>Date</label><input type="date" id="pay-date"/></div>
+      <div><label>Amount</label><input type="number" id="pay-amt" step=".01" inputmode="decimal" placeholder="0.00"/></div></div>
+    <div class="f g2"><div><label>Method</label><select id="pay-method"><option>Check</option><option>Cash</option><option>Zelle</option><option>Card</option><option>Other</option></select></div>
+      <div><label>Type</label><select id="pay-kind"><option value="deposit">Deposit</option><option value="final">Final Payment</option><option value="other">Other</option></select></div></div>
+    <div class="f"><label>Note (check #, etc.)</label><input type="text" id="pay-note" placeholder="optional"/></div>
+    <button class="gen-btn" style="margin-top:4px" onclick="addPayment()">＋ Add Payment</button>
+    <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px">Payments received</p>
+    <div id="pay-list"></div>
+    <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px">Documents</p>
+    <button class="gen-btn" style="background:#0079bf" onclick="previewDoc('invoice')">🧾 Preview Invoice</button>
+    <button class="gen-btn" style="background:#1a5c38;margin-top:8px" onclick="previewDoc('receipt')">✅ Preview Receipt</button>
+    <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:7px">Same layout as your proposal — with the balance and payment history filled in</p>
   </div>
 
   <!-- MOVE -->
@@ -1512,6 +1531,50 @@ function buildProposalLines(){
   });
   return lines;
 }
+// ── PAYMENTS ── payments live on the job itself so they sync and survive like everything else
+function jobPayments(job){return (job&&job.payments)||[];}
+function paidTotal(job){return jobPayments(job).reduce((s,p)=>s+(parseFloat(p.amt)||0),0);}
+function money(n){return '$'+(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+// The proposal number is created once and stored, so an invoice and its proposal always match
+function ensurePropNum(job){
+  if(!job.propNum){job.propNum='MC-'+Date.now().toString().slice(-6);saveData();}
+  return job.propNum;
+}
+function addPayment(){
+  const job=jobs.find(j=>j.id===editId);if(!job){alert('Save the job first.');return;}
+  const amt=parseFloat(document.getElementById('pay-amt').value)||0;
+  if(amt<=0){alert('Enter an amount.');return;}
+  const date=document.getElementById('pay-date').value||todayStr();
+  const method=document.getElementById('pay-method').value;
+  const kind=document.getElementById('pay-kind').value;
+  const note=document.getElementById('pay-note').value||'';
+  if(!job.payments)job.payments=[];
+  job.payments.push({id:uid(),date,amt,method,kind,note});
+  job.payments.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('pay-amt').value='';document.getElementById('pay-note').value='';
+  saveData();renderPayments();render();
+}
+function deletePayment(pid){
+  const job=jobs.find(j=>j.id===editId);if(!job)return;
+  if(!confirm('Remove this payment?'))return;
+  job.payments=jobPayments(job).filter(p=>p.id!==pid);
+  saveData();renderPayments();render();
+}
+function renderPayments(){
+  const job=jobs.find(j=>j.id===editId);if(!job)return;
+  const total=job.sale||0,paid=paidTotal(job),bal=total-paid;
+  const dateEl=document.getElementById('pay-date');if(dateEl&&!dateEl.value)dateEl.value=todayStr();
+  const sum=document.getElementById('pay-summary');
+  if(sum)sum.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>Job Total</span><span>${money(total)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>Paid</span><span style="color:#1a5c38;font-weight:700">${money(paid)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;border-top:1px solid var(--border);padding-top:6px"><span>${bal<=0.005?'Paid in Full':'Balance Due'}</span><span style="color:${bal<=0.005?'#1a5c38':'#c0392b'}">${money(Math.max(0,bal))}</span></div>
+    ${total?`<div style="font-size:11px;color:var(--muted);margin-top:5px">50% deposit would be ${money(total/2)}</div>`:'<div style="font-size:11px;color:var(--muted);margin-top:5px">Add pricing in the Pricing tab to see a balance.</div>'}`;
+  const list=document.getElementById('pay-list');if(!list)return;
+  const ps=jobPayments(job);
+  list.innerHTML=ps.length?ps.map(p=>`<div class="srow" style="align-items:center">
+    <span class="sl" style="flex:1;text-align:left">${new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — <strong>${money(parseFloat(p.amt)||0)}</strong> · ${p.method}${p.note?' · '+p.note:''}</span>
+    <button class="mv-btn" onclick="deletePayment('${p.id}')">✕</button></div>`).join(''):'<p style="font-size:12px;color:var(--muted)">No payments recorded yet.</p>';
+}
 function getProposalData(){
   const job=jobs.find(j=>j.id===editId);if(!job)return null;
   const sale=melSl+doorSl+drwSl+hwSl+spSl;if(!sale){alert('Add pricing in the Pricing tab first.');return null;}
@@ -1523,29 +1586,56 @@ function getProposalData(){
   const hrs=vn('hlp-hrs',P.hlpHrs);
   const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
   const melColor=melQty>0?(document.getElementById('mel-type')?.value==='white'?'White':'Color'):'';
-  return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,plansPdf:proposalPlansPdf,subtotal,afterDisc,total,deposit,today,hrs,melColor,propNum:'MC-'+Date.now().toString().slice(-6),lines:buildProposalLines()};
+  const payments=jobPayments(job),paid=paidTotal(job),balance=total-paid;
+  return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,plansPdf:proposalPlansPdf,subtotal,afterDisc,total,deposit,today,hrs,melColor,propNum:ensurePropNum(job),payments,paid,balance,lines:buildProposalLines()};
 }
-function buildProposalHTML(d){
+// mode: 'proposal' (default) | 'invoice' | 'receipt' — same layout, different header and money box
+function buildProposalHTML(d,mode){
+  mode=mode||'proposal';
+  const DOCLBL={proposal:'Proposal',invoice:'Invoice',receipt:'Receipt'}[mode];
+  const payHist=(d.payments&&d.payments.length)?`<p class="prop-title">Payments Received</p>
+    <table class="prop-table"><thead><tr><th>Date</th><th>Method</th><th style="text-align:right">Amount</th></tr></thead><tbody>${d.payments.map(p=>`<tr><td>${new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td><td>${p.method}${p.note?' — '+p.note:''}</td><td style="text-align:right;white-space:nowrap">$${(parseFloat(p.amt)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr>`).join('')}</tbody></table>`:'';
+  const moneyBox=mode==='proposal'
+    ?`<div class="prop-deposit"><div class="dl">50% Deposit Required to Schedule</div><div class="da">$${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>`
+    :mode==='invoice'
+    ?`<div class="prop-deposit"><div class="dl">Balance Due</div><div class="da">$${Math.max(0,d.balance).toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>`
+    :`<div class="prop-deposit"><div class="dl">Paid in Full — Thank You</div><div class="da">$${d.paid.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>`;
+  const terms=mode==='proposal'
+    ?'A 50% deposit is required before scheduling. The remaining balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Maximum Closets is not responsible for pre-existing structural issues. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge.'
+    :mode==='invoice'
+    ?'Balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge.'
+    :'Paid in full — no balance remains on this job. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge. Thank you for your business.';
   const rowsHtml=d.lines.map(l=>`<tr><td>${l.label}</td><td style="text-align:right;white-space:nowrap">${l.qty}</td></tr>`).join('');
   const discRow=d.disc>0?`<div class="prop-trow"><span>Discount</span><span>-$${d.disc.toFixed(2)}</span></div>`:'';
   const taxRow=d.tax>0?`<div class="prop-trow"><span>Tax</span><span>$${d.tax.toFixed(2)}</span></div>`:'';
   return`<div class="prop-co"><div><img src="${LOGO_DATA_URL}" alt="Maximum Closets" style="height:60px;display:block;margin-bottom:4px"><div style="font-size:11px;color:#888;margin-top:3px">Custom Closet Installation · Long Island, NY</div></div>
-    <div class="prop-co-info">james@maximumclosets.com<br>Proposal #${d.propNum}<br>${d.today}</div></div>
+    <div class="prop-co-info">james@maximumclosets.com<br>${DOCLBL} #${d.propNum}<br>${d.today}</div></div>
     <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${d.job.name}${d.addr?'<br>'+d.addr:''}${d.job.phone?'<br>'+d.job.phone:''}${d.job.email?'<br>'+d.job.email:''}</p></div>
     <div class="prop-meta-box"><h4>Installation Details</h4><p>Est. Install Time: ${d.hrs} hours${d.melColor?'<br>Melamine Color: '+d.melColor:''}</p></div></div>
     <p class="prop-title">Line Items</p>
     <table class="prop-table"><thead><tr><th>What's Included</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="2" style="color:#aaa;font-style:italic">No line items</td></tr>'}</tbody></table>
     <div class="prop-totals"><div class="prop-trow"><span>Subtotal</span><span>$${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>${discRow}${taxRow}
-    <div class="prop-trow"><span><strong>Total</strong></span><span><strong>$${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span></div></div>
-    <div class="prop-deposit"><div class="dl">50% Deposit Required to Schedule</div><div class="da">$${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+    <div class="prop-trow"><span><strong>Total</strong></span><span><strong>$${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span></div>
+    ${mode!=='proposal'&&d.paid>0?`<div class="prop-trow"><span>Paid to Date</span><span>-$${d.paid.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>`:''}</div>
+    ${moneyBox}
     ${d.desc?`<div style="background:#f4f5f7;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#333;line-height:1.7"><strong style="color:#222;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
     ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">${d.images.map(img=>`<img src="${img.dataUrl}" style="width:100%;border-radius:8px;border:1px solid #ddd;object-fit:cover;max-height:160px">`).join('')}</div></div>`:''}
     ${d.plans?`<div style="background:#eaf6ef;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1a5c38;font-weight:600">📐 Design plans / drawings are included with this proposal</div>`:''}
     ${d.plansPdf?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><a href="${d.plansPdf.dataUrl}" download="${d.plansPdf.name}" style="color:#1a5c38;font-weight:600;text-decoration:underline">${d.plansPdf.name}</a></div>`:''}
     ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
-    <div class="prop-terms"><strong>Terms & Conditions:</strong> A 50% deposit is required before scheduling. The remaining balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Maximum Closets is not responsible for pre-existing structural issues. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge.</div>`;
+    ${mode!=='proposal'?payHist:''}
+    <div class="prop-terms"><strong>Terms & Conditions:</strong> ${terms}</div>`;
 }
-function previewProposal(){const d=getProposalData();if(!d)return;document.getElementById('prop-doc').innerHTML=buildProposalHTML(d);document.getElementById('prop-overlay').classList.add('open');}
+// Which document the preview window is currently showing — proposal, invoice or receipt
+let docMode='proposal';
+function previewDoc(mode){
+  const d=getProposalData();if(!d)return;
+  if(mode==='receipt'&&d.balance>0.005&&!confirm('There is still a balance of $'+d.balance.toFixed(2)+' on this job. Send a receipt anyway?'))return;
+  docMode=mode||'proposal';
+  document.getElementById('prop-doc').innerHTML=buildProposalHTML(d,docMode);
+  document.getElementById('prop-overlay').classList.add('open');
+}
+function previewProposal(){previewDoc('proposal');}
 function dataUrlToBytes(dataUrl){const b64=dataUrl.split(',')[1]||'';const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return arr;}
 // Build the full proposal PDF — a pixel-for-pixel render of the same view shown on screen
 // (photos, pricing, terms) with the uploaded plans PDF appended. Returns {blob, filename}.
@@ -1556,7 +1646,7 @@ async function buildProposalPdf(d){
   const doc=document.createElement('div');
   doc.className='prop-doc';
   doc.style.cssText='width:640px;max-width:640px;margin:0;border-radius:0;box-shadow:none';
-  doc.innerHTML=buildProposalHTML(d);
+  doc.innerHTML=buildProposalHTML(d,docMode);
   holder.appendChild(doc);document.body.appendChild(holder);
   await Promise.all(Array.from(doc.querySelectorAll('img')).map(im=>im.complete?Promise.resolve():new Promise(r=>{im.onload=im.onerror=r;})));
   const canvas=await html2canvas(doc,{scale:3,backgroundColor:'#fff',useCORS:true,logging:false,windowWidth:640});
@@ -1590,7 +1680,8 @@ async function buildProposalPdf(d){
     }catch(err){console.error('Plans merge failed',err);}
   }
   const cust=(d.job.name||'Customer').replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'')||'Customer';
-  return{blob:new Blob([bytes],{type:'application/pdf'}),filename:'Maximum-Closets-Proposal-'+cust+'.pdf'};
+  const docWord={proposal:'Proposal',invoice:'Invoice',receipt:'Receipt'}[docMode]||'Proposal';
+  return{blob:new Blob([bytes],{type:'application/pdf'}),filename:'Maximum-Closets-'+docWord+'-'+cust+'.pdf'};
 }
 function triggerDownload(blob,filename){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;
@@ -1609,13 +1700,17 @@ function closePropPreview(){document.getElementById('prop-overlay').classList.re
 // A short cover note only — the proposal itself (photos, pricing, terms, plans) travels as the attached PDF,
 // so the email no longer restates a separate, different-looking plain-text version.
 function proposalEmailBody(d){
-  return `Hi ${d.job.name.split(' ')[0]},\n\nYour proposal from Maximum Closets is attached — it includes the full pricing, the 3D renders, and the drawings.\n\nAny questions just ask.\n\nThanks,\nJames\nMaximum Closets\n631-339-1303`;
+  const first=d.job.name.split(' ')[0];
+  if(docMode==='invoice')return `Hi ${first},\n\nYour invoice from Maximum Closets is attached. The balance due is $${Math.max(0,d.balance).toLocaleString('en-US',{minimumFractionDigits:2})}.\n\nAny questions just ask.\n\nThanks,\nJames\nMaximum Closets\n631-339-1303`;
+  if(docMode==='receipt')return `Hi ${first},\n\nYour receipt from Maximum Closets is attached — paid in full. It was a pleasure working with you.\n\nIf you have a minute, a Google review would mean a lot: https://g.page/r/CQlLD4HUEtgzEBM/review\n\nThanks,\nJames\nMaximum Closets\n631-339-1303`;
+  return `Hi ${first},\n\nYour proposal from Maximum Closets is attached — it includes the full pricing, the 3D renders, and the drawings.\n\nAny questions just ask.\n\nThanks,\nJames\nMaximum Closets\n631-339-1303`;
 }
 async function sendProposalEmail(btn){
   const job=jobs.find(j=>j.id===editId);if(!job)return;const d=getProposalData();if(!d)return;
   if(!window.jspdf||!window.html2canvas){alert('PDF tools are still loading — please wait a moment and tap the button again.');return;}
   // Open the Gmail compose window right away (inside the click) so pop-up blockers don't stop it
-  const to=encodeURIComponent(job.email||''),subject=encodeURIComponent('Your Custom Closet Proposal — Maximum Closets');
+  const subjText={proposal:'Your Custom Closet Proposal — Maximum Closets',invoice:'Your Invoice — Maximum Closets',receipt:'Your Receipt — Maximum Closets'}[docMode]||'Your Custom Closet Proposal — Maximum Closets';
+  const to=encodeURIComponent(job.email||''),subject=encodeURIComponent(subjText);
   const body=encodeURIComponent(proposalEmailBody(d));
   window.open(`https://mail.google.com/mail/u/0/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`,'_blank');
   // Build + download the SAME proposal shown on screen (photos, pricing, terms, plans) so it can be attached
@@ -1623,7 +1718,7 @@ async function sendProposalEmail(btn){
   try{
     const {blob,filename}=await buildProposalPdf(d);
     triggerDownload(blob,filename);
-    setTimeout(()=>alert('Your proposal just downloaded as "'+filename+'". Attach that one PDF to the Gmail window that opened — it is the exact proposal shown here, with the photos, pricing, terms, and drawings.'),400);
+    setTimeout(()=>alert('Your '+docMode+' just downloaded as "'+filename+'". Attach that one PDF to the Gmail window that opened — it is exactly what is shown here.'),400);
   }catch(err){console.error(err);alert('The Gmail window opened, but building the proposal PDF failed: '+(err&&err.message?err.message:'')+'\nUse the "Download Full Proposal PDF" button, then attach that file.');}
   finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
 }
@@ -1694,6 +1789,7 @@ function render(){
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
         ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
+        ${(()=>{const pd=paidTotal(job),tot=job.sale||0;if(!pd)return'';const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;})()}
         ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
         ${ds||hasL?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''}</div>`:''}
@@ -1717,6 +1813,7 @@ function mTab(name){
   document.querySelector(`.mtab[onclick="mTab('${name}')"]`).classList.add('on');
   document.getElementById('mp-'+name).classList.add('on');
   if(name==='checklist'&&editId){const job=jobs.find(j=>j.id===editId);if(job)renderCL(job.id,job.stage);}
+  if(name==='payments')renderPayments();
   if(name==='proposal'){const pAddr=document.getElementById('p-addr');if(pAddr&&!pAddr.value){const fAddr=document.getElementById('f-addr')?.value||'';if(fAddr)pAddr.value=fAddr;}}
 }
 function resetPricing(){
@@ -1795,6 +1892,7 @@ function openEdit(id){
   document.querySelectorAll('.lopt').forEach(el=>el.classList.toggle('on',selLbls.includes(el.dataset.v)));
   document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
   document.getElementById('p-notes').value='';document.getElementById('p-addr').value='';document.getElementById('p-disc').value='';
+  docMode='proposal';
   resetPricing();loadPricingForJob(id);renderSchedList(id);mTab('info');
   if(job.addr)document.getElementById('p-addr').value=job.addr;
   driveState.kcd.editing=false;driveState.pdf.editing=false;driveRenderBox('kcd');driveRenderBox('pdf');
