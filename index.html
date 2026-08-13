@@ -44,6 +44,13 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .sync-dot.syncing{background:#f39c12;animation:pulse .8s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .agenda{background:rgba(0,0,0,0.18);padding:7px 14px;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+/* Board search / filter bar — sits between the agenda and the board, styled from theme vars so it works in light and dark. */
+.mc-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:rgba(0,0,0,0.18);padding:8px 14px;border-bottom:1px solid var(--border)}
+.mc-filter input,.mc-filter select{background:var(--input-bg);color:var(--text);border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;outline:none;font-family:inherit}
+.mc-filter input#mc-q{flex:1;min-width:150px;max-width:340px}
+.mc-fbtn{background:var(--col-bg);color:var(--muted);border:1.5px solid var(--border);border-radius:6px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.mc-fbtn.active{background:var(--green);color:#fff;border-color:var(--green)}
+.mc-fclear{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit}
 .agenda::-webkit-scrollbar{display:none}
 .agenda-empty{color:rgba(255,255,255,0.45);font-size:11px;font-style:italic}
 .ag-item{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.13);border-radius:6px;padding:4px 9px;margin-right:7px;cursor:pointer;font-size:11px;color:#fff;font-weight:600;white-space:nowrap}
@@ -346,6 +353,17 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 </header>
 
 <div class="agenda" id="agenda"><span class="agenda-empty">No upcoming tasks</span></div>
+<div class="mc-filter" id="mc-filter">
+  <input type="text" id="mc-q" placeholder="🔍 Search name, source, notes, phone…" oninput="mcSetQ(this.value)">
+  <select id="mc-owner" onchange="mcSetOwner(this.value)">
+    <option value="ALL">Everyone</option>
+    <option value="James">James</option>
+    <option value="Pete">Pete</option>
+  </select>
+  <button class="mc-fbtn" onclick="mcSetTag('OVERDUE',this)">⚠️ Overdue</button>
+  <button class="mc-fbtn" onclick="mcSetTag('PLANS',this)">📐 Needs Plans</button>
+  <button class="mc-fclear" onclick="mcClear()">Clear</button>
+</div>
 <div class="board" id="board"></div>
 
 <!-- JOB MODAL -->
@@ -1782,11 +1800,27 @@ function restoreJob(id){
   job.archived=false;job.doneAt=Date.now();
   saveData();render();openArchive();
 }
+// ── BOARD SEARCH / FILTER ── purely a view filter; decides which cards render() draws, so it re-applies on every redraw and never fights the live board.
+let mcFilter={q:'',owner:'ALL',tag:'ALL'};
+function mcMatch(j){
+  if(mcFilter.owner!=='ALL'){const o=j.assignedTo==='Pete'?'Pete':'James';if(o!==mcFilter.owner)return false;}
+  if(mcFilter.tag==='PLANS'&&!(j.labels||[]).includes('plans'))return false;
+  if(mcFilter.tag==='OVERDUE'&&!(j.date&&new Date(j.date+'T12:00:00')<new Date()&&j.stage<5))return false;
+  if(mcFilter.q){
+    const hay=[j.name,j.source,j.refBy,j.notes,j.phone,j.email,j.addr,(j.labels||[]).map(l=>LBLS[l]?LBLS[l].t:'').join(' ')].join(' ').toLowerCase();
+    if(!hay.includes(mcFilter.q))return false;
+  }
+  return true;
+}
+function mcSetQ(v){mcFilter.q=(v||'').trim().toLowerCase();render();}
+function mcSetOwner(v){mcFilter.owner=v;render();}
+function mcSetTag(t,btn){mcFilter.tag=mcFilter.tag===t?'ALL':t;document.querySelectorAll('#mc-filter .mc-fbtn').forEach(b=>b.classList.remove('active'));if(mcFilter.tag!=='ALL'&&btn)btn.classList.add('active');render();}
+function mcClear(){mcFilter={q:'',owner:'ALL',tag:'ALL'};const i=document.getElementById('mc-q');if(i)i.value='';const s=document.getElementById('mc-owner');if(s)s.value='ALL';document.querySelectorAll('#mc-filter .mc-fbtn').forEach(b=>b.classList.remove('active'));render();}
 function render(){
   if(sweepJobs())saveData();
   const board=document.getElementById('board');board.innerHTML='';
   STAGES.forEach((stage,si)=>{
-    const sj=jobs.filter(j=>j.stage===si&&!j.archived);
+    const sj=jobs.filter(j=>j.stage===si&&!j.archived&&mcMatch(j));
     const col=document.createElement('div');col.className='col';
     col.innerHTML=`<div class="col-hd"><div class="col-dot" style="background:${SCOLS[si]}"></div><h2>${stage}</h2><span class="col-cnt">${sj.length}</span></div>
       <div class="cards" id="col-${si}"></div><div class="col-add" onclick="openAdd(${si})">＋ Add a card</div>`;
