@@ -70,6 +70,11 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .card.owner-pete{border-left:7px solid #ff4d4d;padding-left:3px;background:linear-gradient(0deg,rgba(255,77,77,0.14),rgba(255,77,77,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(255,77,77,0.6),0 0 10px rgba(255,77,77,0.22),var(--shadow)}
 /* Reviewed owner cards keep the green reviewed ring so the completed-today checkbox stays visible. */
 .card.reviewed.owner-james,.card.reviewed.owner-pete{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow)}
+/* Stuck-card warning rings override the owner glow: amber at 5+ days in a stage, red at 10+. */
+.card.stale{box-shadow:0 0 0 2px #f2a500 inset,0 0 10px rgba(242,165,0,0.5),var(--shadow)}
+.card.stale2{box-shadow:0 0 0 2px #eb5a46 inset,0 0 10px rgba(235,90,70,0.5),var(--shadow)}
+/* A reviewed card still shows the green reviewed ring even when stale — keep this override last. */
+.card.reviewed.stale,.card.reviewed.stale2{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow)}
 .own-badge{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#0d1016;padding:1px 6px;border-radius:3px;margin-bottom:5px}
 .card.owner-james .own-badge{background:#4a8fbf}
 .card.owner-pete .own-badge{background:#ff4d4d}
@@ -106,6 +111,8 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .kcd-item .mt{color:var(--muted);font-size:10px;white-space:nowrap}
 .chip.tmrw{color:#172b4d;background:#f2a500;font-weight:700}
 .chip.soon{color:#fff;background:#0079bf}
+.chip.stale{color:#172b4d;background:#f2a500;font-weight:700}
+.chip.stale2{color:#fff;background:#eb5a46;font-weight:700}
 .prog-bar{background:#dfe1e6;border-radius:3px;height:4px;margin-top:6px;overflow:hidden}
 .prog-fill{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
 .prog-fill.full{background:#61bd4f}
@@ -1487,14 +1494,13 @@ function renderPlansPdfPreview(){
   const el=document.getElementById('p-plans-pdf-preview');if(!el)return;
   if(proposalPlansPdf){
     el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;background:#22263a;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text)">
-      <span>📎 ${proposalPlansPdf.name}</span>
-      <a href="${proposalPlansPdf.dataUrl}" download="${proposalPlansPdf.name}" style="color:var(--green);text-decoration:underline;margin-left:auto">Download</a>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${proposalPlansPdf.name}</span>
       <button onclick="removePlansPdf()" style="background:#e74c3c;border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:13px;line-height:1;font-weight:bold;flex-shrink:0">×</button>
     </div>`;return;
   }
   const remoteName=editId?pricingData[editId]?.plansPdfName:'';
   if(remoteName){
-    el.innerHTML=`<div style="background:#22263a;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted)">📎 ${remoteName} — uploaded on another device. Open this job there to include the plans, or re-upload the PDF here.</div>`;return;
+    el.innerHTML=`<div style="background:#22263a;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted)">${remoteName} — uploaded on another device. Open this job there to include the plans, or re-upload the PDF here.</div>`;return;
   }
   el.innerHTML='';
 }
@@ -1741,6 +1747,9 @@ function fallbackCopyText(text,done,fail){
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
 
 const ARCHIVE_MS=14*24*60*60*1000;
+// Stuck-card warnings: flag a card amber after this many whole days in one stage, red after the second.
+const STALE_DAYS=5,STALE_DAYS_2=10;
+function daysInStage(j){return j.stageAt?Math.floor((Date.now()-j.stageAt)/86400000):0;}
 // Map old Job Source values onto the new list so existing jobs keep working / lose no data
 const MIG_SOURCE={'Jed Referral':'James Referral','Google':'James Referral','Instagram':'James Referral','Facebook':'James Referral','Customer Referral':'Other','Repeat Customer':'Other'};
 function migSource(s){return MIG_SOURCE[s]||s||'';}
@@ -1751,6 +1760,7 @@ function toggleRefBy(){
 function sweepJobs(){
   const now=Date.now();let changed=false;
   jobs.forEach(j=>{
+    if(!j.stageAt){j.stageAt=now;changed=true;}
     if(MIG_SOURCE[j.source]){j.source=MIG_SOURCE[j.source];changed=true;}
     if(j.assignedTo==='Jed'){j.assignedTo='James';changed=true;}
     if(j.stage===6){
@@ -1785,7 +1795,11 @@ function render(){
     sj.forEach(job=>{
       const reviewed=job.reviewedDate===todayStr();
       const owner=job.assignedTo==='Pete'?'pete':'james';
-      const card=document.createElement('div');card.className=`card owner-${owner}${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
+      // Stuck-card warning: only stages 0–5 (Done auto-archives, so never flag it).
+      const dis=daysInStage(job);
+      let staleCls='';if(si<6){if(dis>=STALE_DAYS_2)staleCls=' stale stale2';else if(dis>=STALE_DAYS)staleCls=' stale';}
+      const staleChip=staleCls?`<span class="chip ${dis>=STALE_DAYS_2?'stale2':'stale'}">⏳ ${dis}d in stage</span>`:'';
+      const card=document.createElement('div');card.className=`card owner-${owner}${reviewed?' reviewed':''}${staleCls}`;attachTap(card,()=>openEdit(job.id));
       const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
@@ -1798,7 +1812,7 @@ function render(){
         ${(()=>{const pd=paidTotal(job),tot=job.sale||0;if(!pd)return'';const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;})()}
         ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
-        ${ds||hasL?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''}</div>`:''}
+        ${ds||hasL||staleChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${staleChip}</div>`:''}
         ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="event.stopPropagation();window.open('${job.kcdFile.link}','_blank')" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
         ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}`;
@@ -2054,15 +2068,15 @@ function saveCard(){
   const data=captureInfoFields();
   if(!data.name){alert('Please enter a customer name.');return;}
   if(doorsMissingDims()){alert('Please enter a Height and Width for every door so the Order List is accurate.');return;}
-  if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0)jobs[idx]={...jobs[idx],...data};}
-  else{const nj={id:uid(),...data,sale:0,cost:0};jobs.push(nj);editId=nj.id;}
+  if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0){const stageChanged=jobs[idx].stage!==data.stage;jobs[idx]={...jobs[idx],...data};if(stageChanged)jobs[idx].stageAt=Date.now();}}
+  else{const nj={id:uid(),...data,sale:0,cost:0,stageAt:Date.now()};jobs.push(nj);editId=nj.id;}
   calcAll();
   saveData();render();
   const job=jobs.find(j=>j.id===editId);
   if(job)document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
   document.getElementById('mtitle').textContent=data.name;
 }
-function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){job.stage=si;document.getElementById('f-stage').value=si;saveData();render();closeModal();}}
+function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){job.stage=si;job.stageAt=Date.now();document.getElementById('f-stage').value=si;saveData();render();closeModal();}}
 function deleteJob(){
   if(!editId||!confirm('Delete this job?'))return;
   jobs=jobs.filter(j=>j.id!==editId);delete clSt[editId];delete pricingData[editId];
