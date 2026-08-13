@@ -348,6 +348,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <button class="hadd" onclick="openArchive()" title="Archived jobs" style="background:rgba(255,255,255,0.15)">📦 <span id="arch-count">0</span></button>
     <button class="hadd" id="theme-btn" onclick="toggleTheme()" title="Switch to light theme" style="background:rgba(255,255,255,0.15)">☀️</button>
     <button class="hadd" onclick="openSettings()" style="background:rgba(255,255,255,0.15)">⚙️</button>
+    <button class="hadd" onclick="openPaste()" title="Paste a Website estimate request email">📋 Paste Lead</button>
     <button class="hadd" onclick="openAdd()">+ Job</button>
   </div>
 </header>
@@ -693,6 +694,38 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <div class="set-modal">
   <div class="mh"><h3>📦 Archived Jobs</h3><button class="mclose" onclick="closeArchive()">×</button></div>
   <div style="padding:14px 15px" id="arch-list"></div>
+</div>
+</div>
+
+<!-- PASTE LEAD (turn a Website "New Estimate Request" email into a Lead card) -->
+<div class="set-overlay" id="paste-overlay">
+<div class="set-modal">
+  <div class="mh"><h3>📋 Paste Lead</h3><button class="mclose" onclick="closePaste()">×</button></div>
+  <div style="padding:14px 15px">
+    <!-- Step 1: paste the raw email -->
+    <div id="paste-step1">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Paste the full "New Estimate Request" email below, then tap Parse. I'll pull out the details for you to check.</p>
+      <div class="f"><textarea id="paste-raw" style="min-height:200px" placeholder="Paste the estimate request email here…"></textarea></div>
+      <button class="save-p" onclick="parsePastedLead()">Parse Email</button>
+    </div>
+    <!-- Step 2: confirm / correct the parsed fields -->
+    <div id="paste-step2" style="display:none">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Check the details below, fix anything that's off, then create the card. It'll land in <b>Lead / Customer</b> with Job Source = <b>Website</b>.</p>
+      <div class="f"><label>Name</label><input type="text" id="pl-name" placeholder="Customer name"></div>
+      <div class="f g2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label>Email</label><input type="email" id="pl-email" placeholder="customer@email.com"></div>
+        <div><label>Phone</label><input type="tel" id="pl-phone" placeholder="(631) 555-0000"></div>
+      </div>
+      <div class="f"><label>ZIP</label><input type="text" id="pl-zip" placeholder="e.g. 11701"></div>
+      <div class="f"><label>Closet Types</label><input type="text" id="pl-types" placeholder="e.g. Reach-in, Walk-in"></div>
+      <div class="f"><label>Dimensions</label><input type="text" id="pl-dims" placeholder="e.g. 8ft x 10ft"></div>
+      <div class="f"><label>Timeframe</label><input type="text" id="pl-timeframe" placeholder="e.g. 1–3 months"></div>
+      <div class="f"><label>Add-ons</label><input type="text" id="pl-addons" placeholder="e.g. Drawers, Lighting"></div>
+      <div class="f"><label>Notes</label><textarea id="pl-notes" style="min-height:70px" placeholder="Any extra message from the customer…"></textarea></div>
+      <button class="save-p" onclick="createLeadFromPaste()">✅ Create Lead Card</button>
+      <button class="save-p" style="background:var(--border);color:var(--muted);margin-top:8px" onclick="pasteBackToStep1()">← Back to paste</button>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -1795,6 +1828,96 @@ function openArchive(){
   document.getElementById('arch-overlay').classList.add('open');
 }
 function closeArchive(){document.getElementById('arch-overlay').classList.remove('open');}
+
+// ── PASTE LEAD — parse a Website "New Estimate Request" email into a Lead card ──
+function openPaste(){
+  document.getElementById('paste-raw').value='';
+  ['pl-name','pl-email','pl-phone','pl-zip','pl-types','pl-dims','pl-timeframe','pl-addons','pl-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('paste-step2').style.display='none';
+  document.getElementById('paste-step1').style.display='block';
+  document.getElementById('paste-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('paste-raw').focus(),100);
+}
+function closePaste(){document.getElementById('paste-overlay').classList.remove('open');}
+function pasteBackToStep1(){
+  document.getElementById('paste-step2').style.display='none';
+  document.getElementById('paste-step1').style.display='block';
+}
+document.getElementById('paste-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('paste-overlay'))closePaste();});
+// Pull labelled fields out of a pasted estimate-request email. Tolerant of ":" / "-" separators and common wording variations.
+function parseLeadEmail(text){
+  const out={name:'',email:'',phone:'',zip:'',types:'',dims:'',timeframe:'',addons:'',notes:''};
+  const FIELDS=[
+    {k:'name',re:/^(?:customer\s+name|full\s+name|name)$/i},
+    {k:'email',re:/^(?:e-?mail(?:\s+address)?)$/i},
+    {k:'phone',re:/^(?:phone(?:\s+number)?|telephone|tel|cell|mobile)$/i},
+    {k:'zip',re:/^(?:zip(?:\s*code)?|postal(?:\s*code)?)$/i},
+    {k:'types',re:/^(?:closet\s+types?|type\s+of\s+closets?|project\s+types?|closets?)$/i},
+    {k:'dims',re:/^(?:dimensions?|measurements?|sizes?|square\s+footage|sq\.?\s*ft\.?)$/i},
+    {k:'timeframe',re:/^(?:time\s*frame|timeline|when(?:\s+to\s+start)?|desired\s+timeframe|start\s+date)$/i},
+    {k:'addons',re:/^(?:add-?ons?|extras?|options?|upgrades?|accessories)$/i},
+    {k:'notes',re:/^(?:notes?|message|comments?|details?|description|additional\s+(?:info|information|comments|details))$/i}
+  ];
+  const lines=(text||'').split(/\r?\n/);
+  let lastKey='';
+  lines.forEach(raw=>{
+    const line=raw.trim();
+    if(!line){return;}
+    const m=line.match(/^(.{1,40}?)\s*(?::|\s[-–—]\s)\s*(.*)$/);
+    if(m){
+      const labelHit=FIELDS.find(f=>f.re.test(m[1].trim()));
+      if(labelHit){
+        out[labelHit.k]=(out[labelHit.k]?out[labelHit.k]+'\n':'')+m[2].trim();
+        lastKey=labelHit.k;
+        return;
+      }
+    }
+    // Unlabelled line: keep appending to a free-text field (notes) if that was the last thing seen.
+    if(lastKey==='notes'){out.notes+=(out.notes?'\n':'')+line;}
+  });
+  // Fallbacks by pattern when a label was missing.
+  if(!out.email){const em=text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);if(em)out.email=em[0];}
+  if(!out.phone){const ph=text.match(/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/);if(ph)out.phone=ph[0].trim();}
+  if(!out.zip){const stripped=text.replace(out.phone||'~~none~~','');const zp=stripped.match(/\b\d{5}(?:-\d{4})?\b/);if(zp)out.zip=zp[0];}
+  Object.keys(out).forEach(k=>out[k]=out[k].trim());
+  return out;
+}
+function parsePastedLead(){
+  const raw=document.getElementById('paste-raw').value;
+  if(!raw.trim()){alert('Paste the estimate request email first.');return;}
+  const d=parseLeadEmail(raw);
+  document.getElementById('pl-name').value=d.name;
+  document.getElementById('pl-email').value=d.email;
+  document.getElementById('pl-phone').value=d.phone;
+  document.getElementById('pl-zip').value=d.zip;
+  document.getElementById('pl-types').value=d.types;
+  document.getElementById('pl-dims').value=d.dims;
+  document.getElementById('pl-timeframe').value=d.timeframe;
+  document.getElementById('pl-addons').value=d.addons;
+  document.getElementById('pl-notes').value=d.notes;
+  document.getElementById('paste-step1').style.display='none';
+  document.getElementById('paste-step2').style.display='block';
+}
+function createLeadFromPaste(){
+  const g=id=>document.getElementById(id).value.trim();
+  const name=g('pl-name');
+  if(!name){alert('Please enter a customer name before creating the card.');return;}
+  // Fold the extra intake fields into Notes so nothing is lost on the card.
+  const extra=[];
+  if(g('pl-zip'))extra.push('ZIP: '+g('pl-zip'));
+  if(g('pl-types'))extra.push('Closet types: '+g('pl-types'));
+  if(g('pl-dims'))extra.push('Dimensions: '+g('pl-dims'));
+  if(g('pl-timeframe'))extra.push('Timeframe: '+g('pl-timeframe'));
+  if(g('pl-addons'))extra.push('Add-ons: '+g('pl-addons'));
+  const msg=g('pl-notes');
+  const notes=[extra.join('\n'),msg].filter(Boolean).join(extra.length&&msg?'\n\n':'');
+  const nj={id:uid(),name:name,stage:0,source:'Website',labels:['new'],
+    email:g('pl-email'),phone:g('pl-phone'),addr:'',notes:notes,date:'',
+    assignedTo:getWho()==='pete'?'Pete':'James',refBy:'',sale:0,cost:0,stageAt:Date.now()};
+  jobs.push(nj);
+  saveData();render();
+  closePaste();
+}
 function restoreJob(id){
   const job=jobs.find(j=>j.id===id);if(!job)return;
   job.archived=false;job.doneAt=Date.now();
