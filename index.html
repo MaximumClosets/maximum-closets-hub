@@ -1916,7 +1916,7 @@ function createLeadFromPaste(){
   const nj={id:uid(),name:name,stage:0,source:'Website',labels:['new'],
     email:g('pl-email'),phone:g('pl-phone'),addr:'',notes:notes,date:'',
     assignedTo:getWho()==='pete'?'Pete':'James',refBy:'',sale:0,cost:0,stageAt:Date.now()};
-  jobs.push(nj);
+  jobs.unshift(nj);
   saveData();render();
   closePaste();
 }
@@ -2228,7 +2228,7 @@ function saveCard(){
   if(!data.name){alert('Please enter a customer name.');return;}
   if(doorsMissingDims()){alert('Please enter a Height and Width for every door so the Order List is accurate.');return;}
   if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0){const stageChanged=jobs[idx].stage!==data.stage;jobs[idx]={...jobs[idx],...data};if(stageChanged)jobs[idx].stageAt=Date.now();}}
-  else{const nj={id:uid(),...data,sale:0,cost:0,stageAt:Date.now()};jobs.push(nj);editId=nj.id;}
+  else{const nj={id:uid(),...data,sale:0,cost:0,stageAt:Date.now()};jobs.unshift(nj);editId=nj.id;}
   calcAll();
   saveData();render();
   const job=jobs.find(j=>j.id===editId);
@@ -2244,7 +2244,7 @@ function deleteJob(){
 function closeModal(){
   const infoData=captureInfoFields();
   if(!editId&&infoData.name){
-    const nj={id:uid(),...infoData,sale:0,cost:0};jobs.push(nj);editId=nj.id;
+    const nj={id:uid(),...infoData,sale:0,cost:0};jobs.unshift(nj);editId=nj.id;
   }
   if(editId){
     if(infoData.name){
