@@ -1858,22 +1858,24 @@ function parseLeadEmail(text){
     {k:'addons',re:/^(?:add-?ons?|extras?|options?|upgrades?|accessories)$/i},
     {k:'notes',re:/^(?:notes?|message|comments?|details?|description|additional\s+(?:info|information|comments|details))$/i}
   ];
+  const add=(k,v)=>{out[k]=(out[k]?out[k]+'\n':'')+v;};
   const lines=(text||'').split(/\r?\n/);
-  let lastKey='';
+  let curKey='';
   lines.forEach(raw=>{
     const line=raw.trim();
     if(!line){return;}
-    const m=line.match(/^(.{1,40}?)\s*(?::|\s[-–—]\s)\s*(.*)$/);
-    if(m){
-      const labelHit=FIELDS.find(f=>f.re.test(m[1].trim()));
-      if(labelHit){
-        out[labelHit.k]=(out[labelHit.k]?out[labelHit.k]+'\n':'')+m[2].trim();
-        lastKey=labelHit.k;
-        return;
-      }
+    // Style A — label and value on one line: "Name: Jarrod" or "Name - Jarrod"
+    const inline=line.match(/^(.{1,40}?)\s*(?::|\s[-–—]\s)\s*(.+)$/);
+    if(inline){
+      const hit=FIELDS.find(f=>f.re.test(inline[1].trim()));
+      if(hit){add(hit.k,inline[2].trim());curKey=hit.k;return;}
     }
-    // Unlabelled line: keep appending to a free-text field (notes) if that was the last thing seen.
-    if(lastKey==='notes'){out.notes+=(out.notes?'\n':'')+line;}
+    // Style B — label sits alone on its own line; the value comes on the following line(s)
+    const labelOnly=line.replace(/[:\-–—]\s*$/,'').trim();
+    const hitLabel=FIELDS.find(f=>f.re.test(labelOnly));
+    if(hitLabel){curKey=hitLabel.k;return;}
+    // Neither — this is a value line, so it belongs to whatever label we last saw
+    if(curKey){add(curKey,line);}
   });
   // Fallbacks by pattern when a label was missing.
   if(!out.email){const em=text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);if(em)out.email=em[0];}
