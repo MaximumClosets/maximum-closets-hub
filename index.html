@@ -1708,29 +1708,29 @@ function buildProposalHTML(d,mode){
   mode=mode||'proposal';
   const DOCLBL={proposal:'Proposal',invoice:'Invoice',receipt:'Receipt'}[mode];
   const payHist=(d.payments&&d.payments.length)?`<p class="prop-title">Payments Received</p>
-    <table class="prop-table"><thead><tr><th>Date</th><th>Method</th><th style="text-align:right">Amount</th></tr></thead><tbody>${d.payments.map(p=>`<tr><td>${new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td><td>${p.method}${p.note?' — '+p.note:''}</td><td style="text-align:right;white-space:nowrap">$${(parseFloat(p.amt)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td></tr>`).join('')}</tbody></table>`:'';
+    <table class="prop-table"><thead><tr><th>Date</th><th>Method</th><th style="text-align:right">Amount</th></tr></thead><tbody>${d.payments.map(p=>`<tr><td>${new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td><td>${p.method}${p.note?' — '+p.note:''}</td><td style="text-align:right;white-space:nowrap">${money(parseFloat(p.amt)||0)}</td></tr>`).join('')}</tbody></table>`:'';
   const moneyBox=mode==='proposal'
-    ?`<div class="prop-deposit"><div class="dl">50% Deposit Required to Schedule</div><div class="da">$${d.deposit.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>`
+    ?`<div class="prop-deposit"><div class="dl">50% Deposit Required to Schedule</div><div class="da">${money(d.deposit)}</div></div>`
     :mode==='invoice'
-    ?`<div class="prop-deposit"><div class="dl">Balance Due</div><div class="da">$${Math.max(0,d.balance).toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>`
-    :`<div class="prop-deposit"><div class="dl">Paid in Full — Thank You</div><div class="da">$${d.paid.toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>`;
+    ?`<div class="prop-deposit"><div class="dl">Balance Due</div><div class="da">${money(Math.max(0,d.balance))}</div></div>`
+    :`<div class="prop-deposit"><div class="dl">Paid in Full — Thank You</div><div class="da">${money(d.paid)}</div></div>`;
   const terms=mode==='proposal'
     ?'A 50% deposit is required before scheduling. The remaining balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Maximum Closets is not responsible for pre-existing structural issues. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge.'
     :mode==='invoice'
     ?'Balance is due upon completion of installation. All materials remain the property of Maximum Closets until paid in full. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge.'
     :'Paid in full — no balance remains on this job. Minor touch-ups or adjustments will be addressed within 30 days of installation at no charge. Thank you for your business.';
   const rowsHtml=d.lines.map(l=>`<tr><td>${l.label}</td><td style="text-align:right;white-space:nowrap">${l.qty}</td></tr>`).join('');
-  const discRow=d.disc>0?`<div class="prop-trow"><span>Discount</span><span>-$${d.disc.toFixed(2)}</span></div>`:'';
-  const taxRow=d.tax>0?`<div class="prop-trow"><span>Tax</span><span>$${d.tax.toFixed(2)}</span></div>`:'';
+  const discRow=d.disc>0?`<div class="prop-trow"><span>Discount</span><span>-${money(d.disc)}</span></div>`:'';
+  const taxRow=d.tax>0?`<div class="prop-trow"><span>Tax</span><span>${money(d.tax)}</span></div>`:'';
   return`<div class="prop-co"><div><img src="${LOGO_DATA_URL}" alt="Maximum Closets" style="height:60px;display:block;margin-bottom:4px"><div style="font-size:11px;color:#888;margin-top:3px">Custom Closet Installation · Long Island, NY</div></div>
     <div class="prop-co-info">james@maximumclosets.com<br>${DOCLBL} #${d.propNum}<br>${d.today}</div></div>
     <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${d.job.name}${d.addr?'<br>'+d.addr:''}${d.job.phone?'<br>'+d.job.phone:''}${d.job.email?'<br>'+d.job.email:''}</p></div>
     <div class="prop-meta-box"><h4>Installation Details</h4><p>Est. Install Time: ${d.hrs} hours${d.melColor?'<br>Melamine Color: '+d.melColor:''}</p></div></div>
     <p class="prop-title">Line Items</p>
     <table class="prop-table"><thead><tr><th>What's Included</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="2" style="color:#aaa;font-style:italic">No line items</td></tr>'}</tbody></table>
-    <div class="prop-totals"><div class="prop-trow"><span>Subtotal</span><span>$${d.subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>${discRow}${taxRow}
-    <div class="prop-trow"><span><strong>Total</strong></span><span><strong>$${d.total.toLocaleString('en-US',{minimumFractionDigits:2})}</strong></span></div>
-    ${mode!=='proposal'&&d.paid>0?`<div class="prop-trow"><span>Paid to Date</span><span>-$${d.paid.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>`:''}</div>
+    <div class="prop-totals"><div class="prop-trow"><span>Subtotal</span><span>${money(d.subtotal)}</span></div>${discRow}${taxRow}
+    <div class="prop-trow"><span><strong>Total</strong></span><span><strong>${money(d.total)}</strong></span></div>
+    ${mode!=='proposal'&&d.paid>0?`<div class="prop-trow"><span>Paid to Date</span><span>-${money(d.paid)}</span></div>`:''}</div>
     ${moneyBox}
     ${d.desc?`<div style="background:#f4f5f7;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#333;line-height:1.7"><strong style="color:#222;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
     ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">${d.images.map(img=>`<img src="${img.dataUrl}" style="width:100%;border-radius:8px;border:1px solid #ddd;object-fit:cover;max-height:160px">`).join('')}</div></div>`:''}
