@@ -1748,6 +1748,7 @@ function previewDoc(mode){
   if(mode==='receipt'&&d.balance>0.005&&!confirm('There is still a balance of $'+d.balance.toFixed(2)+' on this job. Send a receipt anyway?'))return;
   docMode=mode||'proposal';
   document.getElementById('prop-doc').innerHTML=buildProposalHTML(d,docMode);
+  clearArmedShare();
   document.getElementById('prop-overlay').classList.add('open');
 }
 function previewProposal(){previewDoc('proposal');}
@@ -1812,34 +1813,64 @@ async function downloadFullProposalPdf(btn){
   finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
 }
 // Hand the finished PDF straight to the device share menu (Gmail, Messages, WhatsApp, AirDrop)
-// so there is no download-then-attach step. Falls back to a plain download if the share menu refuses.
+// so there is no download-then-attach step.
+// Browsers only allow the share menu to open for a few seconds after a tap, and building the PDF
+// usually takes longer than that — so when the tap "expires" mid-build we keep the finished PDF in
+// armedShare and the next tap sends it straight away.
+let armedShare=null;
+const SHARE_LABEL='📲 Share';
+function clearArmedShare(){
+  armedShare=null;
+  const b=document.getElementById('pa-share');
+  if(b){b.textContent=SHARE_LABEL;b.disabled=false;}
+}
 function canSharePdf(){
   try{
     if(!(navigator.share&&navigator.canShare&&window.File))return false;
     return navigator.canShare({files:[new File([new Blob([''],{type:'application/pdf'})],'t.pdf',{type:'application/pdf'})]});
   }catch(e){return false;}
 }
+// Throws ShareUnsupported when this device will not take the file at all, so callers can fall back to a download.
+async function openShareSheet(r){
+  const file=new File([r.blob],r.filename,{type:'application/pdf'});
+  if(!(navigator.canShare&&navigator.canShare({files:[file]})))throw Object.assign(new Error('files not shareable'),{name:'ShareUnsupported'});
+  await navigator.share({files:[file],title:r.filename,text:r.text});
+}
+function shareFallbackDownload(r){
+  triggerDownload(r.blob,r.filename);
+  alert('This device would not open the share menu, so the '+docMode+' downloaded instead as "'+r.filename+'". Attach that file to your email.');
+}
 async function shareProposalPdf(btn){
+  // Second tap — the PDF is already built, so the share menu opens while this tap is still fresh
+  if(armedShare){
+    const r=armedShare;armedShare=null;if(btn)btn.textContent=SHARE_LABEL;
+    try{await openShareSheet(r);}
+    catch(err){if(err&&err.name==='AbortError')return;console.error(err);shareFallbackDownload(r);}
+    return;
+  }
   const d=getProposalData();if(!d)return;
   if(!window.jspdf||!window.html2canvas){alert('PDF tools are still loading — please wait a moment and tap the button again.');return;}
-  const orig=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='⏳ Building PDF…';}
+  if(btn){btn.disabled=true;btn.textContent='⏳ Building PDF…';}
+  let built=null;
   try{
     const {blob,filename}=await buildProposalPdf(d);
-    const file=new File([blob],filename,{type:'application/pdf'});
-    if(navigator.canShare&&navigator.canShare({files:[file]}))
-      await navigator.share({files:[file],title:filename,text:proposalEmailBody(d)});
-    else{
-      triggerDownload(blob,filename);
-      alert('This device would not open the share menu, so the '+docMode+' downloaded instead as "'+filename+'".');
-    }
+    built={blob,filename,text:proposalEmailBody(d)};
+    await openShareSheet(built);
+    if(btn)btn.textContent=SHARE_LABEL;
   }catch(err){
-    if(err&&(err.name==='AbortError'||err.name==='NotAllowedError'))return;  // user closed the share sheet
-    console.error(err);
-    alert('Sorry — sharing the '+docMode+' failed. '+(err&&err.message?err.message:''));
-  }
-  finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
+    if(err&&err.name==='AbortError'){if(btn)btn.textContent=SHARE_LABEL;}          // share menu swiped away
+    else if(built&&err&&err.name==='NotAllowedError'){                             // tap expired while the PDF built
+      armedShare=built;
+      if(btn)btn.textContent='📲 PDF ready — tap to send';
+    }else{
+      console.error(err);
+      if(built)shareFallbackDownload(built);
+      else alert('Sorry — building the '+docMode+' PDF failed. '+(err&&err.message?err.message:''));
+      if(btn)btn.textContent=SHARE_LABEL;
+    }
+  }finally{if(btn)btn.disabled=false;}
 }
-function closePropPreview(){document.getElementById('prop-overlay').classList.remove('open');}
+function closePropPreview(){document.getElementById('prop-overlay').classList.remove('open');clearArmedShare();}
 // A short cover note only — the proposal itself (photos, pricing, terms, plans) travels as the attached PDF,
 // so the email no longer restates a separate, different-looking plain-text version.
 // The values every {{token}} in INVOICE_EMAIL / RECEIPT_EMAIL is filled from — all read off the job the preview is already showing.
