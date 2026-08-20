@@ -258,8 +258,8 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .prop-msg{background:#f4f5f7;border-radius:8px;padding:12px 14px;font-size:12px;color:#555;line-height:1.6;margin-bottom:20px;font-style:italic}
 .prop-terms{font-size:10px;color:#666;line-height:1.6;border-top:1px solid #e0e0e0;padding-top:14px}
 .prop-terms strong{color:#444}
-.prop-actions{display:flex;gap:8px;margin-bottom:14px;position:sticky;top:0;background:rgba(0,0,0,0.7);padding:8px;border-radius:8px;z-index:10}
-.prop-actions button{flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
+.prop-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;position:sticky;top:0;background:rgba(0,0,0,0.7);padding:8px;border-radius:8px;z-index:10}
+.prop-actions button{flex:1;min-width:104px;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
 .pa-close{background:#555;color:#fff}
 .set-modal{background:#1a1d27;border-radius:13px;width:100%;max-width:500px;margin:0 auto;padding-bottom:16px}
 .set-modal .mh{padding:13px 15px 10px}
@@ -607,6 +607,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <button class="pa-close" onclick="closePropPreview()">✕ Close</button>
     <button onclick="copyProposalEmail(this)" style="background:#555;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">📋 Copy email text</button>
     <button onclick="sendProposalEmail(this)" style="background:#0079bf;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">✉️ Send via Gmail</button>
+    <button id="pa-share" onclick="shareProposalPdf(this)" style="display:none;background:#1a5c38;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">📲 Share</button>
   </div>
   <div class="prop-doc" id="prop-doc"></div>
 </div>
@@ -1810,6 +1811,34 @@ async function downloadFullProposalPdf(btn){
   catch(err){console.error(err);alert('Sorry — building the PDF failed. '+(err&&err.message?err.message:''));}
   finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
 }
+// Hand the finished PDF straight to the device share menu (Gmail, Messages, WhatsApp, AirDrop)
+// so there is no download-then-attach step. Falls back to a plain download if the share menu refuses.
+function canSharePdf(){
+  try{
+    if(!(navigator.share&&navigator.canShare&&window.File))return false;
+    return navigator.canShare({files:[new File([new Blob([''],{type:'application/pdf'})],'t.pdf',{type:'application/pdf'})]});
+  }catch(e){return false;}
+}
+async function shareProposalPdf(btn){
+  const d=getProposalData();if(!d)return;
+  if(!window.jspdf||!window.html2canvas){alert('PDF tools are still loading — please wait a moment and tap the button again.');return;}
+  const orig=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='⏳ Building PDF…';}
+  try{
+    const {blob,filename}=await buildProposalPdf(d);
+    const file=new File([blob],filename,{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[file]}))
+      await navigator.share({files:[file],title:filename,text:proposalEmailBody(d)});
+    else{
+      triggerDownload(blob,filename);
+      alert('This device would not open the share menu, so the '+docMode+' downloaded instead as "'+filename+'".');
+    }
+  }catch(err){
+    if(err&&(err.name==='AbortError'||err.name==='NotAllowedError'))return;  // user closed the share sheet
+    console.error(err);
+    alert('Sorry — sharing the '+docMode+' failed. '+(err&&err.message?err.message:''));
+  }
+  finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
+}
 function closePropPreview(){document.getElementById('prop-overlay').classList.remove('open');}
 // A short cover note only — the proposal itself (photos, pricing, terms, plans) travels as the attached PDF,
 // so the email no longer restates a separate, different-looking plain-text version.
@@ -1858,6 +1887,7 @@ function copyProposalEmail(btn){
 function fallbackCopyText(text,done,fail){
   try{const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.focus();ta.select();const ok=document.execCommand('copy');ta.remove();ok?done():fail();}catch(e){fail();}
 }
+if(canSharePdf())document.getElementById('pa-share').style.display='';
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
 
 const ARCHIVE_MS=14*24*60*60*1000;
