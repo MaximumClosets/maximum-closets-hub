@@ -2240,7 +2240,7 @@ function render(){
         ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
         ${ds||hasL||staleChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${staleChip}</div>`:''}
-        ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="event.stopPropagation();window.open('${kcdLocalUrl(job.kcdFile.name)}','_blank')" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
+        ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="openKcdFile('${job.id}',this,event)" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
         ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}`;
       ce.appendChild(card);
@@ -2357,6 +2357,18 @@ const driveState={kcd:{files:null,time:0,editing:false},pdf:{files:null,time:0,e
 let driveToken='',driveTokenExp=0;
 // KCD .job files open straight off the Google Drive for Desktop H: mapping so Windows hands them to KCD —
 // no download, no duplicate "name (1).job" copies piling up.
+// Browsers block a web page from launching a file:/// link, so the button copies the Windows path instead —
+// paste it into Explorer's address bar (or Win+R) and Windows hands the .job file to KCD.
+function kcdWinPath(name){const n=(name||'').trim();if(!n)return '';
+  return 'H:\\Shared drives\\MAXKCDFILES\\1_DOTJ_JOBS\\'+(/\.job$/i.test(n)?n:n+'.job');}
+function openKcdFile(jobId,el,ev){
+  if(ev){ev.stopPropagation();ev.preventDefault();}
+  const job=jobs.find(j=>j.id===jobId),path=kcdWinPath(job&&job.kcdFile&&job.kcdFile.name);
+  if(!path){alert('No KCD file is linked to this job yet.');return;}
+  const done=()=>{if(!el)return;const o=el.textContent;el.textContent='✓ Copied — paste in Explorer';setTimeout(()=>{el.textContent=o;},2500);};
+  const fail=()=>prompt('Copy this path, then paste it into Windows Explorer:',path);
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(path).then(done).catch(()=>fallbackCopyText(path,done,fail));
+  else fallbackCopyText(path,done,fail);}
 function kcdLocalUrl(name){const n=(name||'').trim();if(!n)return '';
   return 'file:///H:/Shared%20drives/MAXKCDFILES/1_DOTJ_JOBS/'+encodeURIComponent(/\.job$/i.test(n)?n:n+'.job');}
 function driveEsc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -2430,7 +2442,7 @@ function driveRenderBox(kind){
   let html='';
   if(cur&&!st.editing){
     html=`<div class="kcd-cur"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${driveEsc(cur.name)}</span>
-      <a class="kcd-open" href="${kind==='kcd'?kcdLocalUrl(cur.name):cur.link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${cfg.openLabel} ↗</a>
+      <a class="kcd-open" href="${kind==='kcd'?kcdLocalUrl(cur.name):cur.link}" target="_blank" rel="noopener" onclick="${kind==='kcd'?`openKcdFile('${editId}',this,event)`:'event.stopPropagation()'}">${cfg.openLabel} ↗</a>
       <button class="kcd-btn" style="width:auto" onclick="driveStartEdit('${kind}')">Change</button></div>`;
   }else if(!st.files){
     html=`<button class="kcd-btn" onclick="driveConnect('${kind}',this)">🔗 Connect Google Drive &amp; load files</button>`;
