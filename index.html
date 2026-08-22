@@ -609,6 +609,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <button onclick="sendProposalEmail(this)" style="background:#0079bf;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">✉️ Send via Gmail</button>
     <button id="pa-share" onclick="shareProposalPdf(this)" style="display:none;background:#1a5c38;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">📲 Share</button>
   </div>
+  <div id="plans-strip"></div>
   <div class="prop-doc" id="prop-doc"></div>
 </div>
 
@@ -1735,11 +1736,61 @@ function buildProposalHTML(d,mode){
     ${moneyBox}
     ${d.desc?`<div style="background:#f4f5f7;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#333;line-height:1.7"><strong style="color:#222;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
     ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">${d.images.map(img=>`<img src="${img.dataUrl}" style="width:100%;border-radius:8px;border:1px solid #ddd;object-fit:cover;max-height:160px">`).join('')}</div></div>`:''}
-    ${d.plans?`<div style="background:#eaf6ef;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1a5c38;font-weight:600">📐 Design plans / drawings are included with this proposal</div>`:''}
-    ${d.plansPdf?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><a href="${d.plansPdf.dataUrl}" download="${d.plansPdf.name}" style="color:#1a5c38;font-weight:600;text-decoration:underline">${d.plansPdf.name}</a></div>`:''}
+    ${d.plans&&plansAreAttached()?`<div style="background:#eaf6ef;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1a5c38;font-weight:600">📐 Design plans / drawings are included with this proposal${plansStatus.modifiedTime?` <span style="font-weight:500">(drawings dated ${plansDateLabel(plansStatus.modifiedTime)})</span>`:''}</div>`:''}
+    ${plansAreAttached()?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><span style="color:#1a5c38;font-weight:600">${plansStatus.name||''}</span></div>`:''}
     ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
     ${mode!=='proposal'?payHist:''}
     <div class="prop-terms"><strong>Terms & Conditions:</strong> ${terms}</div>`;
+}
+// ── WHAT PLANS WILL ACTUALLY GO OUT ──
+// source: 'drive' = the live linked file (preferred) | 'local' = an older manual upload | 'none'
+// Nothing here ever promises plans that are not really attached — that mismatch is what lets a
+// customer receive a proposal saying "plans included" with the drawings missing or out of date.
+let plansStatus={source:'none',state:'idle'};
+function plansJobFile(){const j=jobs.find(x=>x.id===editId);return j&&j.pdfFile&&j.pdfFile.id?j.pdfFile:null;}
+function plansAreAttached(){return plansStatus.state==='ready'&&plansStatus.source!=='none';}
+function plansDateLabel(t){try{return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return '';}}
+async function refreshPlansStatus(){
+  const jf=plansJobFile(),hasLocal=!!(proposalPlansPdf&&proposalPlansPdf.dataUrl);
+  if(jf&&driveClientId()&&!driveHasToken()){
+    plansStatus={source:'drive',state:'needs-connect',name:jf.name};renderPlansStrip();return;
+  }
+  if(jf&&driveClientId()){
+    plansStatus={source:'drive',state:'loading',name:jf.name};renderPlansStrip();
+    try{
+      const meta=await driveFileMeta(jf.id),bytes=await driveFileBytes(jf.id);
+      plansStatus={source:'drive',state:'ready',name:meta.name||jf.name,modifiedTime:meta.modifiedTime,bytes};
+    }catch(err){
+      console.error('Plans from Drive failed',err);
+      plansStatus=hasLocal?{source:'local',state:'ready',name:proposalPlansPdf.name,fellBack:true}
+                          :{source:'none',state:'error',err:(err&&err.message)||''};
+    }
+  }else if(hasLocal){plansStatus={source:'local',state:'ready',name:proposalPlansPdf.name};}
+  else{plansStatus={source:'none',state:'ready'};}
+  renderPlansStrip();
+  // The document banner depends on what we just learned, so redraw it
+  const doc=document.getElementById('prop-doc');
+  if(doc&&document.getElementById('prop-overlay').classList.contains('open')){
+    const d=getProposalData();if(d)doc.innerHTML=buildProposalHTML(d,docMode);
+  }
+}
+async function plansConnectDrive(){try{await driveGetToken();await refreshPlansStatus();}catch(e){driveAuthError('pdf',e);}}
+function renderPlansStrip(){
+  const el=document.getElementById('plans-strip');if(!el)return;
+  const wrap=(bg,bd,fg,html)=>`<div style="background:${bg};border:1.5px solid ${bd};color:${fg};border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;margin-bottom:12px;line-height:1.5">${html}</div>`;
+  const st=plansStatus,wantsPlans=!!document.getElementById('p-plans')?.checked;
+  if(st.state==='loading')return void(el.innerHTML=wrap('#eef1f5','#c3cbd6','#3d4450','⏳ Loading the latest plans from Google Drive…'));
+  if(st.state==='needs-connect')return void(el.innerHTML=wrap('#fff6e5','#e0a800','#7a5c00',
+    `📐 Latest plans not loaded yet — <b>${driveEsc(st.name)}</b><br><button onclick="plansConnectDrive()" style="margin-top:6px;background:#0079bf;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">Connect Drive &amp; attach latest plans</button>`));
+  if(st.source==='drive'&&st.state==='ready')return void(el.innerHTML=wrap('#eaf6ef','#1a5c38','#12522f',
+    `📐 Latest plans attached: <b>${driveEsc(st.name)}</b>${st.modifiedTime?' — updated '+plansDateLabel(st.modifiedTime):''}`));
+  if(st.source==='local'&&st.state==='ready')return void(el.innerHTML=wrap('#fff6e5','#e0a800','#7a5c00',
+    `📎 Attaching a saved copy from this device: <b>${driveEsc(st.name)}</b><br>This is not the live Drive file — if the drawings changed since you uploaded it, the customer gets the old version.${st.fellBack?'<br>(Could not reach Drive just now.)':''}`));
+  if(st.state==='error')return void(el.innerHTML=wrap('#fdecea','#c0392b','#922b21',
+    `⚠️ Could not load the plans from Drive${st.err?' ('+driveEsc(st.err)+')':''}. <b>No plans will be attached.</b>`));
+  if(wantsPlans)return void(el.innerHTML=wrap('#fdecea','#c0392b','#922b21',
+    `⚠️ You ticked “plans included” but <b>no plans will be attached</b>. Link the plans PDF on the job card, or untick the box.`));
+  el.innerHTML='';
 }
 // Which document the preview window is currently showing — proposal, invoice or receipt
 let docMode='proposal';
@@ -1749,7 +1800,9 @@ function previewDoc(mode){
   docMode=mode||'proposal';
   document.getElementById('prop-doc').innerHTML=buildProposalHTML(d,docMode);
   clearArmedShare();
+  plansStatus={source:'none',state:'idle'};renderPlansStrip();
   document.getElementById('prop-overlay').classList.add('open');
+  refreshPlansStatus();
 }
 function previewProposal(){previewDoc('proposal');}
 function dataUrlToBytes(dataUrl){const b64=dataUrl.split(',')[1]||'';const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return arr;}
@@ -1784,12 +1837,15 @@ async function buildProposalPdf(d){
     donenPx+=sliceH;page++;
   }
   let bytes=pdf.output('arraybuffer');
-  // Append the uploaded plans PDF (full quality, not rasterized) if this device has it locally
-  if(proposalPlansPdf&&proposalPlansPdf.dataUrl&&window.PDFLib){
+  // Append the plans (full quality, not rasterized) — the live Drive file when we have it,
+  // otherwise an older upload held on this device
+  const planBytes=(plansStatus.source==='drive'&&plansStatus.state==='ready'&&plansStatus.bytes)?plansStatus.bytes
+    :((proposalPlansPdf&&proposalPlansPdf.dataUrl)?dataUrlToBytes(proposalPlansPdf.dataUrl):null);
+  if(planBytes&&window.PDFLib){
     try{
       const {PDFDocument}=window.PDFLib;
       const merged=await PDFDocument.load(bytes);
-      const plansDoc=await PDFDocument.load(dataUrlToBytes(proposalPlansPdf.dataUrl));
+      const plansDoc=await PDFDocument.load(planBytes);
       const pages=await merged.copyPages(plansDoc,plansDoc.getPageIndices());
       pages.forEach(p=>merged.addPage(p));
       bytes=await merged.save();
@@ -2242,6 +2298,20 @@ async function driveLoadFiles(kind,force){
   }while(pageToken);
   st.files=out;st.time=Date.now();return out;
 }
+// ── LIVE PLANS FROM DRIVE ──
+// Plans are pulled from the job's linked Drive file at send time, so a drawing revised in KCD
+// is never left behind as a stale copy sitting on one device.
+function driveHasToken(){return !!(driveToken&&Date.now()<driveTokenExp-60000);}
+async function driveApi(id,query){
+  const token=await driveGetToken();
+  const r=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?'+query,{headers:{Authorization:'Bearer '+token}});
+  if(r.status===401){driveToken='';throw new Error('reconnect');}
+  if(!r.ok)throw new Error('drive-'+r.status);
+  return r;
+}
+async function driveFileMeta(id){return (await driveApi(id,'fields=id,name,modifiedTime&supportsAllDrives=true')).json();}
+async function driveFileBytes(id){return new Uint8Array(await (await driveApi(id,'alt=media&supportsAllDrives=true')).arrayBuffer());}
+
 // Fuzzy score: how well a filename matches a customer name (handles first-name, first+last, address-based names)
 function driveScore(customer,filename){
   const norm=s=>(s||'').toLowerCase().replace(/\.(job|pdf|jpe?g|png)$/i,'').replace(/[^a-z0-9]+/g,' ').trim();
