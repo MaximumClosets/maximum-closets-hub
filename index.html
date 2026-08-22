@@ -193,6 +193,10 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .cl-item input{margin-top:2px;width:15px;height:15px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
 .cl-item span{font-size:13px;color:var(--text);line-height:1.4}
 .cl-item.ck span{text-decoration:line-through;color:var(--muted)}
+.ol-item span:first-of-type{flex:1;min-width:0}
+.ol-item .ol-q{margin-left:auto;font-weight:700;color:var(--green);text-align:right;min-width:32px;flex-shrink:0;text-decoration:none}
+.ol-item.ck .ol-q{color:var(--muted)}
+.ol-resend{width:100%;margin-top:8px;padding:9px 10px;background:var(--input-bg);border:1.5px solid #f2a500;color:var(--text);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .prop-inp{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:15px;color:var(--text);background:var(--input-bg);font-family:inherit;margin-bottom:10px}
 .prop-inp:focus{outline:none;border-color:var(--green);background:#fff}
 .gen-btn{width:100%;padding:13px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px}
@@ -535,6 +539,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 
   <!-- CHECKLIST -->
   <div class="mtpane" id="mp-checklist">
+    <div id="order-box"></div>
     <div id="cl-content"><p style="color:var(--muted);font-size:13px">Save job first to see checklist.</p></div>
   </div>
 
@@ -677,6 +682,12 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
           </select>
         </div>
         <p style="font-size:11px;color:var(--muted);margin-top:4px">New jobs you create are assigned to <span id="set-who-name">James</span>. This only tints cards — everyone can still see and edit every job.</p>
+      </div>
+    </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-order')">Order List Emails<span>▾</span></div>
+      <div class="set-bd" id="s-order">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Who gets the order list when a job reaches <b>Deposit Paid</b>. Separate addresses with a comma.</p>
+        <input type="text" id="set-ordemails" placeholder="james@maximumclosets.com, pete@…" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--input-bg);color:var(--text);font-family:inherit"/>
       </div>
     </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-gdrive')">Google Drive (KCD + plans)<span>▾</span></div>
@@ -963,7 +974,7 @@ const DEF = {
   dWF:8, dWS:15, dCF:11, dCS:18, dGM:30, dGMS:30, dMu:2.25,
   drwWC:55, drwWS:120, drwSC:65, drwSS:140,
   hgC:3.30, hgS:10, hnC:1.57, hnS:10, hbC:4.26, hbS:10, slC:5.06, slS:12, rdC:5.30, rdS:16,
-  hlpRate:20, leadPct:8, hlpHrs:8, gClientId:''
+  hlpRate:20, leadPct:8, hlpHrs:8, gClientId:'', ordEmails:'james@maximumclosets.com'
 };
 let P = {...DEF};
 function loadP(){try{P=Object.assign({},DEF,JSON.parse(localStorage.getItem('mc-p')||'{}'));}catch(e){P={...DEF};}}
@@ -1178,6 +1189,7 @@ function getProgress(jid,si){
 }
 function toggleCL(jid,si,ci,ii){const k=clKey(jid,si,ci,ii);clSt[k]=!clSt[k];saveData();renderCL(jid,si);render();}
 function renderCL(jid,si){
+  renderOrderList();
   const el=document.getElementById('cl-content');if(!el)return;
   const lists=getChecklistItems(jid,si);
   if(!lists.length){el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:4px 0">No checklist for this stage.</p>';return;}
@@ -1370,17 +1382,21 @@ function calcSpecial(){
   document.getElementById('special-badge').textContent=fmt(spSl);calcAll();calcOrderList();
 }
 function hingesForHeight(h){if(!h||h<=0)return 0;if(h<=50)return 2;if(h<=65)return 3;return 4;}
-function calcOrderList(){
+// ── ORDER LIST ROWS ──
+// The one place that decides what gets ordered, built from the saved pricing inputs so the
+// pricing tab panel, the job-card checklist and the emailed PDF always show the same list.
+function spLabelFrom(s){
+  if(!s)return 'Special Item';
+  if(s.itemIdx==='other')return (s.customName||'').trim()||'Special Item';
+  return SPECIAL_ITEMS[parseInt(s.itemIdx)||0]?.l||'Special Item';
+}
+function orderRowsFrom(inp){
+  inp=inp||{};
   let hinges=0,handles=0,latches=0,flanges=0;
-  const slidePairs={};
-  const hamperFronts={};
-  const doorCuts=[];
-  document.querySelectorAll('#door-items .item-block').forEach(b=>{
-    const sqft=parseFloat(b.querySelector('.dsqft')?.value)||0;
-    const count=parseFloat(b.querySelector('.dcount')?.value)||1;
-    const height=parseFloat(b.querySelector('.dheight')?.value)||0;
-    const width=parseFloat(b.querySelector('.dwidth')?.value)||0;
-    const hw=b.querySelector('.dhw')?.value||'handle';
+  const slidePairs={},hamperFronts={},drawerBoxes={},specials={},doorCuts=[];
+  (inp.doors||[]).forEach(d=>{
+    const sqft=parseFloat(d.sqft)||0,count=parseFloat(d.count)||1;
+    const height=parseFloat(d.height)||0,width=parseFloat(d.width)||0,hw=d.hw||'handle';
     if(sqft>0&&count>0){
       hinges+=count*hingesForHeight(height);
       if(hw==='handle')handles+=count;else if(hw==='latch')latches+=count;
@@ -1390,44 +1406,40 @@ function calcOrderList(){
       }
     }
   });
-  document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
-    const q=parseFloat(b.querySelector('.dqty')?.value)||0;
-    const depth=parseFloat(b.querySelector('.ddepth')?.value)||14;
-    const hw=b.querySelector('.dhw')?.value||'handle';
+  (inp.drawers||[]).forEach(d=>{
+    const q=parseFloat(d.qty)||0,depth=parseFloat(d.depth)||14,hw=d.hw||'handle';
     if(q>0){
       slidePairs[depth]=(slidePairs[depth]||0)+q;
       if(hw==='handle')handles+=q;else if(hw==='latch')latches+=q;
+      const lbl=(d.type==='sh'?'Shaker':'White Flat')+' Drawer Box';
+      drawerBoxes[lbl]=(drawerBoxes[lbl]||0)+q;
     }
   });
-  document.querySelectorAll('#special-items .item-block').forEach(b=>{
-    const bid=b.id;
-    const q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
-    const label=spLabel(bid);
-    if(/hamper/i.test(label)&&q>0){
-      const w=document.getElementById(bid+'-w')?.value||'24';
-      hamperFronts[w]=(hamperFronts[w]||0)+q;
-    }
+  (inp.specialItems||[]).forEach(sp=>{
+    const q=parseFloat(sp.qty)||0;if(q<=0)return;
+    const label=spLabelFrom(sp);
+    if(/hamper/i.test(label)){const w=sp.hamperWidth||'24';hamperFronts[w]=(hamperFronts[w]||0)+q;}
+    specials[label]=(specials[label]||0)+q;
   });
-  document.querySelectorAll('#hw-items .item-block').forEach(b=>{
-    const bid=b.id;
-    const preset=document.getElementById(bid+'-t')?.value;
-    const q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
-    if(preset==='rd')flanges+=q*2;
-  });
+  (inp.hardware||[]).forEach(h=>{if(h.preset==='rd')flanges+=(parseFloat(h.qty)||0)*2;});
   const rows=[];
   if(handles>0)rows.push(['Handles',handles]);
   if(latches>0)rows.push(['Push Latches (Concealed)',latches]);
   if(hinges>0)rows.push(['Hinges',hinges]);
   doorCuts.forEach(r=>rows.push(r));
-  Object.keys(slidePairs).sort((a,b)=>a-b).forEach(d=>{
-    rows.push([`${d}" Drawer Slide Pairs`,slidePairs[d]]);
-  });
+  Object.keys(slidePairs).sort((a,b)=>a-b).forEach(d=>rows.push([`${d}" Drawer Slide Pairs`,slidePairs[d]]));
+  Object.keys(drawerBoxes).sort().forEach(k=>rows.push([k,drawerBoxes[k]]));
   if(flanges>0)rows.push(['Chrome Rod Flanges',flanges]);
   Object.keys(hamperFronts).sort().forEach(w=>{
-    const qty=hamperFronts[w];
     const width=(parseFloat(w)+0.625).toFixed(3).replace(/\.?0+$/,'');
-    rows.push([`Hamper Door Front — ${width}"W × 26⅛"H (${w}" section)`,qty]);
+    rows.push([`Hamper Door Front — ${width}"W × 26⅛"H (${w}" section)`,hamperFronts[w]]);
   });
+  Object.keys(specials).sort().forEach(k=>rows.push([k,specials[k]]));
+  return rows;
+}
+function orderRowsForJob(jid){return orderRowsFrom((pricingData[jid]||{}).inputs);}
+function calcOrderList(){
+  const rows=orderRowsFrom(readPricingInputs());
   const el=document.getElementById('order-list-content');
   const badge=document.getElementById('order-badge');
   if(!el||!badge)return;
@@ -1435,6 +1447,130 @@ function calcOrderList(){
   badge.textContent=total+' item'+(total===1?'':'s');
   if(!rows.length){el.innerHTML='<p style="font-size:12px;color:var(--muted)">Nothing to order yet — add doors, drawers, hardware, or special items above.</p>';return;}
   el.innerHTML=rows.map(r=>`<div class="brow"><span>${r[0]}</span><span class="cv">${r[1]}</span></div>`).join('');
+}
+// ── ORDER LIST ON THE JOB CARD ──
+// Built automatically once a job reaches Deposit Paid, checked off by either phone (synced),
+// and emailed out as a PDF using the same Gmail-compose + attach flow as the proposal.
+const ORDER_STAGE=3;
+function orderSig(rows){return rows.map(r=>r[0]+' |'+r[1]).join(' ~ ');}
+function orderProgress(job){
+  const l=(job&&job.orderList)||[];
+  return{done:l.filter(i=>i.done).length,tot:l.length};
+}
+// Keep the ticks for any line that did not change; anything new starts unchecked
+function orderItemsFrom(rows,prev){
+  return rows.map(r=>{
+    const old=(prev||[]).find(i=>i.d===r[0]&&i.q===r[1]);
+    return{d:r[0],q:r[1],done:old?!!old.done:false};
+  });
+}
+function orderListChanged(job){
+  if(!job||!Array.isArray(job.orderList)||!job.orderList.length)return false;
+  return orderSig(orderRowsForJob(job.id))!==(job.orderSig||'');
+}
+// Called after any save or stage move. Builds the list the first time the job is at Deposit Paid,
+// emails it only when the job actually just moved into that stage (so older jobs stay quiet),
+// and never resends without asking first.
+function orderListSync(job,ask,justEntered){
+  if(!job||job.stage<ORDER_STAGE)return;
+  const rows=orderRowsForJob(job.id);
+  if(!rows.length)return;
+  const sig=orderSig(rows);
+  if(!Array.isArray(job.orderList)||!job.orderList.length){
+    job.orderList=orderItemsFrom(rows,null);job.orderSig=sig;job.orderAskedSig='';job.orderSentAt=0;
+    saveData();render();renderOrderList();
+    if(justEntered)orderListEmail(job.id,false);
+    return;
+  }
+  if(sig!==job.orderSig&&ask&&job.orderAskedSig!==sig){
+    job.orderAskedSig=sig;saveData();render();renderOrderList();
+    if(confirm('Order list changed — resend updated version?'))orderListResend(job.id);
+  }
+}
+function orderListResend(jid){
+  const job=jobs.find(j=>j.id===jid);if(!job)return;
+  const rows=orderRowsForJob(jid);
+  job.orderList=orderItemsFrom(rows,job.orderList);
+  job.orderSig=orderSig(rows);job.orderAskedSig='';
+  saveData();render();renderOrderList();
+  orderListEmail(jid,true);
+}
+function orderListEmail(jid,resend){
+  const job=jobs.find(j=>j.id===jid);if(!job||!job.orderList)return;
+  job.orderSentAt=Date.now();saveData();renderOrderList();
+  orderListSend(job,resend);
+}
+function toggleOrderItem(i){
+  const job=jobs.find(j=>j.id===editId);
+  if(!job||!job.orderList||!job.orderList[i])return;
+  job.orderList[i].done=!job.orderList[i].done;
+  saveData();renderOrderList();render();
+}
+function renderOrderList(){
+  const el=document.getElementById('order-box');if(!el)return;
+  const job=jobs.find(j=>j.id===editId);
+  if(!job||!Array.isArray(job.orderList)||!job.orderList.length){el.innerHTML='';return;}
+  const pr=orderProgress(job),pct=pr.tot?Math.round(pr.done/pr.tot*100):0;
+  el.innerHTML=`<div class="cl-sec">
+    <div class="cl-hd"><span>📦 Order List</span><span class="cl-pct">${pr.done} of ${pr.tot}</span></div>
+    <div class="cl-bar"><div class="cl-fill" style="width:${pct}%"></div></div>
+    ${job.orderList.map((it,i)=>`<div class="cl-item ol-item ${it.done?'ck':''}" onclick="toggleOrderItem(${i})">
+      <input type="checkbox" ${it.done?'checked':''} onclick="event.stopPropagation();toggleOrderItem(${i})"/>
+      <span>${driveEsc(it.d)}</span><span class="ol-q">${it.q}</span></div>`).join('')}
+    ${!job.orderSentAt?`<button class="ol-resend" style="border-color:var(--green)" onclick="orderListEmail('${job.id}',false)">📧 Email this order list</button>`:''}
+    ${orderListChanged(job)?`<button class="ol-resend" onclick="orderListResend('${job.id}')">⚠️ Order list changed — resend updated version</button>`:''}
+  </div>`;
+}
+function orderEmailTo(){return (P.ordEmails||'').split(',').map(x=>x.trim()).filter(Boolean).join(',');}
+function orderEmailBody(job,resend){
+  const lines=(job.orderList||[]).map(it=>'• '+it.d+' — '+it.q).join('\n');
+  return (resend?'UPDATED order list':'Order list')+' for '+(job.name||'this job')+'.\n\n'+lines+'\n\nThe same list is attached as a PDF.\n\nMaximum Closets';
+}
+// jsPDF only ships the Latin-1 fonts, so swap the fraction characters for plain text
+const PDF_FRACS={'¼':'1/4','½':'1/2','¾':'3/4','⅛':'1/8','⅜':'3/8','⅝':'5/8','⅞':'7/8','⅓':'1/3','⅔':'2/3'};
+function pdfSafe(t){return String(t==null?'':t).replace(/[¼½¾⅛⅜⅝⅞⅓⅔]/g,m=>' '+PDF_FRACS[m]).replace(/ {2,}/g,' ').replace(/[—–]/g,'-').replace(/[^\x00-\xFF]/g,'');}
+function buildOrderListPdf(job){
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({unit:'pt',format:'a4'});
+  const pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight();
+  const L=48,R=pw-48;let y=0;
+  const head=()=>{
+    y=62;
+    pdf.setTextColor(0);pdf.setFont('helvetica','bold');pdf.setFontSize(18);pdf.text('Order List',L,y);
+    pdf.setFontSize(12);pdf.text(pdfSafe(job.name),R,y,{align:'right'});
+    y+=9;pdf.setDrawColor(26,92,56);pdf.setLineWidth(2);pdf.line(L,y,R,y);y+=20;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(120);
+    pdf.text('Maximum Closets · '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}),L,y);
+    y+=22;pdf.setTextColor(0);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(11);
+    pdf.text('Item',L,y);pdf.text('Qty',R,y,{align:'right'});
+    y+=7;pdf.setDrawColor(190);pdf.setLineWidth(1);pdf.line(L,y,R,y);y+=17;
+    pdf.setFont('helvetica','normal');
+  };
+  head();
+  (job.orderList||[]).forEach(it=>{
+    if(y>ph-56){pdf.addPage();head();}
+    const lines=pdf.splitTextToSize(pdfSafe(it.d),R-L-52);
+    pdf.text(lines,L,y);pdf.text(String(it.q),R,y,{align:'right'});
+    y+=lines.length*14+7;
+    pdf.setDrawColor(228);pdf.line(L,y-10,R,y-10);
+  });
+  const cust=(job.name||'Customer').replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'')||'Customer';
+  return{blob:pdf.output('blob'),filename:'Maximum-Closets-Order-List-'+cust+'.pdf'};
+}
+function orderListSend(job,resend){
+  const to=orderEmailTo();
+  if(!to){alert('No order-list email addresses yet — add them in ⚙️ Settings → Order List Emails. The list is saved on the card either way.');return;}
+  // Open Gmail first (inside the click) so pop-up blockers leave it alone, same as the proposal email
+  window.open('https://mail.google.com/mail/u/0/?view=cm&fs=1&to='+encodeURIComponent(to)
+    +'&su='+encodeURIComponent((resend?'UPDATED Order List — ':'Order List — ')+(job.name||''))
+    +'&body='+encodeURIComponent(orderEmailBody(job,resend)),'_blank');
+  try{
+    if(!window.jspdf){alert('PDF tools are still loading — reopen the card and use the resend button in a moment.');return;}
+    const {blob,filename}=buildOrderListPdf(job);
+    triggerDownload(blob,filename);
+    setTimeout(()=>alert('The order list downloaded as "'+filename+'". Attach that PDF to the Gmail window that just opened.'),400);
+  }catch(err){console.error(err);alert('The Gmail window opened, but building the order list PDF failed: '+((err&&err.message)||''));}
 }
 function calcLabor(){
   const hrsEl=document.getElementById('hlp-hrs');
@@ -1465,6 +1601,10 @@ function calcAll(){
 function snapshotInputs(){
   if(!editId||isRestoring)return;
   if(!pricingData[editId])pricingData[editId]={};
+  pricingData[editId].inputs=readPricingInputs();
+}
+// Read every pricing field straight off the screen (used for the saved snapshot and the live order list)
+function readPricingInputs(){
   const doors=[];
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');
@@ -1486,7 +1626,7 @@ function snapshotInputs(){
     const bid=b.id;
     specialItems.push({itemIdx:document.getElementById(bid+'-t')?.value||'0',customName:document.getElementById(bid+'-name')?.value||'',qty:parseFloat(document.getElementById(bid+'-q')?.value)||1,cost:parseFloat(document.getElementById(bid+'-c')?.value)||0,sell:parseFloat(document.getElementById(bid+'-s')?.value)||0,hamperWidth:document.getElementById(bid+'-w')?.value||'24'});
   });
-  pricingData[editId].inputs={
+  return{
     melType:document.getElementById('mel-type')?.value||'white',melMethod:document.getElementById('mel-method')?.value||'sqft',
     melQty:parseFloat(document.getElementById('mel-qty')?.value)||0,melCost:parseFloat(document.getElementById('mel-cost')?.value)||0,melSell:parseFloat(document.getElementById('mel-sell')?.value)||0,
     doors,drawers,hardware,specialItems,
@@ -2231,6 +2371,7 @@ function render(){
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
       const pr=getProgress(job.id,si);const hasL=(CL[si]||[]).length>0&&pr.tot>0;
+      const op=orderProgress(job);const opChip=op.tot?`<span class="chip">📦 ${op.done}/${op.tot}</span>`:'';
       card.innerHTML=`<button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
         <span class="own-badge">${owner==='pete'?'Pete':'James'}</span>
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
@@ -2239,7 +2380,7 @@ function render(){
         ${(()=>{const pd=paidTotal(job),tot=job.sale||0;if(!pd)return'';const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;})()}
         ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
-        ${ds||hasL||staleChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${staleChip}</div>`:''}
+        ${ds||hasL||staleChip||opChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${opChip} ${staleChip}</div>`:''}
         ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="openKcdFile('${job.id}',this,event)" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
         ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}`;
@@ -2252,6 +2393,7 @@ function render(){
   const cl=jobs.filter(j=>j.stage===6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   document.getElementById('hstats').textContent=`${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
   const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
+  if(editId)renderOrderList();   // keeps the open card's order list live when the other phone ticks a box
 }
 
 function mTab(name){
@@ -2526,15 +2668,17 @@ function saveCard(){
   const data=captureInfoFields();
   if(!data.name){alert('Please enter a customer name.');return;}
   if(doorsMissingDims()){alert('Please enter a Height and Width for every door so the Order List is accurate.');return;}
-  if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0){const stageChanged=jobs[idx].stage!==data.stage;jobs[idx]={...jobs[idx],...data};if(stageChanged)jobs[idx].stageAt=Date.now();}}
+  let entered=false;
+  if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0){const stageChanged=jobs[idx].stage!==data.stage;entered=jobs[idx].stage<ORDER_STAGE&&data.stage>=ORDER_STAGE;jobs[idx]={...jobs[idx],...data};if(stageChanged)jobs[idx].stageAt=Date.now();}}
   else{const nj={id:uid(),...data,sale:0,cost:0,stageAt:Date.now()};jobs.unshift(nj);editId=nj.id;}
   calcAll();
   saveData();render();
   const job=jobs.find(j=>j.id===editId);
   if(job)document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
   document.getElementById('mtitle').textContent=data.name;
+  if(job)orderListSync(job,true,entered);
 }
-function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){job.stage=si;job.stageAt=Date.now();document.getElementById('f-stage').value=si;saveData();render();closeModal();}}
+function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){const entered=job.stage<ORDER_STAGE&&si>=ORDER_STAGE;job.stage=si;job.stageAt=Date.now();document.getElementById('f-stage').value=si;saveData();render();orderListSync(job,true,entered);closeModal();}}
 function deleteJob(){
   if(!editId||!confirm('Delete this job?'))return;
   jobs=jobs.filter(j=>j.id!==editId);delete clSt[editId];delete pricingData[editId];
@@ -2545,10 +2689,11 @@ function closeModal(){
   if(!editId&&infoData.name){
     const nj={id:uid(),...infoData,sale:0,cost:0};jobs.unshift(nj);editId=nj.id;
   }
+  let entered=false;
   if(editId){
     if(infoData.name){
       const idx=jobs.findIndex(j=>j.id===editId);
-      if(idx>=0)jobs[idx]={...jobs[idx],...infoData};
+      if(idx>=0){entered=jobs[idx].stage<ORDER_STAGE&&infoData.stage>=ORDER_STAGE;jobs[idx]={...jobs[idx],...infoData};}
     }
     calcAll();
     snapshotInputs();
@@ -2557,6 +2702,7 @@ function closeModal(){
       window._pw={id:editId,data:JSON.parse(JSON.stringify(pricingData[editId]))};
     }
     saveData();
+    const oj=jobs.find(j=>j.id===editId);if(oj)orderListSync(oj,true,entered);
     if(window.fbFlush)window.fbFlush();
   }
   document.getElementById('overlay').classList.remove('open');editId=null;
@@ -2570,6 +2716,7 @@ function openSettings(){
   const sw=document.getElementById('set-who');if(sw)sw.value=w;
   const swn=document.getElementById('set-who-name');if(swn)swn.textContent=w==='pete'?'Pete':'James';
   const gc=document.getElementById('set-gclient');if(gc)gc.value=P.gClientId||'';
+  const oe=document.getElementById('set-ordemails');if(oe)oe.value=P.ordEmails||'';
   document.getElementById('set-overlay').classList.add('open');
 }
 function closeSettings(){document.getElementById('set-overlay').classList.remove('open');}
@@ -2579,6 +2726,7 @@ function saveSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
   const gc=document.getElementById('set-gclient');if(gc)P.gClientId=gc.value.trim();
+  const oe=document.getElementById('set-ordemails');if(oe)P.ordEmails=oe.value.trim();
   saveP(P);if(window.fbSave)window.fbSave();
   if(typeof driveRenderBox==='function'){driveRenderBox('kcd');driveRenderBox('pdf');}
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
