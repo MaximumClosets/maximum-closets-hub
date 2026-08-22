@@ -572,6 +572,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <button class="gen-btn" onclick="previewProposal()">👁 Preview Proposal</button>
     <button class="gen-btn" style="background:#0079bf;margin-top:8px" onclick="downloadFullProposalPdf(this)">📄 Download Full Proposal PDF</button>
     <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:7px">No internet needed — generates instantly from your pricing data</p>
+    <div class="fld" style="margin-top:16px"><label>Sent history</label><div id="sent-history"></div></div>
   </div>
 
   <!-- PAYMENTS -->
@@ -1742,6 +1743,91 @@ function buildProposalHTML(d,mode){
     ${mode!=='proposal'?payHist:''}
     <div class="prop-terms"><strong>Terms & Conditions:</strong> ${terms}</div>`;
 }
+// ── RECORD OF WHAT WAS SENT ──
+// Every document that leaves the hub is logged against the job and the exact PDF is filed in
+// Drive, so a customer question months later can be answered with the actual file they received.
+const SENT_FOLDER_NAME='Maximum Closets - Sent Proposals';
+function jobSentLog(id){if(!id)return[];if(!pricingData[id])pricingData[id]={};if(!Array.isArray(pricingData[id].sent))pricingData[id].sent=[];return pricingData[id].sent;}
+async function driveSentFolder(){
+  if(P.sentFolderId)return P.sentFolderId;
+  const token=await driveGetToken();
+  const q="mimeType='application/vnd.google-apps.folder' and name='"+SENT_FOLDER_NAME+"' and trashed=false";
+  const r=await fetch('https://www.googleapis.com/drive/v3/files?'+new URLSearchParams({q,fields:'files(id)',pageSize:'1'}),{headers:{Authorization:'Bearer '+token}});
+  if(r.ok){const j=await r.json();if(j.files&&j.files[0]){P.sentFolderId=j.files[0].id;saveData();return P.sentFolderId;}}
+  const c=await fetch('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',
+    headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({name:SENT_FOLDER_NAME,mimeType:'application/vnd.google-apps.folder'})});
+  if(!c.ok)throw new Error('folder-'+c.status);
+  P.sentFolderId=(await c.json()).id;saveData();return P.sentFolderId;
+}
+async function driveUploadPdf(blob,filename,folderId){
+  const token=await driveGetToken();
+  const form=new FormData();
+  form.append('metadata',new Blob([JSON.stringify({name:filename,parents:[folderId],mimeType:'application/pdf'})],{type:'application/json'}));
+  form.append('file',blob);
+  const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+    {method:'POST',headers:{Authorization:'Bearer '+token},body:form});
+  if(!r.ok)throw new Error('upload-'+r.status);
+  return r.json();
+}
+// Log first and upload afterwards: the record must survive even when Drive is unreachable.
+function recordSend(d,mode,method){
+  const log=jobSentLog(editId);
+  const rec={v:log.length+1,at:new Date().toISOString(),mode,method,who:getWho()||'james',
+    total:d.total,subtotal:d.subtotal,disc:d.disc,tax:d.tax,deposit:d.deposit,paid:d.paid,balance:d.balance,
+    plans:plansAreAttached()?{name:plansStatus.name||'',source:plansStatus.source,modifiedTime:plansStatus.modifiedTime||''}:null,
+    lines:(d.lines||[]).map(l=>({l:l.label,q:l.qty}))};
+  log.push(rec);saveData();renderSentHistory();
+  return rec;
+}
+async function archiveSentPdf(rec,blob,filename){
+  const jobId=editId;
+  try{
+    if(!driveClientId()||!driveHasToken()){rec.archive='skipped';saveData();renderSentHistory();return;}
+    const stamp=new Date(rec.at).toISOString().slice(0,10);
+    const f=await driveUploadPdf(blob,'v'+rec.v+'-'+stamp+'-'+filename,await driveSentFolder());
+    rec.file={id:f.id,link:f.webViewLink};delete rec.archive;
+  }catch(e){console.error('Archiving the sent PDF failed',e);rec.archive='failed';}
+  saveData();if(editId===jobId)renderSentHistory();
+}
+function logAndArchive(d,method,blob,filename){archiveSentPdf(recordSend(d,docMode,method),blob,filename);}
+// Plain-language summary of what moved between one sent version and the one before it
+function sentDiff(rec,prev){
+  if(!prev)return 'First version sent.';
+  const out=[];
+  if(Math.abs((rec.total||0)-(prev.total||0))>0.005){
+    const up=(rec.total||0)>(prev.total||0);
+    out.push('Total '+(up?'up':'down')+' '+money(Math.abs((rec.total||0)-(prev.total||0)))+' (now '+money(rec.total)+')');
+  }
+  const key=l=>l.l+' | '+l.q, now=new Set((rec.lines||[]).map(key)), was=new Set((prev.lines||[]).map(key));
+  const added=[...now].filter(x=>!was.has(x)), gone=[...was].filter(x=>!now.has(x));
+  if(added.length)out.push(added.length+' item'+(added.length>1?'s':'')+' added: '+added.map(x=>x.split(' | ')[0]).join(', '));
+  if(gone.length)out.push(gone.length+' item'+(gone.length>1?'s':'')+' removed: '+gone.map(x=>x.split(' | ')[0]).join(', '));
+  const pn=rec.plans&&rec.plans.name, pp=prev.plans&&prev.plans.name;
+  if(pn!==pp)out.push('Plans '+(pn?('changed to '+pn):'no longer attached'));
+  else if(pn&&rec.plans.modifiedTime!==prev.plans.modifiedTime)out.push('Plans updated to the '+plansDateLabel(rec.plans.modifiedTime)+' drawings');
+  return out.length?out.join(' · '):'No pricing or plans changes.';
+}
+function renderSentHistory(){
+  const el=document.getElementById('sent-history');if(!el)return;
+  const log=editId?jobSentLog(editId):[];
+  if(!log.length){el.innerHTML='<p style="font-size:11px;color:var(--muted);text-align:center;margin:8px 0">Nothing sent yet. Each proposal, invoice or receipt you send gets logged here with the exact PDF.</p>';return;}
+  el.innerHTML=[...log].reverse().map((r,i)=>{
+    const prev=log[log.length-2-i];
+    const when=new Date(r.at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+    const plans=r.plans?('📐 '+driveEsc(r.plans.name)+(r.plans.modifiedTime?' ('+plansDateLabel(r.plans.modifiedTime)+')':'')):'<span style="color:#c0392b">no plans attached</span>';
+    const link=r.file&&r.file.link?`<a href="${r.file.link}" target="_blank" style="color:#4aa3df;font-weight:700;text-decoration:underline">Open exact PDF sent</a>`
+      :r.archive==='failed'?'<span style="color:#c0392b">PDF not filed to Drive</span>'
+      :r.archive==='skipped'?'<span style="color:var(--muted)">PDF not filed (Drive not connected)</span>'
+      :'<span style="color:var(--muted)">filing to Drive…</span>';
+    return `<div style="background:var(--input-bg);border:1.5px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:7px;font-size:12px;line-height:1.6">
+      <div style="display:flex;gap:8px;align-items:baseline"><b style="color:var(--text)">v${r.v} · ${r.mode}</b><span style="color:var(--muted);font-size:11px">${when} · ${r.who==='pete'?'Pete':'James'} · ${r.method}</span></div>
+      <div style="color:var(--text)">${money(r.total)} · ${plans}</div>
+      <div style="color:var(--muted);font-size:11px">${driveEsc(sentDiff(r,prev))}</div>
+      <div style="margin-top:3px">${link}</div></div>`;
+  }).join('');
+}
+
 // ── WHAT PLANS WILL ACTUALLY GO OUT ──
 // source: 'drive' = the live linked file (preferred) | 'local' = an older manual upload | 'none'
 // Nothing here ever promises plans that are not really attached — that mismatch is what lets a
@@ -1864,7 +1950,7 @@ async function downloadFullProposalPdf(btn){
   const d=getProposalData();if(!d)return;
   if(!window.jspdf||!window.html2canvas){alert('PDF tools are still loading — please wait a moment and tap the button again.');return;}
   const orig=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='⏳ Building PDF…';}
-  try{const {blob,filename}=await buildProposalPdf(d);triggerDownload(blob,filename);}
+  try{const {blob,filename}=await buildProposalPdf(d);logAndArchive(d,'download',blob,filename);triggerDownload(blob,filename);}
   catch(err){console.error(err);alert('Sorry — building the PDF failed. '+(err&&err.message?err.message:''));}
   finally{if(btn){btn.disabled=false;btn.textContent=orig;}}
 }
@@ -1900,7 +1986,7 @@ async function shareProposalPdf(btn){
   // Second tap — the PDF is already built, so the share menu opens while this tap is still fresh
   if(armedShare){
     const r=armedShare;armedShare=null;if(btn)btn.textContent=SHARE_LABEL;
-    try{await openShareSheet(r);}
+    try{await openShareSheet(r);const d2=getProposalData();if(d2)logAndArchive(d2,'share',r.blob,r.filename);}
     catch(err){if(err&&err.name==='AbortError')return;console.error(err);shareFallbackDownload(r);}
     return;
   }
@@ -1912,6 +1998,7 @@ async function shareProposalPdf(btn){
     const {blob,filename}=await buildProposalPdf(d);
     built={blob,filename,text:proposalEmailBody(d)};
     await openShareSheet(built);
+    logAndArchive(d,'share',blob,filename);
     if(btn)btn.textContent=SHARE_LABEL;
   }catch(err){
     if(err&&err.name==='AbortError'){if(btn)btn.textContent=SHARE_LABEL;}          // share menu swiped away
@@ -1958,6 +2045,7 @@ async function sendProposalEmail(btn){
   const orig=btn?btn.textContent:'';if(btn){btn.disabled=true;btn.textContent='⏳ Building PDF…';}
   try{
     const {blob,filename}=await buildProposalPdf(d);
+    logAndArchive(d,'gmail',blob,filename);
     triggerDownload(blob,filename);
     setTimeout(()=>alert('Your '+docMode+' just downloaded as "'+filename+'". Attach that one PDF to the Gmail window that opened — it is exactly what is shown here.'),400);
   }catch(err){console.error(err);alert('The Gmail window opened, but building the proposal PDF failed: '+(err&&err.message?err.message:'')+'\nUse the "Download Full Proposal PDF" button, then attach that file.');}
@@ -2213,6 +2301,7 @@ function loadPricingForJob(jid){
   const descEl=document.getElementById('p-desc');if(descEl)descEl.value=inp.pDesc||'';
   const plansEl=document.getElementById('p-plans');if(plansEl)plansEl.checked=inp.pPlans||false;
   proposalImages=pricingData[jid]?.proposalImages||[];renderProposalImagePreview();
+  renderSentHistory();
   proposalPlansPdf=null;renderPlansPdfPreview();
   idbPlansGet(jid).then(p=>{
     if(!p&&pricingData[jid]?.proposalPlansPdf){p=pricingData[jid].proposalPlansPdf;idbPlansSet(jid,p);pricingData[jid].plansPdfName=p.name;delete pricingData[jid].proposalPlansPdf;saveData();}
@@ -2276,7 +2365,7 @@ function driveGetToken(){
     if(!cid)return reject(new Error('no-client-id'));
     if(!(window.google&&google.accounts&&google.accounts.oauth2))return reject(new Error('gis-not-loaded'));
     try{
-      const tc=google.accounts.oauth2.initTokenClient({client_id:cid,scope:'https://www.googleapis.com/auth/drive.readonly',
+      const tc=google.accounts.oauth2.initTokenClient({client_id:cid,scope:'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
         callback:(resp)=>{if(resp&&resp.access_token){driveToken=resp.access_token;driveTokenExp=Date.now()+((resp.expires_in||3600)*1000);resolve(driveToken);}else reject(new Error('auth-failed'));},
         error_callback:(err)=>reject(new Error((err&&err.type)||'auth-cancelled'))});
       tc.requestAccessToken();
