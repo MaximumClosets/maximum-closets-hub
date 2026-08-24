@@ -684,12 +684,6 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <p style="font-size:11px;color:var(--muted);margin-top:4px">New jobs you create are assigned to <span id="set-who-name">James</span>. This only tints cards — everyone can still see and edit every job.</p>
       </div>
     </div>
-    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-order')">Order List Emails<span>▾</span></div>
-      <div class="set-bd" id="s-order">
-        <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Who gets the order list when a job reaches <b>Deposit Paid</b>. Separate addresses with a comma.</p>
-        <input type="text" id="set-ordemails" placeholder="james@maximumclosets.com, pete@…" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--input-bg);color:var(--text);font-family:inherit"/>
-      </div>
-    </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-gdrive')">Google Drive (KCD + plans)<span>▾</span></div>
       <div class="set-bd" id="s-gdrive">
         <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Lets each job card link to its <b>.job</b> file in <b>1_DOTJ_JOBS</b> and its plans <b>PDF</b> in <b>1_PDF_MAX</b>. Paste your Google OAuth Client ID here (one-time), then Save.</p>
@@ -1521,7 +1515,7 @@ function renderOrderList(){
     ${orderListChanged(job)?`<button class="ol-resend" onclick="orderListResend('${job.id}')">⚠️ Order list changed — resend updated version</button>`:''}
   </div>`;
 }
-function orderEmailTo(){return (P.ordEmails||'').split(',').map(x=>x.trim()).filter(Boolean).join(',');}
+function orderEmailTo(){return 'james@maximumclosets.com';}
 function orderEmailBody(job,resend){
   const lines=(job.orderList||[]).map(it=>'• '+it.d+' — '+it.q).join('\n');
   return (resend?'UPDATED order list':'Order list')+' for '+(job.name||'this job')+'.\n\n'+lines+'\n\nThe same list is attached as a PDF.\n\nMaximum Closets';
@@ -2716,7 +2710,6 @@ function openSettings(){
   const sw=document.getElementById('set-who');if(sw)sw.value=w;
   const swn=document.getElementById('set-who-name');if(swn)swn.textContent=w==='pete'?'Pete':'James';
   const gc=document.getElementById('set-gclient');if(gc)gc.value=P.gClientId||'';
-  const oe=document.getElementById('set-ordemails');if(oe)oe.value=P.ordEmails||'';
   document.getElementById('set-overlay').classList.add('open');
 }
 function closeSettings(){document.getElementById('set-overlay').classList.remove('open');}
@@ -2726,7 +2719,6 @@ function saveSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
   const gc=document.getElementById('set-gclient');if(gc)P.gClientId=gc.value.trim();
-  const oe=document.getElementById('set-ordemails');if(oe)P.ordEmails=oe.value.trim();
   saveP(P);if(window.fbSave)window.fbSave();
   if(typeof driveRenderBox==='function'){driveRenderBox('kcd');driveRenderBox('pdf');}
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
