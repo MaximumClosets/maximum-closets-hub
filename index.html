@@ -74,12 +74,14 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .card.reviewed{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow);background:linear-gradient(0deg,rgba(57,255,158,0.1),rgba(57,255,158,0.1)),var(--card-bg)}
 /* Assigned-to owner: 7px colored left stripe + a subtle colour wash + a soft glow, keeping the dark card background so text/checkbox stay readable. */
 .card.owner-james{border-left:7px solid #4a8fbf;padding-left:3px;background:linear-gradient(0deg,rgba(74,143,191,0.14),rgba(74,143,191,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(74,143,191,0.6),0 0 10px rgba(74,143,191,0.22),var(--shadow)}
-.card.owner-pete{border-left:7px solid #ff4d4d;padding-left:3px;background:linear-gradient(0deg,rgba(255,77,77,0.14),rgba(255,77,77,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(255,77,77,0.6),0 0 10px rgba(255,77,77,0.22),var(--shadow)}
+.card.owner-user2{border-left:7px solid #ff4d4d;padding-left:3px;background:linear-gradient(0deg,rgba(255,77,77,0.14),rgba(255,77,77,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(255,77,77,0.6),0 0 10px rgba(255,77,77,0.22),var(--shadow)}
+.card.owner-user3{border-left:7px solid #f0c419;padding-left:3px;background:linear-gradient(0deg,rgba(240,196,25,0.14),rgba(240,196,25,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(240,196,25,0.6),0 0 10px rgba(240,196,25,0.22),var(--shadow)}
 /* Reviewed owner cards keep the green reviewed ring so the completed-today checkbox stays visible. */
-.card.reviewed.owner-james,.card.reviewed.owner-pete{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow)}
+.card.reviewed.owner-james,.card.reviewed.owner-user2,.card.reviewed.owner-user3{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow)}
 .own-badge{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#0d1016;padding:1px 6px;border-radius:3px;margin-bottom:5px}
 .card.owner-james .own-badge{background:#4a8fbf}
-.card.owner-pete .own-badge{background:#ff4d4d}
+.card.owner-user2 .own-badge{background:#ff4d4d}
+.card.owner-user3 .own-badge{background:#f0c419}
 .card-check{position:absolute;top:7px;right:7px;width:19px;height:19px;border-radius:50%;border:1.5px solid var(--border);background:none;color:transparent;font-size:11px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .card-check:hover{border-color:var(--green)}
 .card-check.on{background:#39ff9e;border-color:#39ff9e;color:#0d1016}
@@ -356,7 +358,8 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <select id="mc-owner" onchange="mcSetOwner(this.value)">
     <option value="ALL">Everyone</option>
     <option value="James">James</option>
-    <option value="Pete">Pete</option>
+    <option value="User 2">User 2</option>
+    <option value="User 3">User 3</option>
   </select>
   <button class="mc-fbtn" onclick="mcSetTag('OVERDUE',this)">⚠️ Overdue</button>
   <button class="mc-fbtn" onclick="mcSetTag('PLANS',this)">📐 Needs Plans</button>
@@ -400,7 +403,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <div><label>Job Source</label>
         <select id="f-source" onchange="toggleRefBy()">
           <option value="">—</option>
-          <option>James Referral</option><option>Pete Referral</option>
+          <option>James Referral</option><option>User 2 Referral</option>
           <option>Website</option><option>Other</option>
         </select>
       </div>
@@ -408,7 +411,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <div class="f" id="f-refby-wrap" style="display:none"><label>Referred by</label><input type="text" id="f-refby" placeholder="e.g. Mike Delaney" /></div>
     <div class="f"><label>Assigned To</label>
       <select id="f-assigned">
-        <option value="James">James</option><option value="Pete">Pete</option>
+        <option value="James">James</option><option value="User 2">User 2</option><option value="User 3">User 3</option>
       </select>
     </div>
     <div class="f"><label>📐 KCD Job File</label><div id="kcd-box"></div></div>
@@ -671,7 +674,8 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <div class="srow"><span class="sl">Who uses this device?</span>
           <select id="set-who" onchange="setWho(this.value)" style="width:auto;padding:6px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:#d0d4e2">
             <option value="james">James</option>
-            <option value="pete">Pete</option>
+            <option value="user2">User 2</option>
+            <option value="user3">User 3</option>
           </select>
         </div>
         <p style="font-size:11px;color:var(--muted);margin-top:4px">New jobs you create are assigned to <span id="set-who-name">James</span>. This only tints cards — everyone can still see and edit every job.</p>
@@ -737,7 +741,8 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <div style="padding:16px 15px">
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px">This just tints new job cards by owner. Everyone still sees and can edit every job.</p>
     <button class="save-p" style="margin-top:0;background:#4a8fbf" onclick="setWho('james')">James</button>
-    <button class="save-p" style="margin-top:10px;background:#ff4d4d" onclick="setWho('pete')">Pete</button>
+    <button class="save-p" style="margin-top:10px;background:#ff4d4d" onclick="setWho('user2')">User 2</button>
+    <button class="save-p" style="margin-top:10px;background:#f0c419;color:#0d1016" onclick="setWho('user3')">User 3</button>
   </div>
 </div>
 </div>
@@ -1028,14 +1033,21 @@ function saveData(){
   if(window.fbSave)window.fbSave();
 }
 
+// ── WHO IS WHO (shared helpers so every place that shows an owner agrees) ──
+const WHO_LABEL={james:'James',user2:'User 2',user3:'User 3'};
+function WHO_KEY(v){return (v==='user2'||v==='pete')?'user2':(v==='user3'?'user3':'james');}
+function ASSIGN_LABEL(v){return (v==='User 2'||v==='Pete')?'User 2':(v==='User 3'?'User 3':'James');}
+function ASSIGN_KEY(v){return (v==='User 2'||v==='Pete')?'user2':(v==='User 3'?'user3':'james');}
+try{if(localStorage.getItem('mc-who')==='pete')localStorage.setItem('mc-who','user2');}catch(e){}
+
 // ── WHO IS THIS DEVICE (per-device, localStorage only — NOT synced, NOT a permission) ──
 function getWho(){try{return localStorage.getItem('mc-who')||'';}catch(e){return'';}}
 function setWho(v){
-  const who=v==='pete'?'pete':'james';
+  const who=WHO_KEY(v);
   try{localStorage.setItem('mc-who',who);}catch(e){}
   const o=document.getElementById('who-overlay');if(o)o.classList.remove('open');
   const sw=document.getElementById('set-who');if(sw)sw.value=who;
-  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=who==='pete'?'Pete':'James';
+  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=WHO_LABEL[who];
 }
 
 function todayStr(){
@@ -1948,7 +1960,7 @@ function renderSentHistory(){
       :r.archive==='skipped'?'<span style="color:var(--muted)">PDF not filed (Drive not connected)</span>'
       :'<span style="color:var(--muted)">filing to Drive…</span>';
     return `<div style="background:var(--input-bg);border:1.5px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:7px;font-size:12px;line-height:1.6">
-      <div style="display:flex;gap:8px;align-items:baseline"><b style="color:var(--text)">v${r.v} · ${r.mode}</b><span style="color:var(--muted);font-size:11px">${when} · ${r.who==='pete'?'Pete':'James'} · ${r.method}</span></div>
+      <div style="display:flex;gap:8px;align-items:baseline"><b style="color:var(--text)">v${r.v} · ${r.mode}</b><span style="color:var(--muted);font-size:11px">${when} · ${WHO_LABEL[WHO_KEY(r.who)]} · ${r.method}</span></div>
       <div style="color:var(--text)">${money(r.total)} · ${plans}</div>
       <div style="color:var(--muted);font-size:11px">${driveEsc(sentDiff(r,prev))}</div>
       <div style="margin-top:3px">${link}</div></div>`;
@@ -2206,6 +2218,7 @@ function sweepJobs(){
     if(!j.stageAt){j.stageAt=now;changed=true;}
     if(MIG_SOURCE[j.source]){j.source=MIG_SOURCE[j.source];changed=true;}
     if(j.assignedTo==='Jed'){j.assignedTo='James';changed=true;}
+    if(j.assignedTo==='Pete'){j.assignedTo='User 2';changed=true;}
     if(j.stage===6){
       if(!j.doneAt){j.doneAt=now;changed=true;}
       else if(!j.archived&&!(j.labels||[]).includes('finalpay')&&(now-j.doneAt)>ARCHIVE_MS){j.archived=true;changed=true;}
@@ -2307,7 +2320,7 @@ function createLeadFromPaste(){
   const notes=[extra.join('\n'),msg].filter(Boolean).join(extra.length&&msg?'\n\n':'');
   const nj={id:uid(),name:name,stage:0,source:'Website',labels:['new'],
     email:g('pl-email'),phone:g('pl-phone'),addr:'',notes:notes,date:'',
-    assignedTo:getWho()==='pete'?'Pete':'James',refBy:'',sale:0,cost:0,stageAt:Date.now()};
+    assignedTo:WHO_LABEL[WHO_KEY(getWho())],refBy:'',sale:0,cost:0,stageAt:Date.now()};
   jobs.unshift(nj);
   saveData();render();
   closePaste();
@@ -2320,7 +2333,7 @@ function restoreJob(id){
 // ── BOARD SEARCH / FILTER ── purely a view filter; decides which cards render() draws, so it re-applies on every redraw and never fights the live board.
 let mcFilter={q:'',owner:'ALL',tag:'ALL'};
 function mcMatch(j){
-  if(mcFilter.owner!=='ALL'){const o=j.assignedTo==='Pete'?'Pete':'James';if(o!==mcFilter.owner)return false;}
+  if(mcFilter.owner!=='ALL'){const o=ASSIGN_LABEL(j.assignedTo);if(o!==mcFilter.owner)return false;}
   if(mcFilter.tag==='PLANS'&&!(j.labels||[]).includes('plans'))return false;
   if(mcFilter.tag==='OVERDUE'&&!(j.date&&new Date(j.date+'T12:00:00')<new Date()&&j.stage<5))return false;
   if(mcFilter.q){
@@ -2345,7 +2358,7 @@ function render(){
     const ce=col.querySelector(`#col-${si}`);
     sj.forEach(job=>{
       const reviewed=job.reviewedDate===todayStr();
-      const owner=job.assignedTo==='Pete'?'pete':'james';
+      const owner=ASSIGN_KEY(job.assignedTo);
       const card=document.createElement('div');card.className=`card owner-${owner}${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
       const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
@@ -2353,7 +2366,7 @@ function render(){
       const pr=getProgress(job.id,si);const hasL=(CL[si]||[]).length>0&&pr.tot>0;
       const op=orderProgress(job);const opChip=op.tot?`<span class="chip">📦 ${op.done}/${op.tot}</span>`:'';
       card.innerHTML=`<button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
-        <span class="own-badge">${owner==='pete'?'Pete':'James'}</span>
+        <span class="own-badge">${WHO_LABEL[owner]}</span>
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
         ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
@@ -2438,7 +2451,7 @@ function openAdd(stage=0){
   ['f-name','f-phone','f-email','f-addr','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-stage').value=stage;document.getElementById('f-source').value='';document.getElementById('f-date').value='';
   document.getElementById('f-refby').value='';toggleRefBy();
-  document.getElementById('f-assigned').value=getWho()==='pete'?'Pete':'James';
+  document.getElementById('f-assigned').value=WHO_LABEL[WHO_KEY(getWho())];
   document.querySelectorAll('.lopt').forEach(el=>el.classList.remove('on'));
   document.getElementById('p-addr').value='';document.getElementById('p-notes').value='';document.getElementById('p-disc').value='';
   document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';
@@ -2456,7 +2469,7 @@ function openEdit(id){
   document.getElementById('f-email').value=job.email||'';document.getElementById('f-stage').value=job.stage;
   document.getElementById('f-source').value=migSource(job.source)||'';document.getElementById('f-date').value=job.date||'';
   document.getElementById('f-refby').value=job.refBy||'';toggleRefBy();
-  document.getElementById('f-assigned').value=job.assignedTo==='Pete'?'Pete':'James';
+  document.getElementById('f-assigned').value=ASSIGN_LABEL(job.assignedTo);
   document.getElementById('f-addr').value=job.addr||'';
   document.getElementById('f-notes').value=job.notes||'';
   document.querySelectorAll('.lopt').forEach(el=>el.classList.toggle('on',selLbls.includes(el.dataset.v)));
@@ -2633,7 +2646,7 @@ function captureInfoFields(){
     source:document.getElementById('f-source').value,date:document.getElementById('f-date').value,
     phone:document.getElementById('f-phone').value.trim(),email:document.getElementById('f-email').value.trim(),addr:document.getElementById('f-addr').value.trim(),notes:document.getElementById('f-notes').value.trim(),
     refBy:document.getElementById('f-source').value==='Other'?document.getElementById('f-refby').value.trim():'',
-    assignedTo:document.getElementById('f-assigned').value==='Pete'?'Pete':'James'};
+    assignedTo:ASSIGN_LABEL(document.getElementById('f-assigned').value)};
 }
 function doorsMissingDims(){
   return[...document.querySelectorAll('#door-items .item-block')].some(b=>{
@@ -2692,9 +2705,9 @@ document.getElementById('overlay').addEventListener('click',e=>{if(e.target===do
 function openSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
-  const w=getWho()==='pete'?'pete':'james';
+  const w=WHO_KEY(getWho());
   const sw=document.getElementById('set-who');if(sw)sw.value=w;
-  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=w==='pete'?'Pete':'James';
+  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=WHO_LABEL[w];
   const gc=document.getElementById('set-gclient');if(gc)gc.value=P.gClientId||'';
   document.getElementById('set-overlay').classList.add('open');
 }
