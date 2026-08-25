@@ -77,11 +77,6 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .card.owner-pete{border-left:7px solid #ff4d4d;padding-left:3px;background:linear-gradient(0deg,rgba(255,77,77,0.14),rgba(255,77,77,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(255,77,77,0.6),0 0 10px rgba(255,77,77,0.22),var(--shadow)}
 /* Reviewed owner cards keep the green reviewed ring so the completed-today checkbox stays visible. */
 .card.reviewed.owner-james,.card.reviewed.owner-pete{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow)}
-/* Stuck-card warning rings override the owner glow: muted grey at 5+ days in a stage, brown at 10+ (kept out of the red used for Pete's cards). */
-.card.stale{box-shadow:0 0 0 2px #8b93a6 inset,0 0 10px rgba(139,147,166,0.35),var(--shadow)}
-.card.stale2{box-shadow:0 0 0 2px #8a5a2b inset,0 0 10px rgba(138,90,43,0.6),var(--shadow)}
-/* A reviewed card still shows the green reviewed ring even when stale — keep this override last. */
-.card.reviewed.stale,.card.reviewed.stale2{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow)}
 .own-badge{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#0d1016;padding:1px 6px;border-radius:3px;margin-bottom:5px}
 .card.owner-james .own-badge{background:#4a8fbf}
 .card.owner-pete .own-badge{background:#ff4d4d}
@@ -118,8 +113,6 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .kcd-item .mt{color:var(--muted);font-size:10px;white-space:nowrap}
 .chip.tmrw{color:#172b4d;background:#f2a500;font-weight:700}
 .chip.soon{color:#fff;background:#0079bf}
-.chip.stale{color:#fff;background:#8b93a6;font-weight:700}
-.chip.stale2{color:#fff;background:#8a5a2b;font-weight:700}
 .prog-bar{background:#dfe1e6;border-radius:3px;height:4px;margin-top:6px;overflow:hidden}
 .prog-fill{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
 .prog-fill.full{background:#61bd4f}
@@ -2200,9 +2193,6 @@ if(canSharePdf())document.getElementById('pa-share').style.display='';
 document.getElementById('prop-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('prop-overlay'))closePropPreview();});
 
 const ARCHIVE_MS=14*24*60*60*1000;
-// Stuck-card warnings: flag a card amber after this many whole days in one stage, red after the second.
-const STALE_DAYS=5,STALE_DAYS_2=10;
-function daysInStage(j){return j.stageAt?Math.floor((Date.now()-j.stageAt)/86400000):0;}
 // Map old Job Source values onto the new list so existing jobs keep working / lose no data
 const MIG_SOURCE={'Jed Referral':'James Referral','Google':'James Referral','Instagram':'James Referral','Facebook':'James Referral','Customer Referral':'Other','Repeat Customer':'Other'};
 function migSource(s){return MIG_SOURCE[s]||s||'';}
@@ -2356,11 +2346,7 @@ function render(){
     sj.forEach(job=>{
       const reviewed=job.reviewedDate===todayStr();
       const owner=job.assignedTo==='Pete'?'pete':'james';
-      // Stuck-card warning: only stages 0–5 (Done auto-archives, so never flag it).
-      const dis=daysInStage(job);
-      let staleCls='';if(si<6){if(dis>=STALE_DAYS_2)staleCls=' stale stale2';else if(dis>=STALE_DAYS)staleCls=' stale';}
-      const staleChip=staleCls?`<span class="chip ${dis>=STALE_DAYS_2?'stale2':'stale'}">⏳ ${dis}d in stage</span>`:'';
-      const card=document.createElement('div');card.className=`card owner-${owner}${reviewed?' reviewed':''}${staleCls}`;attachTap(card,()=>openEdit(job.id));
+      const card=document.createElement('div');card.className=`card owner-${owner}${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
       const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
@@ -2374,7 +2360,7 @@ function render(){
         ${(()=>{const pd=paidTotal(job),tot=job.sale||0;if(!pd)return'';const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;})()}
         ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
-        ${ds||hasL||staleChip||opChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${opChip} ${staleChip}</div>`:''}
+        ${ds||hasL||opChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${opChip}</div>`:''}
         ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="openKcdFile('${job.id}',this,event)" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
         ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}`;
