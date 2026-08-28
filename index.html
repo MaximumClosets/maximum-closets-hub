@@ -697,7 +697,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <!-- ARCHIVED JOBS -->
 <div class="set-overlay" id="arch-overlay">
 <div class="set-modal">
-  <div class="mh"><h3>📦 Archived Jobs</h3><button class="mclose" onclick="closeArchive()">×</button></div>
+  <div class="mh"><h3>📦 Archived Jobs</h3><button class="mv-btn" onclick="exportArchivedCsv()" style="margin-right:10px">⬇️ Export CSV</button><button class="mclose" onclick="closeArchive()">×</button></div>
   <div style="padding:14px 15px" id="arch-list"></div>
 </div>
 </div>
@@ -2233,6 +2233,41 @@ function openArchive(){
   document.getElementById('arch-overlay').classList.add('open');
 }
 function closeArchive(){document.getElementById('arch-overlay').classList.remove('open');}
+// ── EXPORT ARCHIVED JOBS TO CSV (opens cleanly in Google Sheets / Excel) ──
+function csvCell(v){
+  if(v===undefined||v===null)return'';
+  const t=String(v);
+  return /[",\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;
+}
+function csvDate(v){
+  if(v===undefined||v===null||v==='')return'';
+  if(typeof v==='string'){
+    if(/^\d{4}-\d{2}-\d{2}/.test(v))return v.slice(0,10);
+    const p=new Date(v);if(isNaN(p))return'';return csvDate(p.getTime());
+  }
+  const d=new Date(v);if(isNaN(d))return'';
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function csvMoney(v){
+  if(v===undefined||v===null||v==='')return'';
+  const n=parseFloat(v);if(!isFinite(n))return'';
+  return String(Math.round(n*100)/100);
+}
+function exportArchivedCsv(){
+  const list=jobs.filter(j=>j.archived);
+  if(!list.length){alert('There are no archived jobs to export yet.');return;}
+  const head=['name','phone','email','addr','stage','assignedTo','source','refBy','labels','date','stageAt','doneAt','sale','cost','profit','total paid','balance','propNum','notes'];
+  const rows=list.map(j=>{
+    const sale=parseFloat(j.sale)||0,cost=parseFloat(j.cost)||0,paid=paidTotal(j);
+    return[j.name,j.phone,j.email,j.addr,STAGES[j.stage]||'',j.assignedTo,j.source,j.refBy,
+      (j.labels||[]).map(l=>LBLS[l]?LBLS[l].t:l).join(';'),
+      csvDate(j.date),csvDate(j.stageAt),csvDate(j.doneAt),
+      csvMoney(j.sale),csvMoney(j.cost),csvMoney(sale-cost),csvMoney(paid),csvMoney(sale-paid),
+      j.propNum,j.notes];
+  });
+  const csv=[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n';
+  triggerDownload(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),'James_Work_archived_'+csvDate(Date.now())+'.csv');
+}
 
 // ── PASTE LEAD — parse a Website "New Estimate Request" email into a Lead card ──
 function openPaste(){
