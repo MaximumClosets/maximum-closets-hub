@@ -1225,6 +1225,8 @@ const SPECIAL_ITEMS=[
 function fmtD(n){return'$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 function fmt(n){return'$'+Math.round(Math.abs(n)).toLocaleString()}
 function vn(id,d=0){return parseFloat(document.getElementById(id)?.value)||d}
+// Quantities never show more than 3 decimals — 5.555555555555555 sq ft reads as 5.556
+function qty3(n){return String(Math.round(((parseFloat(n)||0)+Number.EPSILON)*1000)/1000)}
 
 function melTypeChange(){
   const t=document.getElementById('mel-type').value,m=document.getElementById('mel-method').value;
@@ -1279,7 +1281,7 @@ function calcDoors(){
     const hingeCost=hingeCount*P.hgC,hingeSale=hingeCount*P.hgS;
     const c=doorCost+hingeCost,sl=doorSale+hingeSale;doorC+=c;doorSl+=sl;
     const r=b.querySelector('.dres');if(r)r.textContent=fmt(c)+' → '+fmt(sl);
-    const rs=b.querySelector('.dres-sqft');if(rs)rs.textContent=totalSqft?`(${totalSqft} total sq ft, ${hingeCount} hinges)`:'';
+    const rs=b.querySelector('.dres-sqft');if(rs)rs.textContent=totalSqft?`(${qty3(totalSqft)} total sq ft, ${hingeCount} hinges)`:'';
   });
   document.getElementById('doors-badge').textContent=fmt(doorSl);calcAll();calcOrderList();
 }
@@ -1678,12 +1680,12 @@ function autoDesc(){
   const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
   if(melQty>0){
     const m=document.getElementById('mel-method')?.value==='sqft'?'sq ft':'sheets';
-    parts.push(`${melQty} ${m} of melamine`);
+    parts.push(`${qty3(melQty)} ${m} of melamine`);
   }
   const doorParts=[];
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');const w=parseFloat(b.querySelector('.dwidth')?.value)||0;const hh=parseFloat(b.querySelector('.dheight')?.value)||0;const sqEl=b.querySelector('.dsqft');let sqft=parseFloat(sqEl?.value)||0;if(w>0&&hh>0){sqft=w*hh/144;if(sqEl&&document.activeElement!==sqEl)sqEl.value=sqft.toFixed(2);}
-    if(sqft>0){const lbl=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'doors';doorParts.push(`${sqft} sq ft of ${lbl}`);}
+    if(sqft>0){const lbl=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'doors';doorParts.push(`${qty3(sqft)} sq ft of ${lbl}`);}
   });
   if(doorParts.length)parts.push(doorParts.join(' + ')+' doors');
   let drwCount=0;
@@ -1765,11 +1767,11 @@ function buildProposalLines(){
   if(melQty>0){
     const melType=document.getElementById('mel-type').value==='white'?'White Melamine':'Color Melamine';
     const melUnit=document.getElementById('mel-method')?.value==='sqft'?'sq ft':'sheets';
-    lines.push({label:melType,qty:`${melQty} ${melUnit}`});
+    lines.push({label:melType,qty:`${qty3(melQty)} ${melUnit}`});
   }
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');const w=parseFloat(b.querySelector('.dwidth')?.value)||0;const hh=parseFloat(b.querySelector('.dheight')?.value)||0;const sqEl=b.querySelector('.dsqft');let sqft=parseFloat(sqEl?.value)||0;if(w>0&&hh>0){sqft=w*hh/144;if(sqEl&&document.activeElement!==sqEl)sqEl.value=sqft.toFixed(2);}
-    if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push({label:`${sname} Doors`,qty:`${sqft} sq ft`});}
+    if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push({label:`${sname} Doors`,qty:`${qty3(sqft)} sq ft`});}
   });
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
     const t=b.querySelector('select')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
