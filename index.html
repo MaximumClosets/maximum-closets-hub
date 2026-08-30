@@ -416,6 +416,14 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     </div>
     <div class="f"><label>📐 KCD Job File</label><div id="kcd-box"></div></div>
     <div class="f"><label>📄 Plans PDF (opens on phone)</label><div id="pdf-box"></div></div>
+    <div class="f"><label>🖼️ Customer Photos</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button type="button" onclick="document.getElementById('cp-file').click()" style="padding:8px 12px;background:#22263a;border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer">+ Add Photos</button>
+        <div id="cp-paste" contenteditable="true" onclick="cpPasteClick()" onblur="cpResetPasteBox()" title="Copy a photo from an email or text, then paste it here" style="flex:1;min-width:110px;padding:8px 12px;background:var(--input-bg);border:1.5px dashed var(--border);border-radius:8px;color:var(--muted);font-size:12px;cursor:text;overflow:hidden;white-space:nowrap">Paste</div>
+      </div>
+      <input type="file" id="cp-file" accept="image/*" multiple onchange="addCustomerPhotos(this)" style="display:none"/>
+      <div id="cp-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+    </div>
     <div class="f"><label>Labels</label>
       <div class="lbl-pick">
         <div class="lopt new" data-v="new" onclick="toggleLbl(this)">New Lead</div>
@@ -615,6 +623,12 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <div class="prop-doc" id="prop-doc"></div>
 </div>
 
+<!-- PHOTO LIGHTBOX -->
+<div id="cp-lightbox" onclick="cpCloseLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:1200;align-items:center;justify-content:center;padding:14px">
+  <button onclick="cpCloseLightbox()" style="position:absolute;top:10px;right:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:22px;line-height:1;cursor:pointer">×</button>
+  <img id="cp-lightbox-img" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:6px"/>
+</div>
+
 <!-- SETTINGS -->
 <div class="set-overlay" id="set-overlay">
 <div class="set-modal">
@@ -750,7 +764,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <!-- Firebase SDK + lock/sync -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, get, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDElEwNEqIiA54oH4OpRoJcFY0TcseFCFc",
@@ -807,6 +821,23 @@ window.fbFlush=function(){
   set(ref(db,PATH),snap)
     .then(()=>{window._pw={id:null,data:null};setSyncDot('on');})
     .catch(()=>setSyncDot('off'));
+};
+
+// ── CUSTOMER PHOTOS — their own node, loaded only when a card is opened ──
+// Kept OUT of the {meta,jobs,clSt,pricingData,schedData,p} blob so photos never
+// re-upload / re-download on every keystroke.
+window.fbHasPath=function(){return !!PATH;};
+window.fbPhotosGet=function(jobId){
+  if(!PATH)return Promise.resolve([]);
+  return get(ref(db,PATH+'/photos/'+jobId)).then(s=>s.val()||[]).catch(()=>[]);
+};
+window.fbPhotosSet=function(jobId,arr){
+  if(!PATH)return Promise.resolve();
+  return set(ref(db,PATH+'/photos/'+jobId),arr||[]).catch(()=>{});
+};
+window.fbPhotosDel=function(jobId){
+  if(!PATH)return Promise.resolve();
+  return remove(ref(db,PATH+'/photos/'+jobId)).catch(()=>{});
 };
 
 // ── BOOT (runs after unlock): initial load + listen for changes from other devices ──
@@ -1755,6 +1786,134 @@ function renderProposalImagePreview(){
   const el=document.getElementById('p-img-preview');if(!el)return;
   el.innerHTML=proposalImages.map((img,i)=>`<div style="position:relative;width:80px;height:80px"><img src="${img.dataUrl}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border)"><button onclick="removeProposalImage(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e74c3c;border:none;color:#fff;font-size:13px;cursor:pointer;line-height:1;font-weight:bold">×</button></div>`).join('');
 }
+// ── CUSTOMER PHOTOS (room photos, blueprints, drawings from other companies) ──
+// Stored in their OWN Firebase node (PATH+'/photos/'+jobId), loaded only when a card is opened,
+// so they never ride along in the big {jobs,pricingData,…} blob that syncs on every keystroke.
+let customerPhotos=[];      // [{name,caption,dataUrl}] for the card that's open
+let cpDirty=false,cpTimer=null;
+function idbPhotosDB(){return new Promise((res,rej)=>{const r=indexedDB.open('mc-photos',1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('photos'))r.result.createObjectStore('photos');};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+function idbPhotosGet(id){return idbPhotosDB().then(db=>new Promise((res,rej)=>{const t=db.transaction('photos','readonly').objectStore('photos').get(id);t.onsuccess=()=>res(t.result||null);t.onerror=()=>rej(t.error);})).catch(()=>null);}
+function idbPhotosSet(id,val){return idbPhotosDB().then(db=>new Promise((res,rej)=>{const t=db.transaction('photos','readwrite').objectStore('photos').put(val,id);t.onsuccess=()=>res();t.onerror=()=>rej(t.error);})).catch(()=>{});}
+function idbPhotosDel(id){return idbPhotosDB().then(db=>new Promise((res,rej)=>{const t=db.transaction('photos','readwrite').objectStore('photos').delete(id);t.onsuccess=()=>res();t.onerror=()=>rej(t.error);})).catch(()=>{});}
+function cpOnline(){return !!(window.fbHasPath&&window.fbHasPath());}
+// Load one job's photos: Firebase when we're connected, this device's IndexedDB when we're not.
+// Anything saved offline gets pushed up the first time we see the card with Firebase available.
+function cpLoad(id){
+  if(!cpOnline())return idbPhotosGet(id).then(a=>a||[]);
+  return window.fbPhotosGet(id).then(a=>{
+    if(a&&a.length)return a;
+    return idbPhotosGet(id).then(loc=>{
+      if(loc&&loc.length){window.fbPhotosSet(id,loc);idbPhotosDel(id);return loc;}
+      return [];
+    });
+  }).catch(()=>idbPhotosGet(id).then(a=>a||[]));
+}
+function cpFlush(){
+  clearTimeout(cpTimer);
+  if(!cpDirty||!editId)return;
+  const id=editId,arr=customerPhotos.map(ph=>({name:ph.name||'',caption:ph.caption||'',dataUrl:ph.dataUrl}));
+  cpDirty=false;
+  if(cpOnline())window.fbPhotosSet(id,arr);else idbPhotosSet(id,arr);
+  cpCount(id,arr.length);
+}
+// Only write when something really changed — right away for add/delete, a beat later while typing a caption.
+function cpTouch(now){
+  cpDirty=true;
+  if(!editId)return;   // brand-new card — these get written as soon as saving gives it an id
+  cpCount(editId,customerPhotos.length);
+  clearTimeout(cpTimer);
+  if(now)cpFlush();else cpTimer=setTimeout(cpFlush,900);
+}
+// The board only ever sees this little number — never the images themselves.
+function cpCount(id,n){
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  if(n>0){if(j.photoCount!==n){j.photoCount=n;saveData();render();}}
+  else if(j.photoCount){delete j.photoCount;saveData();render();}
+}
+function cpOpen(id){
+  customerPhotos=[];cpDirty=false;clearTimeout(cpTimer);renderCustomerPhotos();
+  cpLoad(id).then(a=>{
+    if(id!==editId)return;
+    customerPhotos=Array.isArray(a)?a:[];
+    renderCustomerPhotos();cpCount(id,customerPhotos.length);
+  });
+}
+function renderCustomerPhotos(){
+  const el=document.getElementById('cp-grid');if(!el)return;
+  el.innerHTML=customerPhotos.map((ph,i)=>`<div style="width:80px">
+    <div style="position:relative;width:80px;height:80px"><img src="${ph.dataUrl}" onclick="cpLightbox(${i})" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border);cursor:pointer"><button onclick="removeCustomerPhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e74c3c;border:none;color:#fff;font-size:13px;cursor:pointer;line-height:1;font-weight:bold">×</button></div>
+    <input type="text" value="${driveEsc(ph.caption||'')}" placeholder="Caption" oninput="cpCaption(${i},this.value)" style="width:80px;margin-top:4px;padding:3px 4px;border:1.5px solid var(--border);border-radius:5px;background:var(--input-bg);color:var(--text);font-size:10px"/>
+  </div>`).join('');
+}
+function cpCaption(i,val){
+  if(!customerPhotos[i])return;
+  customerPhotos[i].caption=val;
+  cpTouch(false);
+}
+// Same shrink-before-saving trick as addProposalImages() — longest side 1400px, JPEG quality 0.7.
+function cpAddFiles(files){
+  Array.from(files).forEach(file=>{
+    if(file.type&&file.type.indexOf('image')!==0)return;
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const im=new Image();
+      im.onload=()=>{
+        const max=1400;let w=im.width,h=im.height;
+        if(w>max||h>max){const sc=Math.min(max/w,max/h);w=Math.round(w*sc);h=Math.round(h*sc);}
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(im,0,0,w,h);
+        customerPhotos.push({name:file.name||'photo.jpg',caption:'',dataUrl:c.toDataURL('image/jpeg',0.7)});
+        renderCustomerPhotos();cpTouch(true);
+      };
+      im.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function addCustomerPhotos(input){cpAddFiles(input.files);input.value='';}
+function removeCustomerPhoto(i){
+  customerPhotos.splice(i,1);renderCustomerPhotos();cpTouch(true);
+}
+function cpResetPasteBox(){const b=document.getElementById('cp-paste');if(b&&!b.textContent.trim())b.textContent='Paste';}
+// Paste straight out of an email or text message while the card is open.
+document.addEventListener('paste',e=>{
+  const ov=document.getElementById('overlay');
+  if(!ov||!ov.classList.contains('open'))return;
+  const items=(e.clipboardData&&e.clipboardData.items)||[];
+  const files=[];
+  for(let i=0;i<items.length;i++){if(items[i].type&&items[i].type.indexOf('image')===0){const f=items[i].getAsFile();if(f)files.push(f);}}
+  if(!files.length)return;
+  e.preventDefault();
+  cpAddFiles(files);
+  const b=document.getElementById('cp-paste');if(b){b.textContent='Paste';b.blur();}
+});
+// Tapping the box: on desktop we can read the clipboard directly; on the phone it just puts
+// the cursor there so a long-press → Paste lands in the right spot.
+function cpPasteClick(){
+  const b=document.getElementById('cp-paste');if(b)b.textContent='';
+  setTimeout(cpResetPasteBox,8000);
+  if(!(navigator.clipboard&&navigator.clipboard.read))return;
+  navigator.clipboard.read().then(items=>{
+    const jobsQ=[];
+    (items||[]).forEach(it=>{
+      const t=(it.types||[]).filter(x=>x.indexOf('image/')===0)[0];
+      if(t)jobsQ.push(it.getType(t).then(bl=>new File([bl],'pasted.jpg',{type:t})));
+    });
+    if(!jobsQ.length)return;
+    Promise.all(jobsQ).then(fs=>{cpAddFiles(fs);cpResetPasteBox();});
+  }).catch(()=>{});
+}
+function cpLightbox(i){
+  const ph=customerPhotos[i];if(!ph)return;
+  const lb=document.getElementById('cp-lightbox'),im=document.getElementById('cp-lightbox-img');
+  if(!lb||!im)return;
+  im.src=ph.dataUrl;lb.style.display='flex';
+}
+function cpCloseLightbox(){
+  const lb=document.getElementById('cp-lightbox'),im=document.getElementById('cp-lightbox-img');
+  if(lb)lb.style.display='none';
+  if(im)im.src='';
+}
 function rmItem(id,type){
   document.getElementById(id)?.remove();
   if(type==='door')calcDoors();else if(type==='drw')calcDrawers();else if(type==='special')calcSpecial();else calcHw();
@@ -2402,6 +2561,7 @@ function render(){
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
       const pr=getProgress(job.id,si);const hasL=(CL[si]||[]).length>0&&pr.tot>0;
       const op=orderProgress(job);const opChip=op.tot?`<span class="chip">📦 ${op.done}/${op.tot}</span>`:'';
+      const phChip=job.photoCount>0?`<span class="chip">📷 ${job.photoCount}</span>`:'';
       card.innerHTML=`<button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
         <span class="own-badge">${WHO_LABEL[owner]}</span>
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
@@ -2410,7 +2570,7 @@ function render(){
         ${(()=>{const pd=paidTotal(job),tot=job.sale||0;if(!pd)return'';const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;})()}
         ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
         ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
-        ${ds||hasL||opChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${opChip}</div>`:''}
+        ${ds||hasL||opChip||phChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${opChip}${phChip?' '+phChip:''}</div>`:''}
         ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="openKcdFile('${job.id}',this,event)" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
         ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}`;
@@ -2494,6 +2654,7 @@ function openAdd(stage=0){
   document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';
   proposalImages=[];renderProposalImagePreview();
   proposalPlansPdf=null;renderPlansPdfPreview();
+  customerPhotos=[];cpDirty=false;clearTimeout(cpTimer);renderCustomerPhotos();
   driveState.kcd.editing=false;driveState.pdf.editing=false;driveRenderBox('kcd');driveRenderBox('pdf');
   mTab('info');document.getElementById('overlay').classList.add('open');
   setTimeout(()=>document.getElementById('f-name').focus(),100);
@@ -2513,7 +2674,7 @@ function openEdit(id){
   document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
   document.getElementById('p-notes').value='';document.getElementById('p-addr').value='';document.getElementById('p-disc').value='';
   docMode='proposal';
-  resetPricing();loadPricingForJob(id);renderSchedList(id);mTab('info');
+  resetPricing();loadPricingForJob(id);renderSchedList(id);cpOpen(id);mTab('info');
   if(job.addr)document.getElementById('p-addr').value=job.addr;
   driveState.kcd.editing=false;driveState.pdf.editing=false;driveRenderBox('kcd');driveRenderBox('pdf');
   document.getElementById('overlay').classList.add('open');
@@ -2702,6 +2863,7 @@ function saveCard(){
   if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0){const stageChanged=jobs[idx].stage!==data.stage;entered=jobs[idx].stage<ORDER_STAGE&&data.stage>=ORDER_STAGE;jobs[idx]={...jobs[idx],...data};if(stageChanged)jobs[idx].stageAt=Date.now();}}
   else{const nj={id:uid(),...data,sale:0,cost:0,stageAt:Date.now()};jobs.unshift(nj);editId=nj.id;}
   calcAll();
+  cpFlush();
   saveData();render();
   const job=jobs.find(j=>j.id===editId);
   if(job)document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
@@ -2711,6 +2873,9 @@ function saveCard(){
 function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){const entered=job.stage<ORDER_STAGE&&si>=ORDER_STAGE;job.stage=si;job.stageAt=Date.now();document.getElementById('f-stage').value=si;saveData();render();orderListSync(job,true,entered);closeModal();}}
 function deleteJob(){
   if(!editId||!confirm('Delete this job?'))return;
+  if(window.fbPhotosDel)window.fbPhotosDel(editId);
+  idbPhotosDel(editId);
+  customerPhotos=[];cpDirty=false;clearTimeout(cpTimer);
   jobs=jobs.filter(j=>j.id!==editId);delete clSt[editId];delete pricingData[editId];
   saveData();render();closeModal();
 }
@@ -2731,6 +2896,7 @@ function closeModal(){
     if(pricingData[editId]){
       window._pw={id:editId,data:JSON.parse(JSON.stringify(pricingData[editId]))};
     }
+    cpFlush();
     saveData();
     const oj=jobs.find(j=>j.id===editId);if(oj)orderListSync(oj,true,entered);
     if(window.fbFlush)window.fbFlush();
