@@ -51,6 +51,24 @@ header h1{color:#fff;font-size:15px;font-weight:700;white-space:nowrap}
 .mc-fbtn{background:var(--col-bg);color:var(--muted);border:1.5px solid var(--border);border-radius:6px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .mc-fbtn.active{background:var(--green);color:#fff;border-color:var(--green)}
 .mc-fclear{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit}
+/* List view — every job in one sortable, searchable table (the board can hide a lead; this can't). */
+.listview{padding:10px 14px 24px}
+.lv-ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.lv-ctrls select{background:var(--input-bg);color:var(--text);border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;outline:none;font-family:inherit}
+.lv-ctrls label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer}
+.lv-count{font-size:12px;color:var(--muted);margin-bottom:8px}
+.lv-wrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:calc(100vh - 250px);min-height:220px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg)}
+table.lv{border-collapse:collapse;width:100%;min-width:920px;font-size:12px;color:var(--text)}
+table.lv th{position:sticky;top:0;z-index:2;background:var(--col-bg);text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);white-space:nowrap;cursor:pointer;border-bottom:1px solid var(--border);user-select:none}
+table.lv th.on{color:var(--green)}
+table.lv td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;vertical-align:middle}
+table.lv tbody tr{cursor:pointer}
+table.lv tbody tr:hover{background:rgba(125,140,180,0.10)}
+table.lv tbody tr.lv-arch{opacity:.55}
+.lv-name{font-weight:700;color:var(--text)}
+.lv-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;flex-shrink:0}
+.lv-tag{font-size:9px;font-weight:700;letter-spacing:.5px;background:var(--border);color:var(--muted);border-radius:3px;padding:1px 5px;margin-left:6px}
+.lv-empty{padding:18px;text-align:center;color:var(--muted);font-size:12px}
 .agenda::-webkit-scrollbar{display:none}
 .agenda-empty{color:rgba(255,255,255,0.45);font-size:11px;font-style:italic}
 .ag-item{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.13);border-radius:6px;padding:4px 9px;margin-right:7px;cursor:pointer;font-size:11px;color:#fff;font-weight:600;white-space:nowrap}
@@ -345,6 +363,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <span title="Sync status"><span class="sync-dot syncing" id="sync-dot"></span></span>
     <button class="hadd" onclick="lockDevice()" title="Lock this device" style="background:rgba(255,255,255,0.15)">🔒</button>
     <button class="hadd" onclick="openArchive()" title="Archived jobs" style="background:rgba(255,255,255,0.15)">📦 <span id="arch-count">0</span></button>
+    <button class="hadd" id="view-btn" onclick="toggleView()" title="Switch between the board and a list of every job" style="background:rgba(255,255,255,0.15)">📋 List</button>
     <button class="hadd" id="theme-btn" onclick="toggleTheme()" title="Switch to light theme" style="background:rgba(255,255,255,0.15)">☀️</button>
     <button class="hadd" onclick="openSettings()" style="background:rgba(255,255,255,0.15)">⚙️</button>
     <button class="hadd" onclick="openPaste()" title="Paste a Website estimate request email">📋 Paste Lead</button>
@@ -366,6 +385,25 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <button class="mc-fclear" onclick="mcClear()">Clear</button>
 </div>
 <div class="board" id="board"></div>
+<div class="listview" id="listview" style="display:none">
+  <div class="lv-ctrls">
+    <select id="lv-sort" onchange="lvSetSort(this.value)">
+      <option value="createdAt:desc">Newest first</option>
+      <option value="createdAt:asc">Oldest first</option>
+      <option value="name:asc">Name A–Z</option>
+      <option value="name:desc">Name Z–A</option>
+      <option value="stage:asc">Stage</option>
+      <option value="sale:desc">Biggest sale</option>
+      <option value="balance:desc">Biggest balance owed</option>
+      <option value="date:desc">Date visited</option>
+      <option value="days:desc">Longest in stage</option>
+    </select>
+    <select id="lv-stage" onchange="lvSetStage(this.value)"></select>
+    <label><input type="checkbox" id="lv-arch" onchange="lvSetArch(this.checked)"> Include archived</label>
+  </div>
+  <div class="lv-count" id="lv-count"></div>
+  <div class="lv-wrap"><table class="lv"><thead><tr id="lv-head"></tr></thead><tbody id="lv-body"></tbody></table></div>
+</div>
 
 <!-- JOB MODAL -->
 <div class="overlay" id="overlay">
@@ -2375,7 +2413,14 @@ function toggleRefBy(){
 }
 function sweepJobs(){
   const now=Date.now();let changed=false;
-  jobs.forEach(j=>{
+  jobs.forEach((j,i)=>{
+    // Older jobs were saved before we stamped a created date. Best guess, in order:
+    // when it last moved stage, the date visited, else its spot in the list (newest first).
+    if(!j.createdAt){
+      const guess=j.stageAt||(j.date?new Date(j.date+'T12:00:00').getTime():0);
+      j.createdAt=guess||(now-i*60000);
+      changed=true;
+    }
     if(!j.stageAt){j.stageAt=now;changed=true;}
     if(MIG_SOURCE[j.source]){j.source=MIG_SOURCE[j.source];changed=true;}
     if(j.assignedTo==='Jed'){j.assignedTo='James';changed=true;}
@@ -2516,7 +2561,7 @@ function createLeadFromPaste(){
   const notes=[extra.join('\n'),msg].filter(Boolean).join(extra.length&&msg?'\n\n':'');
   const nj={id:uid(),name:name,stage:0,source:'Website',labels:['new'],
     email:g('pl-email'),phone:g('pl-phone'),addr:'',notes:notes,date:'',
-    assignedTo:WHO_LABEL[WHO_KEY(getWho())],refBy:'',sale:0,cost:0,stageAt:Date.now()};
+    assignedTo:WHO_LABEL[WHO_KEY(getWho())],refBy:'',sale:0,cost:0,stageAt:Date.now(),createdAt:Date.now()};
   jobs.unshift(nj);
   saveData();render();
   closePaste();
@@ -2542,6 +2587,120 @@ function mcSetQ(v){mcFilter.q=(v||'').trim().toLowerCase();render();}
 function mcSetOwner(v){mcFilter.owner=v;render();}
 function mcSetTag(t,btn){mcFilter.tag=mcFilter.tag===t?'ALL':t;document.querySelectorAll('#mc-filter .mc-fbtn').forEach(b=>b.classList.remove('active'));if(mcFilter.tag!=='ALL'&&btn)btn.classList.add('active');render();}
 function mcClear(){mcFilter={q:'',owner:'ALL',tag:'ALL'};const i=document.getElementById('mc-q');if(i)i.value='';const s=document.getElementById('mc-owner');if(s)s.value='ALL';document.querySelectorAll('#mc-filter .mc-fbtn').forEach(b=>b.classList.remove('active'));render();}
+// ── LIST VIEW ── every job in one sortable table, so nothing can hide on the board.
+// Uses the same mcMatch() filter as the board, plus its own stage / archived controls.
+const OWN_COLS={james:'#4a8fbf',user2:'#ff4d4d',user3:'#f0c419'};
+const LV_COLS=[
+  {k:'name',t:'Customer'},{k:'stage',t:'Stage'},{k:'owner',t:'Assigned'},{k:'source',t:'Source'},
+  {k:'date',t:'Visited'},{k:'days',t:'Days in stage'},{k:'sale',t:'Sale'},{k:'balance',t:'Balance'},
+  {k:'labels',t:'Labels'},{k:'files',t:'Files'}
+];
+const LV_NUM=['stage','days','sale','balance','labels','files','createdAt'];
+let lvView='board';
+let lvSort={k:'createdAt',d:'desc'};
+let lvStage='ALL',lvArch=false;
+function lvDays(j){return Math.max(0,Math.floor((Date.now()-(j.stageAt||Date.now()))/86400000));}
+function lvBal(j){return (j.sale||0)-paidTotal(j);}
+function lvVal(j,k){
+  switch(k){
+    case 'name':return (j.name||'').toLowerCase();
+    case 'stage':return j.stage||0;
+    case 'owner':return ASSIGN_LABEL(j.assignedTo);
+    case 'source':return ((j.source||'')+' '+(j.refBy||'')).toLowerCase();
+    case 'date':return j.date||'';
+    case 'days':return lvDays(j);
+    case 'sale':return j.sale||0;
+    case 'balance':return lvBal(j);
+    case 'labels':return (j.labels||[]).length;
+    case 'files':return ((j.kcdFile&&j.kcdFile.link)?1:0)+((j.pdfFile&&j.pdfFile.link)?1:0)+(j.photoCount||0);
+    default:return j.createdAt||0;
+  }
+}
+function lvRows(){
+  const rows=jobs.filter(j=>{
+    if(j.archived&&!lvArch)return false;
+    if(lvStage!=='ALL'&&j.stage!==parseInt(lvStage))return false;
+    return mcMatch(j);
+  });
+  const k=lvSort.k,sign=lvSort.d==='desc'?-1:1;
+  return rows.sort((a,b)=>{
+    const av=lvVal(a,k),bv=lvVal(b,k);
+    if(av<bv)return -1*sign;
+    if(av>bv)return 1*sign;
+    return (b.createdAt||0)-(a.createdAt||0);
+  });
+}
+function lvSetSort(v){
+  const parts=(v||'').split(':');
+  if(parts.length===2){lvSort={k:parts[0],d:parts[1]};lvRemember();renderList();}
+}
+function lvHead(k){
+  // Same column again flips the direction; a new one starts the way that column reads best.
+  if(lvSort.k===k)lvSort.d=lvSort.d==='asc'?'desc':'asc';
+  else lvSort={k:k,d:LV_NUM.indexOf(k)>=0?'desc':'asc'};
+  lvRemember();renderList();
+}
+function lvRemember(){try{localStorage.setItem('mc-sort',lvSort.k+':'+lvSort.d);}catch(e){}}
+function lvSetStage(v){lvStage=v;renderList();}
+function lvSetArch(v){lvArch=!!v;renderList();}
+function renderList(){
+  const body=document.getElementById('lv-body');if(!body)return;
+  const head=document.getElementById('lv-head');
+  const stageSel=document.getElementById('lv-stage');
+  if(stageSel&&!stageSel.options.length){
+    stageSel.innerHTML='<option value="ALL">All stages</option>'+STAGES.map((s,i)=>`<option value="${i}">${s}</option>`).join('');
+    stageSel.value=lvStage;
+  }
+  const sortSel=document.getElementById('lv-sort');
+  if(sortSel)sortSel.value=lvSort.k+':'+lvSort.d;
+  if(head)head.innerHTML=LV_COLS.map(c=>`<th class="${lvSort.k===c.k?'on':''}" onclick="lvHead('${c.k}')">${c.t}${lvSort.k===c.k?(lvSort.d==='asc'?' ▲':' ▼'):''}</th>`).join('');
+  const rows=lvRows();
+  let tot=0,owed=0;
+  const html=rows.map(job=>{
+    const bal=lvBal(job);tot+=job.sale||0;if(bal>0.005)owed+=bal;
+    const own=ASSIGN_KEY(job.assignedTo);
+    const lbls=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join(' ');
+    const chips=[(job.kcdFile&&job.kcdFile.link)?'<span class="chip">📐 KCD</span>':'',
+      (job.pdfFile&&job.pdfFile.link)?'<span class="chip">📄 PDF</span>':'',
+      job.photoCount>0?`<span class="chip">📷 ${job.photoCount}</span>`:''].filter(Boolean).join(' ');
+    return `<tr class="${job.archived?'lv-arch':''}" onclick="openEdit('${job.id}')">
+      <td><span class="lv-name">${driveEsc(job.name)}</span>${job.archived?'<span class="lv-tag">ARCHIVED</span>':''}</td>
+      <td><span class="lv-dot" style="background:${SCOLS[job.stage]||'#6b778c'}"></span>${STAGES[job.stage]||''}</td>
+      <td><span class="own-badge" style="background:${OWN_COLS[own]}">${WHO_LABEL[own]}</span></td>
+      <td>${driveEsc(job.source||'—')}${job.refBy?' — '+driveEsc(job.refBy):''}</td>
+      <td>${job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'}</td>
+      <td>${lvDays(job)}</td>
+      <td>${job.sale>0?'$'+job.sale.toLocaleString():'—'}</td>
+      <td>${!job.sale?'—':(bal<=0.005?'<span style="color:var(--green);font-weight:700">Paid in full</span>':'$'+bal.toLocaleString('en-US',{maximumFractionDigits:0}))}</td>
+      <td>${lbls||'—'}</td>
+      <td>${chips||'—'}</td>
+    </tr>`;
+  }).join('');
+  body.innerHTML=html||`<tr><td colspan="${LV_COLS.length}" class="lv-empty">No jobs match — try clearing the search, or tick “Include archived”.</td></tr>`;
+  const cnt=document.getElementById('lv-count');
+  if(cnt)cnt.textContent=`${rows.length} job${rows.length===1?'':'s'} · $${Math.round(tot).toLocaleString()} total · $${Math.round(owed).toLocaleString()} owed`;
+}
+function applyView(){
+  const list=lvView==='list';
+  const b=document.getElementById('board'),lv=document.getElementById('listview'),btn=document.getElementById('view-btn');
+  if(b)b.style.display=list?'none':'';
+  if(lv)lv.style.display=list?'':'none';
+  if(btn)btn.textContent=list?'🗂 Board':'📋 List';
+  if(list)renderList();
+}
+function toggleView(){
+  lvView=lvView==='list'?'board':'list';
+  try{localStorage.setItem('mc-view',lvView);}catch(e){}
+  applyView();
+}
+function initView(){
+  try{
+    const v=localStorage.getItem('mc-view');if(v==='list')lvView='list';
+    const st=(localStorage.getItem('mc-sort')||'').split(':');
+    if(st.length===2&&st[0])lvSort={k:st[0],d:st[1]==='asc'?'asc':'desc'};
+  }catch(e){}
+  applyView();
+}
 function render(){
   if(sweepJobs())saveData();
   const board=document.getElementById('board');board.innerHTML='';
@@ -2583,6 +2742,7 @@ function render(){
   const cl=jobs.filter(j=>j.stage===6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   document.getElementById('hstats').textContent=`${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
   const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
+  if(lvView==='list')renderList();
   if(editId)renderOrderList();   // keeps the open card's order list live when the other phone ticks a box
 }
 
@@ -2861,7 +3021,7 @@ function saveCard(){
   if(doorsMissingDims()){alert('Please enter a Height and Width for every door so the Order List is accurate.');return;}
   let entered=false;
   if(editId){const idx=jobs.findIndex(j=>j.id===editId);if(idx>=0){const stageChanged=jobs[idx].stage!==data.stage;entered=jobs[idx].stage<ORDER_STAGE&&data.stage>=ORDER_STAGE;jobs[idx]={...jobs[idx],...data};if(stageChanged)jobs[idx].stageAt=Date.now();}}
-  else{const nj={id:uid(),...data,sale:0,cost:0,stageAt:Date.now()};jobs.unshift(nj);editId=nj.id;}
+  else{const nj={id:uid(),...data,sale:0,cost:0,stageAt:Date.now(),createdAt:Date.now()};jobs.unshift(nj);editId=nj.id;}
   calcAll();
   cpFlush();
   saveData();render();
@@ -2882,7 +3042,7 @@ function deleteJob(){
 function closeModal(){
   const infoData=captureInfoFields();
   if(!editId&&infoData.name){
-    const nj={id:uid(),...infoData,sale:0,cost:0};jobs.unshift(nj);editId=nj.id;
+    const nj={id:uid(),...infoData,sale:0,cost:0,createdAt:Date.now()};jobs.unshift(nj);editId=nj.id;
   }
   let entered=false;
   if(editId){
@@ -2946,7 +3106,7 @@ window.toggleTheme=function(){
 applyThemeUI();
 
 loadP();
-render();renderAgenda();
+render();renderAgenda();initView();
 // One-time prompt: ask who this device belongs to (tints new cards by owner)
 if(!getWho()){const wo=document.getElementById('who-overlay');if(wo)wo.classList.add('open');}
 </script>
