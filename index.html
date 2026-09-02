@@ -1313,7 +1313,7 @@ const SPECIAL_ITEMS=[
   {l:'Hamper Cloth Tilt Out 30" Black',c:71.01},{l:'Tilt Out Hamper 21"x14" Chrome',c:60.09},
   {l:'Ironing Board Rotating 14" Silver',c:292.44},
   {l:'Jewelry Tray 21 3/8"x12 1/8" Black',c:61.06},
-  {l:'Wire Pull-Out Baskets 24"W 16"D 11"H Chrome',c:55.16}
+  {l:'Wire Pull-Out Baskets 24"W 16"D 11"H Chrome',c:55.16,retired:true}
 ];
 function fmtD(n){return'$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 function fmt(n){return'$'+Math.round(Math.abs(n)).toLocaleString()}
@@ -1466,7 +1466,7 @@ function calcHw(){
 }
 function addSpecial(){
   spIdx++;const id='sp-'+spIdx;
-  const opts=SPECIAL_ITEMS.map((p,i)=>`<option value="${i}">${p.l} — $${p.c.toFixed(2)}</option>`).join('')+`<option value="other">✎ Other (type your own)…</option>`;
+  const opts=SPECIAL_ITEMS.map((p,i)=>p.retired?'':`<option value="${i}">${p.l} — $${p.c.toFixed(2)}</option>`).join('')+`<option value="other">✎ Other (type your own)…</option>`;
   const div=document.createElement('div');div.className='item-block';div.id=id;
   div.innerHTML=`<div class="ititle">Special Item ${spIdx}</div><button class="rm" onclick="rmItem('${id}','special')">×</button>
     <div class="f"><label>Item</label><select id="${id}-t" onchange="spPre('${id}')">${opts}</select></div>
@@ -2875,7 +2875,8 @@ function loadPricingForJob(jid){
     if(jid!==editId)return;
     proposalPlansPdf=p||null;renderPlansPdfPreview();
   });
-  (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=(si.itemIdx!==undefined&&si.itemIdx!==null?si.itemIdx:'0');const isOther=String(sel?.value)==='other';const nameEl=document.getElementById(bid+'-name');if(nameEl)nameEl.value=si.customName||'';const nameRow=document.getElementById(bid+'-name-row');if(nameRow)nameRow.style.display=isOther?'':'none';const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;const wEl=document.getElementById(bid+'-w');if(wEl)wEl.value=si.hamperWidth||'24';const hamperRow=document.getElementById(bid+'-hamper');if(hamperRow)hamperRow.style.display=(!isOther&&/hamper/i.test(SPECIAL_ITEMS[parseInt(sel?.value)]?.l||''))?'':'none';});
+  (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');const want=(si.itemIdx!==undefined&&si.itemIdx!==null)?String(si.itemIdx):'0';
+    if(sel){const sp=SPECIAL_ITEMS[parseInt(want)];if(sp&&![...sel.options].some(o=>o.value===want))sel.add(new Option(sp.l+' (retired)',want),0);sel.value=want;}const isOther=String(sel?.value)==='other';const nameEl=document.getElementById(bid+'-name');if(nameEl)nameEl.value=si.customName||'';const nameRow=document.getElementById(bid+'-name-row');if(nameRow)nameRow.style.display=isOther?'':'none';const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;const wEl=document.getElementById(bid+'-w');if(wEl)wEl.value=si.hamperWidth||'24';const hamperRow=document.getElementById(bid+'-hamper');if(hamperRow)hamperRow.style.display=(!isOther&&/hamper/i.test(SPECIAL_ITEMS[parseInt(sel?.value)]?.l||''))?'':'none';});
   isRestoring=false;calcMel();calcDoors();calcDrawers();calcHw();calcSpecial();calcLabor();calcOrderList();
 }
 function openAdd(stage=0){
