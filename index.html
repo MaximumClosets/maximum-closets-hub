@@ -519,8 +519,8 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <div class="pcard-bd hide" id="doors-bd"><div id="door-items"></div><button class="add-line" onclick="addDoor()">+ Add Door Style</button></div>
     </div>
     <div class="pcard">
-      <div class="pcard-hd" onclick="toggleP('drawers')"><h4>Drawer Boxes</h4><span id="drawers-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
-      <div class="pcard-bd hide" id="drawers-bd"><div id="drawer-items"></div><button class="add-line" onclick="addDrawer()">+ Add Drawer Type</button></div>
+      <div class="pcard-hd" onclick="toggleP('drawers')"><h4>Drawers</h4><span id="drawers-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
+      <div class="pcard-bd hide" id="drawers-bd"><div id="drawer-items"></div><button class="add-line" onclick="addDrawer()">+ Add Drawer or Pull-Out</button></div>
     </div>
     <div class="pcard">
       <div class="pcard-hd" onclick="toggleP('hw')"><h4>Hardware</h4><span id="hw-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
@@ -567,7 +567,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <div class="bkdown">
           <div class="brow"><span>Melamine</span><span class="cv" id="s-mel">$0</span></div>
           <div class="brow"><span>Doors</span><span class="cv" id="s-doors">$0</span></div>
-          <div class="brow"><span>Drawer Boxes</span><span class="cv" id="s-drawers">$0</span></div>
+          <div class="brow"><span>Drawers</span><span class="cv" id="s-drawers">$0</span></div>
           <div class="brow"><span>Hardware</span><span class="cv" id="s-hw">$0</span></div>
           <div class="brow"><span>Special Items</span><span class="cv" id="s-sp">$0</span></div>
           <div class="brow"><span>Helper Labor</span><span class="cv" id="s-hlp">$0</span></div>
@@ -697,12 +697,14 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <div class="srow"><span class="sl">Glass / Mirror</span><input type="number" id="sd-gm" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div><div class="srow"><span class="sl">Glass / Mirror Shaker</span><input type="number" id="sd-gms" step=".5" inputmode="decimal"/><span class="su">$/sqft</span></div><div class="srow"><span class="sl">Default markup</span><input type="number" id="sd-mu" step=".05" inputmode="decimal"/><span class="su">×</span></div>
       </div>
     </div>
-    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-drw')">Drawer Boxes<span>▾</span></div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-drw')">Drawers<span>▾</span></div>
       <div class="set-bd" id="s-drw">
         <div class="srow"><span class="sl">White Flat cost</span><input type="number" id="sdrw-wc" step="1" inputmode="decimal"/><span class="su">$</span></div>
         <div class="srow"><span class="sl">White Flat sell</span><input type="number" id="sdrw-ws" step="1" inputmode="decimal"/><span class="su">$</span></div>
         <div class="srow"><span class="sl">Shaker cost</span><input type="number" id="sdrw-sc" step="1" inputmode="decimal"/><span class="su">$</span></div>
         <div class="srow"><span class="sl">Shaker sell</span><input type="number" id="sdrw-ss" step="1" inputmode="decimal"/><span class="su">$</span></div>
+        <div class="srow"><span class="sl">Pull-out basket cost</span><input type="number" id="spb-c" step=".01" inputmode="decimal"/><span class="su">$</span></div>
+        <div class="srow"><span class="sl">Pull-out basket sell</span><input type="number" id="spb-s" step=".01" inputmode="decimal"/><span class="su">$</span></div>
         <div class="srow"><span class="sl">Slide sell multiplier</span><input type="number" id="ssl-mu" step=".1" inputmode="decimal"/><span class="su">×</span></div>
         <div class="srow"><span class="sl" style="font-weight:700">Soft-close slide cost / pair</span></div>
         <div class="srow"><span class="sl">12" deep</span><input type="number" id="ssl-12" step=".01" inputmode="decimal"/><span class="su">$</span></div>
@@ -1052,6 +1054,7 @@ const DEF = {
   cSqftC:3.33, cSqftS:8.33, cShtC:160, cShtS:400,
   dWF:8, dWS:15, dCF:11, dCS:18, dGM:30, dGMS:30, dMu:2.25,
   drwWC:55, drwWS:120, drwSC:65, drwSS:140,
+  pbC:55.16, pbS:110.32,
   slMu:2.4,
   sl12:4.92, sl14:5.06, sl16:6.04, sl18:8.04, sl20:8.80, sl22:7.77, sl24:9.50,
   po12:15, po14:15, po16:15, po18:20, po20:20, po22:20, po24:20,
@@ -1378,19 +1381,36 @@ function calcDoors(){
 function addDrawer(){
   drwIdx++;const id='drw-'+drwIdx;const div=document.createElement('div');div.className='item-block';div.id=id;
   div.innerHTML=`<div class="ititle">Drawer ${drwIdx}</div><button class="rm" onclick="rmItem('${id}','drw')">×</button>
-    <div class="f g2"><div><label>Type</label><select onchange="calcDrawers()">
+    <div class="f g2"><div><label>Type</label><select class="dtype" onchange="drwTypeChange('${id}')">
       <option value="wf">White Flat ($${P.drwWC}→$${P.drwWS})</option>
-      <option value="sh">Shaker ($${P.drwSC}→$${P.drwSS})</option></select></div>
+      <option value="sh">Shaker ($${P.drwSC}→$${P.drwSS})</option>
+      <option value="pb">Pull-Out Basket ($${P.pbC}→$${P.pbS})</option></select></div>
     <div><label>Qty</label><input type="number" class="dqty" placeholder="0" oninput="calcDrawers()" inputmode="decimal"/></div></div>
-    <div class="f g2"><div><label>Slide Depth (in)</label><select class="ddepth" onchange="calcDrawers()">
+    <div class="f g2 drw-slide-row"><div><label>Slide Depth (in)</label><select class="ddepth" onchange="calcDrawers()">
       <option value="12">12"</option><option value="14" selected>14"</option><option value="16">16"</option><option value="18">18"</option><option value="20">20"</option><option value="22">22"</option><option value="24">24"</option></select></div>
     <div><label>Slide Type</label><select class="dslide" onchange="calcDrawers()">
       <option value="sc">Soft-Close</option><option value="po">Push-to-Open</option></select></div></div>
-    <div class="f"><label>Hardware</label><select class="dhw" onchange="calcDrawers()">
+    <div class="f drw-hw-row"><label>Hardware</label><select class="dhw" onchange="calcDrawers()">
       <option value="handle">Handle</option><option value="none">No Handle</option><option value="latch">Push Latch (Concealed)</option>
     </select></div>
+    <div class="f g3 drw-pb-row" style="display:none"><div><label>Section Width</label><select class="dsecw" onchange="calcDrawers()">
+      <option value="18">18"</option><option value="21">21"</option><option value="24" selected>24"</option><option value="30">30"</option><option value="36">36"</option></select></div>
+    <div><label>Cost $</label><input type="number" class="dcost" step=".01" oninput="calcDrawers()" inputmode="decimal"/></div>
+    <div><label>Sell $</label><input type="number" class="dsell" step=".01" oninput="calcDrawers()" inputmode="decimal"/></div></div>
     <div class="result"><span>Cost → Sale</span><strong class="drres">$0 → $0</strong></div>`;
   document.getElementById('drawer-items').appendChild(div);calcDrawers();
+}
+// A pull-out basket is one unit with its own slides, so it hides the slide and handle
+// rows and prices off its own cost/sell instead of drawer box + slide pair.
+function drwTypeChange(id){
+  const b=document.getElementById(id);if(!b)return;
+  const pb=b.querySelector('.dtype')?.value==='pb';
+  b.querySelectorAll('.drw-slide-row,.drw-hw-row').forEach(el=>el.style.display=pb?'none':'');
+  const pr=b.querySelector('.drw-pb-row');if(pr)pr.style.display=pb?'':'none';
+  if(pb){const c=b.querySelector('.dcost'),s=b.querySelector('.dsell');
+    if(c&&!c.value)c.value=Number(P.pbC||0).toFixed(2);
+    if(s&&!s.value)s.value=Number(P.pbS||0).toFixed(2);}
+  calcDrawers();
 }
 const SLIDE_DEPTHS=[12,14,16,18,20,22,24];
 function slideMu(){const v=parseFloat(P.slMu);return(isFinite(v)&&v>0)?v:2.4;}
@@ -1404,9 +1424,15 @@ function slideCost(type,depth){
 function calcDrawers(){
   drwC=0;drwSl=0;
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
-    const t=b.querySelector('select')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
-    const sc=slideCost(b.querySelector('.dslide')?.value||'sc',b.querySelector('.ddepth')?.value||14);
-    const c=((t==='sh'?P.drwSC:P.drwWC)+sc)*q,sl=((t==='sh'?P.drwSS:P.drwWS)+sc*slideMu())*q;
+    const t=b.querySelector('.dtype')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
+    let c,sl;
+    if(t==='pb'){
+      c=(parseFloat(b.querySelector('.dcost')?.value)||0)*q;
+      sl=(parseFloat(b.querySelector('.dsell')?.value)||0)*q;
+    }else{
+      const sc=slideCost(b.querySelector('.dslide')?.value||'sc',b.querySelector('.ddepth')?.value||14);
+      c=((t==='sh'?P.drwSC:P.drwWC)+sc)*q;sl=((t==='sh'?P.drwSS:P.drwWS)+sc*slideMu())*q;
+    }
     drwC+=c;drwSl+=sl;const r=b.querySelector('.drres');if(r)r.textContent=fmt(c)+' → '+fmt(sl);
   });
   document.getElementById('drawers-badge').textContent=fmt(drwSl);calcAll();calcOrderList();
@@ -1497,7 +1523,7 @@ function spLabelFrom(s){
 function orderRowsFrom(inp){
   inp=inp||{};
   let hinges=0,handles=0,latches=0,flanges=0;
-  const slidePairs={},hamperFronts={},drawerBoxes={},specials={},doorCuts=[];
+  const slidePairs={},hamperFronts={},drawerBoxes={},specials={},doorCuts=[],pullOuts={};
   (inp.doors||[]).forEach(d=>{
     const sqft=parseFloat(d.sqft)||0,count=parseFloat(d.count)||1;
     const height=parseFloat(d.height)||0,width=parseFloat(d.width)||0,hw=d.hw||'handle';
@@ -1513,6 +1539,7 @@ function orderRowsFrom(inp){
   (inp.drawers||[]).forEach(d=>{
     const q=parseFloat(d.qty)||0,depth=parseFloat(d.depth)||14,hw=d.hw||'handle';
     const slide=(d.slide==='po')?'po':'sc',style=(d.type==='sh')?'sh':'wf';
+    if(q>0&&d.type==='pb'){const w=d.secW||'24';pullOuts[w]=(pullOuts[w]||0)+q;return;}
     if(q>0){
       const sk=slide+'|'+depth;slidePairs[sk]=(slidePairs[sk]||0)+q;
       if(hw==='handle')handles+=q;else if(hw==='latch')latches+=q;
@@ -1538,6 +1565,8 @@ function orderRowsFrom(inp){
     rows.push([`${d}" ${slideName[t]} Slide Pairs`,slidePairs[k]]);});
   Object.keys(drawerBoxes).sort(byTypeDepth(['wf','sh'])).forEach(k=>{const[t,d]=k.split('|');
     rows.push([`${d}" Deep ${boxName[t]} Drawer Boxes`,drawerBoxes[k]]);});
+  Object.keys(pullOuts).sort((a,b)=>parseFloat(a)-parseFloat(b)).forEach(w=>
+    rows.push([`Wire Pull-Out Basket — ${w}" Section`,pullOuts[w]]));
   if(flanges>0)rows.push(['Chrome Rod Flanges',flanges]);
   Object.keys(hamperFronts).sort().forEach(w=>{
     const width=(parseFloat(w)+0.625).toFixed(3).replace(/\.?0+$/,'');
@@ -1722,8 +1751,9 @@ function readPricingInputs(){
   });
   const drawers=[];
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
-    drawers.push({type:b.querySelector('select')?.value||'wf',qty:parseFloat(b.querySelector('.dqty')?.value)||0,
-      depth:parseFloat(b.querySelector('.ddepth')?.value)||14,slide:b.querySelector('.dslide')?.value||'sc',hw:b.querySelector('.dhw')?.value||'handle'});
+    drawers.push({type:b.querySelector('.dtype')?.value||'wf',qty:parseFloat(b.querySelector('.dqty')?.value)||0,
+      depth:parseFloat(b.querySelector('.ddepth')?.value)||14,slide:b.querySelector('.dslide')?.value||'sc',hw:b.querySelector('.dhw')?.value||'handle',
+      secW:b.querySelector('.dsecw')?.value||'24',cost:parseFloat(b.querySelector('.dcost')?.value)||0,sell:parseFloat(b.querySelector('.dsell')?.value)||0});
   });
   const hardware=[];
   document.querySelectorAll('#hw-items .item-block').forEach(b=>{
@@ -2010,8 +2040,10 @@ function buildProposalLines(){
     if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push({label:`${sname} Doors`,qty:`${qty3(sqft)} sq ft`});}
   });
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
-    const t=b.querySelector('select')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
-    if(q>0)lines.push({label:`${t==='sh'?'Shaker':'White Flat'} Drawer Boxes`,qty:q});
+    const t=b.querySelector('.dtype')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
+    if(q<=0)return;
+    if(t==='pb'){lines.push({label:`Wire Pull-Out Basket — ${b.querySelector('.dsecw')?.value||'24'}" Section`,qty:q});return;}
+    lines.push({label:`${t==='sh'?'Shaker':'White Flat'} Drawer Boxes`,qty:q});
   });
   document.querySelectorAll('#hw-items .item-block').forEach(b=>{
     const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
@@ -2819,7 +2851,11 @@ function loadPricingForJob(jid){
   if(inp.melCost)document.getElementById('mel-cost').value=inp.melCost;
   if(inp.melSell)document.getElementById('mel-sell').value=inp.melSell;
   (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl){const mv=String(d.mu||P.dMu);if(![...muEl.options].some(o=>o.value===mv))muEl.add(new Option(d.mu+'x',mv));muEl.value=mv;}const countEl=b.querySelector('.dcount');if(countEl)countEl.value=d.count||1;const heightEl=b.querySelector('.dheight');if(heightEl)heightEl.value=d.height||'';const widthEl=b.querySelector('.dwidth');if(widthEl)widthEl.value=d.width||'';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
-  (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;const depthEl=b.querySelector('.ddepth');if(depthEl){const dv=String(d.depth||14);if(![...depthEl.options].some(o=>o.value===dv))depthEl.add(new Option(dv+'"',dv));depthEl.value=dv;}const slEl=b.querySelector('.dslide');if(slEl)slEl.value=d.slide||'sc';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
+  (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('.dtype');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;const depthEl=b.querySelector('.ddepth');if(depthEl){const dv=String(d.depth||14);if(![...depthEl.options].some(o=>o.value===dv))depthEl.add(new Option(dv+'"',dv));depthEl.value=dv;}const slEl=b.querySelector('.dslide');if(slEl)slEl.value=d.slide||'sc';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';
+    const wEl2=b.querySelector('.dsecw');if(wEl2)wEl2.value=String(d.secW||'24');
+    const cEl2=b.querySelector('.dcost');if(cEl2&&d.cost)cEl2.value=d.cost;
+    const sEl2=b.querySelector('.dsell');if(sEl2&&d.sell)sEl2.value=d.sell;
+    drwTypeChange(b.id);}});
   (inp.hardware||[]).forEach(h=>{addHw();const bid='hw-'+hwIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=h.preset;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=h.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=h.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=h.sell;});
   if(inp.hlpHrs!==undefined){const e=document.getElementById('hlp-hrs');if(e)e.value=inp.hlpHrs;}
   if(inp.hlpRate!==undefined){const e=document.getElementById('hlp-rate');if(e)e.value=inp.hlpRate;}
@@ -3105,7 +3141,7 @@ function closeModal(){
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
 
 function openSettings(){
-  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','spb-c':'pbC','spb-s':'pbS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
   const w=WHO_KEY(getWho());
   const sw=document.getElementById('set-who');if(sw)sw.value=w;
@@ -3117,7 +3153,7 @@ function closeSettings(){document.getElementById('set-overlay').classList.remove
 document.getElementById('set-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('set-overlay'))closeSettings();});
 document.getElementById('arch-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('arch-overlay'))closeArchive();});
 function saveSettings(){
-  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','spb-c':'pbC','spb-s':'pbS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
   const gc=document.getElementById('set-gclient');if(gc)P.gClientId=gc.value.trim();
   saveP(P);if(window.fbSave)window.fbSave();
