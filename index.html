@@ -2145,7 +2145,7 @@ function buildProposalHTML(d,mode){
     ${mode!=='proposal'&&d.paid>0?`<div class="prop-trow"><span>Paid to Date</span><span>-${money(d.paid)}</span></div>`:''}</div>
     ${moneyBox}
     ${d.desc?`<div style="background:#f4f5f7;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#333;line-height:1.7"><strong style="color:#222;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
-    ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">${d.images.map(img=>`<img src="${img.dataUrl}" style="width:100%;border-radius:8px;border:1px solid #ddd;object-fit:cover;max-height:160px">`).join('')}</div></div>`:''}
+    ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(${d.images.length>1?2:1},1fr);gap:12px">${d.images.map(img=>`<div style="border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><img src="${img.dataUrl}" style="width:100%;height:auto;display:block"></div>`).join('')}</div></div>`:''}
     ${d.plans&&plansAreAttached()?`<div style="background:#eaf6ef;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1a5c38;font-weight:600">📐 Design plans / drawings are included with this proposal${plansStatus.modifiedTime?` <span style="font-weight:500">(drawings dated ${plansDateLabel(plansStatus.modifiedTime)})</span>`:''}</div>`:''}
     ${plansAreAttached()?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><span style="color:#1a5c38;font-weight:600">${plansStatus.name||''}</span></div>`:''}
     ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
@@ -2313,7 +2313,15 @@ async function buildProposalPdf(d){
   doc.innerHTML=buildProposalHTML(d,docMode);
   holder.appendChild(doc);document.body.appendChild(holder);
   await Promise.all(Array.from(doc.querySelectorAll('img')).map(im=>im.complete?Promise.resolve():new Promise(r=>{im.onload=im.onerror=r;})));
-  const canvas=await html2canvas(doc,{scale:3,backgroundColor:'#fff',useCORS:true,logging:false,windowWidth:640});
+  const CANVAS_SCALE=3;
+  const canvas=await html2canvas(doc,{scale:CANVAS_SCALE,backgroundColor:'#fff',useCORS:true,logging:false,windowWidth:640});
+  // Note the "don't cut me" blocks (renders, tables, the boxed sections) in canvas pixels, so the
+  // page breaks below can be nudged up instead of slicing a render or a table in half.
+  const docTop=doc.getBoundingClientRect().top;
+  const keepWhole=Array.from(doc.querySelectorAll('img,table,.prop-deposit,.prop-totals,.prop-msg,.prop-terms')).map(el=>{
+    const r=el.getBoundingClientRect();
+    return{top:(r.top-docTop)*CANVAS_SCALE,bottom:(r.bottom-docTop)*CANVAS_SCALE};
+  });
   document.body.removeChild(holder);
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF({unit:'pt',format:'a4',compress:true});
@@ -2321,9 +2329,20 @@ async function buildProposalPdf(d){
   const margin=24,imgW=pw-margin*2;
   const pxPerPt=canvas.width/imgW;                     // canvas pixels per PDF point
   const sliceMaxPx=Math.floor((ph-margin*2)*pxPerPt);  // usable page height in canvas pixels
+  const CUT_GAP=8;              // canvas px of breathing room left above a block we pulled the break up to
+  const MIN_PAGE_FILL=0.35;     // never pull a break up so far that the page ends up mostly empty
   let donenPx=0,page=0;
   while(donenPx<canvas.height){
-    const sliceH=Math.min(sliceMaxPx,canvas.height-donenPx);
+    let sliceH=Math.min(sliceMaxPx,canvas.height-donenPx);
+    if(donenPx+sliceH<canvas.height){        // not the last page — check what this break would land on
+      const cut=donenPx+sliceH;
+      let pulled=cut;
+      keepWhole.forEach(r=>{if(r.top<cut&&r.bottom>cut&&r.top-CUT_GAP<pulled)pulled=r.top-CUT_GAP;});
+      const pulledH=Math.floor(pulled-donenPx);
+      // Only move the break up if the page is still reasonably full; a block taller than a whole
+      // page (or one starting before this page) falls through and is hard-cut as before.
+      if(pulled<cut&&pulledH>=sliceMaxPx*MIN_PAGE_FILL)sliceH=pulledH;
+    }
     const pc=document.createElement('canvas');pc.width=canvas.width;pc.height=sliceH;
     const ctx=pc.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,pc.width,pc.height);
     ctx.drawImage(canvas,0,donenPx,canvas.width,sliceH,0,0,canvas.width,sliceH);
