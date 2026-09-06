@@ -395,7 +395,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <option value="stage:asc">Stage</option>
       <option value="sale:desc">Biggest sale</option>
       <option value="balance:desc">Biggest balance owed</option>
-      <option value="date:desc">Date visited</option>
+      <option value="date:desc">Appointment date</option>
       <option value="days:desc">Longest in stage</option>
     </select>
     <select id="lv-stage" onchange="lvSetStage(this.value)"></select>
@@ -426,7 +426,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <div class="f"><label>Customer Name *</label><input type="text" id="f-name" placeholder="e.g. Elliot Blue Coat" /></div>
     <div class="f g2">
       <div><label>Phone</label><input type="tel" id="f-phone" placeholder="(631) 555-0000" inputmode="tel" /></div>
-      <div><label>Date Visited</label><input type="date" id="f-date" /></div>
+      <div><label>Appointment Date</label><input type="date" id="f-date" /></div>
     </div>
     <div class="f"><label>Email</label><input type="email" id="f-email" placeholder="customer@email.com" inputmode="email" /></div>
     <div class="f"><label>Address</label><input type="text" id="f-addr" placeholder="50 Greybarn Lane, Amityville NY 11701" /></div>
@@ -2505,7 +2505,7 @@ function sweepJobs(){
   const now=Date.now();let changed=false;
   jobs.forEach((j,i)=>{
     // Older jobs were saved before we stamped a created date. Best guess, in order:
-    // when it last moved stage, the date visited, else its spot in the list (newest first).
+    // when it last moved stage, the appointment date, else its spot in the list (newest first).
     if(!j.createdAt){
       const guess=j.stageAt||(j.date?new Date(j.date+'T12:00:00').getTime():0);
       j.createdAt=guess||(now-i*60000);
@@ -2682,7 +2682,7 @@ function mcClear(){mcFilter={q:'',owner:'ALL',tag:'ALL'};const i=document.getEle
 const OWN_COLS={james:'#4a8fbf',user2:'#ff4d4d',user3:'#f0c419'};
 const LV_COLS=[
   {k:'name',t:'Customer'},{k:'stage',t:'Stage'},{k:'owner',t:'Assigned'},{k:'source',t:'Source'},
-  {k:'date',t:'Visited'},{k:'days',t:'Days in stage'},{k:'sale',t:'Sale'},{k:'balance',t:'Balance'},
+  {k:'date',t:'Appointment'},{k:'days',t:'Days in stage'},{k:'sale',t:'Sale'},{k:'balance',t:'Balance'},
   {k:'labels',t:'Labels'},{k:'files',t:'Files'}
 ];
 const LV_NUM=['stage','days','sale','balance','labels','files','createdAt'];
