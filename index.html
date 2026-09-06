@@ -2791,6 +2791,19 @@ function initView(){
   }catch(e){}
   applyView();
 }
+// Small "📅 Aug 24 · 13 days ago" line shown on Lead / Customer cards only. Text only, no colouring.
+function leadAgeLine(job){
+  const raw=job.stageAt||job.createdAt||(job.date?job.date+'T12:00:00':0);
+  if(!raw)return'';
+  const d=new Date(raw);if(isNaN(d.getTime()))return'';
+  const now=new Date();
+  let ds=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  if(d.getFullYear()!==now.getFullYear())ds+=" '"+String(d.getFullYear()).slice(-2);
+  const a=new Date(d);a.setHours(0,0,0,0);const b=new Date(now);b.setHours(0,0,0,0);
+  const n=Math.max(0,Math.round((b-a)/86400000));
+  const age=n===0?'today':n===1?'1 day ago':n+' days ago';
+  return `<div class="card-src">📅 ${ds} · ${age}</div>`;
+}
 function render(){
   if(sweepJobs())saveData();
   const board=document.getElementById('board');board.innerHTML='';
@@ -2822,7 +2835,8 @@ function render(){
         ${ds||hasL||opChip||phChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${opChip}${phChip?' '+phChip:''}</div>`:''}
         ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="openKcdFile('${job.id}',this,event)" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
-        ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}`;
+        ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}
+        ${si===0?leadAgeLine(job):''}`;
       ce.appendChild(card);
     });
   });
