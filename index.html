@@ -501,18 +501,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <div class="mtpane" id="mp-pricing">
     <div class="pcard">
       <div class="pcard-hd" onclick="toggleP('mel')"><h4>Melamine</h4><span id="mel-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
-      <div class="pcard-bd" id="mel-bd">
-        <div class="f g2">
-          <div><label>Color</label><select id="mel-type" onchange="melTypeChange()"><option value="white">White</option><option value="color">Color</option></select></div>
-          <div><label>Price By</label><select id="mel-method" onchange="melTypeChange()"><option value="sqft">Sq Ft</option><option value="sheets">Sheets</option></select></div>
-        </div>
-        <div class="f"><label id="mel-qty-lbl">Sq Ft</label><input type="number" id="mel-qty" placeholder="0" oninput="calcMel()" inputmode="decimal" /></div>
-        <div class="f g2">
-          <div><label>Cost / <span id="mel-cu">sq ft</span></label><input type="number" id="mel-cost" step=".01" oninput="calcMel()" inputmode="decimal" /></div>
-          <div><label>Sell / <span id="mel-su">sq ft</span></label><input type="number" id="mel-sell" step=".01" oninput="calcMel()" inputmode="decimal" /></div>
-        </div>
-        <div class="result"><span>Cost → Sale</span><strong id="mel-res">$0 → $0</strong></div>
-      </div>
+      <div class="pcard-bd" id="mel-bd"><div id="mel-items"></div><button class="add-line" onclick="addMel()">+ Add Melamine</button></div>
     </div>
     <div class="pcard">
       <div class="pcard-hd" onclick="toggleP('doors')"><h4>Doors</h4><span id="doors-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
@@ -1302,7 +1291,7 @@ function renderCL(jid,si){
 }
 
 let melC=0,melSl=0,doorC=0,doorSl=0,drwC=0,drwSl=0,hwC=0,hwSl=0,hlpC=0,spC=0,spSl=0;
-let doorIdx=0,drwIdx=0,hwIdx=0,spIdx=0;
+let melIdx=0,doorIdx=0,drwIdx=0,hwIdx=0,spIdx=0;
 const SPECIAL_ITEMS=[
   {l:'Valet Rod 12" Nickel',c:12.55},{l:'Valet Rod 12" Black',c:13.07},{l:'Valet Rod 12" Satin Brass',c:19.11},
   {l:'Valet Rod 14" Nickel',c:24.79},{l:'Valet Rod 14" Black',c:30.35},
@@ -1321,23 +1310,58 @@ function vn(id,d=0){return parseFloat(document.getElementById(id)?.value)||d}
 // Quantities never show more than 3 decimals — 5.555555555555555 sq ft reads as 5.556
 function qty3(n){return String(Math.round(((parseFloat(n)||0)+Number.EPSILON)*1000)/1000)}
 
-function melTypeChange(){
-  const t=document.getElementById('mel-type').value,m=document.getElementById('mel-method').value;
+// Melamine used to be one fixed block per job. It is now a list of rows so one job can carry
+// several colors. Jobs saved under the old shape still have the single melType/melQty/melCost/
+// melSell fields, so fold those into row 1 (color left blank) everywhere the rows are read.
+function melRowsFrom(inp){
+  inp=inp||{};
+  if(Array.isArray(inp.melamine))return inp.melamine;
+  if(inp.melQty||inp.melCost||inp.melSell)
+    return[{color:'',type:inp.melType||'white',method:inp.melMethod||'sqft',
+      qty:parseFloat(inp.melQty)||0,cost:parseFloat(inp.melCost)||0,sell:parseFloat(inp.melSell)||0}];
+  return[];
+}
+// The color Jed typed, else plain White/Color so a blank row still reads sensibly
+function melLabel(m){return(((m&&m.color)||'').trim())||((m&&m.type==='color')?'Color':'White');}
+function melPreset(t,m){
+  if(t==='white'&&m==='sqft')return{c:P.wSqftC,s:P.wSqftS};
+  if(t==='white'&&m==='sheets')return{c:P.wShtC,s:P.wShtS};
+  if(t==='color'&&m==='sqft')return{c:P.cSqftC,s:P.cSqftS};
+  return{c:P.cShtC,s:P.cShtS};
+}
+function addMel(){
+  melIdx++;const id='mel-'+melIdx;const div=document.createElement('div');div.className='item-block';div.id=id;
+  div.innerHTML=`<div class="ititle">Melamine ${melIdx}</div><button class="rm" onclick="rmItem('${id}','mel')">×</button>
+    <div class="f"><label>Color / Finish</label><input type="text" class="mname" placeholder="e.g. White, Kiss Curl, Acacia Honey" oninput="calcOrderList()"/></div>
+    <div class="f g2"><div><label>Color</label><select class="mtype" onchange="melTypeChange('${id}')"><option value="white">White</option><option value="color">Color</option></select></div>
+    <div><label>Price By</label><select class="mmethod" onchange="melTypeChange('${id}')"><option value="sqft">Sq Ft</option><option value="sheets">Sheets</option></select></div></div>
+    <div class="f"><label class="mqty-lbl">Sq Ft</label><input type="number" class="mqty" placeholder="0" oninput="calcMel()" inputmode="decimal"/></div>
+    <div class="f g2"><div><label>Cost / <span class="mcu">sq ft</span></label><input type="number" class="mcost" step=".01" oninput="calcMel()" inputmode="decimal"/></div>
+    <div><label>Sell / <span class="msu">sq ft</span></label><input type="number" class="msell" step=".01" oninput="calcMel()" inputmode="decimal"/></div></div>
+    <div class="result"><span>Cost → Sale</span><strong class="mres">$0 → $0</strong></div>`;
+  document.getElementById('mel-items').appendChild(div);melTypeChange(id);
+}
+function melTypeChange(id){
+  const b=document.getElementById(id);if(!b)return;
+  const t=b.querySelector('.mtype')?.value||'white',m=b.querySelector('.mmethod')?.value||'sqft';
   const unit=m==='sqft'?'sq ft':'sheet';
-  document.getElementById('mel-qty-lbl').textContent=m==='sqft'?'Sq Ft':'Sheets';
-  document.getElementById('mel-cu').textContent=unit;document.getElementById('mel-su').textContent=unit;
-  let c,s;
-  if(t==='white'&&m==='sqft'){c=P.wSqftC;s=P.wSqftS;}
-  else if(t==='white'&&m==='sheets'){c=P.wShtC;s=P.wShtS;}
-  else if(t==='color'&&m==='sqft'){c=P.cSqftC;s=P.cSqftS;}
-  else{c=P.cShtC;s=P.cShtS;}
-  document.getElementById('mel-cost').value=c;document.getElementById('mel-sell').value=s;calcMel();
+  const ql=b.querySelector('.mqty-lbl');if(ql)ql.textContent=m==='sqft'?'Sq Ft':'Sheets';
+  b.querySelectorAll('.mcu,.msu').forEach(el=>el.textContent=unit);
+  const pre=melPreset(t,m);
+  const cEl=b.querySelector('.mcost'),sEl=b.querySelector('.msell');
+  if(cEl)cEl.value=pre.c;if(sEl)sEl.value=pre.s;
+  calcMel();
 }
 function calcMel(){
-  const qty=vn('mel-qty'),cost=vn('mel-cost',P.wSqftC),sell=vn('mel-sell',P.wSqftS);
-  melC=qty*cost;melSl=qty*sell;
-  document.getElementById('mel-res').textContent=fmt(melC)+' → '+fmt(melSl);
-  document.getElementById('mel-badge').textContent=fmt(melSl);calcAll();
+  melC=0;melSl=0;
+  document.querySelectorAll('#mel-items .item-block').forEach(b=>{
+    const pre=melPreset(b.querySelector('.mtype')?.value||'white',b.querySelector('.mmethod')?.value||'sqft');
+    const qty=parseFloat(b.querySelector('.mqty')?.value)||0;
+    const cost=parseFloat(b.querySelector('.mcost')?.value)||pre.c,sell=parseFloat(b.querySelector('.msell')?.value)||pre.s;
+    const c=qty*cost,sl=qty*sell;melC+=c;melSl+=sl;
+    const r=b.querySelector('.mres');if(r)r.textContent=fmt(c)+' → '+fmt(sl);
+  });
+  document.getElementById('mel-badge').textContent=fmt(melSl);calcAll();calcOrderList();
 }
 function getDoorStyles(){return[{v:'white-flat',l:'White Flat',c:(P.dWF??8)},{v:'color-flat',l:'Color Flat',c:(P.dCF??11)},{v:'white-shaker',l:'White Shaker',c:(P.dWS??15)},{v:'color-shaker',l:'Color Shaker',c:(P.dCS??18)},{v:'glass',l:'Glass / Mirror',c:(P.dGM??30)},{v:'glass-shaker',l:'Glass / Mirror Shaker',c:(P.dGMS??30)}]} function hingesPerDoor(h){h=parseFloat(h)||0;if(h<=0)return 0;if(h>65)return 4;if(h>50)return 3;return 2;}
 function addDoor(){
@@ -1524,6 +1548,14 @@ function orderRowsFrom(inp){
   inp=inp||{};
   let hinges=0,handles=0,latches=0,flanges=0;
   const slidePairs={},hamperFronts={},drawerBoxes={},specials={},doorCuts=[],pullOuts={};
+  // Melamine is ordered per color, so each color gets its own line with its own quantity
+  const melAgg={},melIsSqft={};
+  melRowsFrom(inp).forEach(m=>{
+    const q=parseFloat(m.qty)||0;if(q<=0)return;
+    const sqft=(m.method!=='sheets');
+    const k=`${melLabel(m)} Melamine — ${sqft?'Sq Ft':'Sheets'}`;
+    melAgg[k]=(melAgg[k]||0)+q;melIsSqft[k]=sqft;
+  });
   (inp.doors||[]).forEach(d=>{
     const sqft=parseFloat(d.sqft)||0,count=parseFloat(d.count)||1;
     const height=parseFloat(d.height)||0,width=parseFloat(d.width)||0,hw=d.hw||'handle';
@@ -1554,6 +1586,7 @@ function orderRowsFrom(inp){
   });
   (inp.hardware||[]).forEach(h=>{if(h.preset==='rd')flanges+=(parseFloat(h.qty)||0)*2;});
   const rows=[];
+  Object.keys(melAgg).sort().forEach(k=>rows.push([k,Math.round(melAgg[k]*1000)/1000,melIsSqft[k]?'sqft':'']));
   if(handles>0)rows.push(['Handles',handles]);
   if(latches>0)rows.push(['Push Latches (Concealed)',latches]);
   if(hinges>0)rows.push(['Hinges',hinges]);
@@ -1581,7 +1614,7 @@ function calcOrderList(){
   const el=document.getElementById('order-list-content');
   const badge=document.getElementById('order-badge');
   if(!el||!badge)return;
-  const total=rows.reduce((s,r)=>s+r[1],0);
+  const total=rows.reduce((s,r)=>s+(r[2]==='sqft'?1:r[1]),0);
   badge.textContent=total+' item'+(total===1?'':'s');
   if(!rows.length){el.innerHTML='<p style="font-size:12px;color:var(--muted)">Nothing to order yet — add doors, drawers, hardware, or special items above.</p>';return;}
   el.innerHTML=rows.map(r=>`<div class="brow"><span>${r[0]}</span><span class="cv">${r[1]}</span></div>`).join('');
@@ -1765,9 +1798,13 @@ function readPricingInputs(){
     const bid=b.id;
     specialItems.push({itemIdx:document.getElementById(bid+'-t')?.value||'0',customName:document.getElementById(bid+'-name')?.value||'',qty:parseFloat(document.getElementById(bid+'-q')?.value)||1,cost:parseFloat(document.getElementById(bid+'-c')?.value)||0,sell:parseFloat(document.getElementById(bid+'-s')?.value)||0,hamperWidth:document.getElementById(bid+'-w')?.value||'24'});
   });
+  const melamine=[];
+  document.querySelectorAll('#mel-items .item-block').forEach(b=>{
+    melamine.push({color:b.querySelector('.mname')?.value||'',type:b.querySelector('.mtype')?.value||'white',method:b.querySelector('.mmethod')?.value||'sqft',
+      qty:parseFloat(b.querySelector('.mqty')?.value)||0,cost:parseFloat(b.querySelector('.mcost')?.value)||0,sell:parseFloat(b.querySelector('.msell')?.value)||0});
+  });
   return{
-    melType:document.getElementById('mel-type')?.value||'white',melMethod:document.getElementById('mel-method')?.value||'sqft',
-    melQty:parseFloat(document.getElementById('mel-qty')?.value)||0,melCost:parseFloat(document.getElementById('mel-cost')?.value)||0,melSell:parseFloat(document.getElementById('mel-sell')?.value)||0,
+    melamine,
     doors,drawers,hardware,specialItems,
     hlpHrs:parseFloat(document.getElementById('hlp-hrs')?.value??''),hlpRate:parseFloat(document.getElementById('hlp-rate')?.value)||P.hlpRate,
     leadPct:parseFloat(document.getElementById('lead-pct')?.value)||P.leadPct,ownerPct:parseFloat(document.getElementById('owner-pct')?.value)||0,
@@ -1815,11 +1852,12 @@ function savePropFieldsAndToast(){
 }
 function autoDesc(){
   const parts=[];
-  const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
-  if(melQty>0){
-    const m=document.getElementById('mel-method')?.value==='sqft'?'sq ft':'sheets';
-    parts.push(`${qty3(melQty)} ${m} of melamine`);
-  }
+  document.querySelectorAll('#mel-items .item-block').forEach(b=>{
+    const q=parseFloat(b.querySelector('.mqty')?.value)||0;if(q<=0)return;
+    const unit=b.querySelector('.mmethod')?.value==='sheets'?'sheets':'sq ft';
+    const nm=(b.querySelector('.mname')?.value||'').trim();
+    parts.push(`${qty3(q)} ${unit} of ${nm?nm+' ':''}melamine`);
+  });
   const doorParts=[];
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');const w=parseFloat(b.querySelector('.dwidth')?.value)||0;const hh=parseFloat(b.querySelector('.dheight')?.value)||0;const sqEl=b.querySelector('.dsqft');let sqft=parseFloat(sqEl?.value)||0;if(w>0&&hh>0){sqft=w*hh/144;if(sqEl&&document.activeElement!==sqEl)sqEl.value=sqft.toFixed(2);}
@@ -2023,18 +2061,18 @@ function cpCloseLightbox(){
 }
 function rmItem(id,type){
   document.getElementById(id)?.remove();
-  if(type==='door')calcDoors();else if(type==='drw')calcDrawers();else if(type==='special')calcSpecial();else calcHw();
+  if(type==='mel')calcMel();else if(type==='door')calcDoors();else if(type==='drw')calcDrawers();else if(type==='special')calcSpecial();else calcHw();
 }
 function toggleP(key){document.getElementById(key+'-bd').classList.toggle('hide');}
 
 function buildProposalLines(){
   const lines=[];
-  const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
-  if(melQty>0){
-    const melType=document.getElementById('mel-type').value==='white'?'White Melamine':'Color Melamine';
-    const melUnit=document.getElementById('mel-method')?.value==='sqft'?'sq ft':'sheets';
-    lines.push({label:melType,qty:`${qty3(melQty)} ${melUnit}`});
-  }
+  document.querySelectorAll('#mel-items .item-block').forEach(b=>{
+    const q=parseFloat(b.querySelector('.mqty')?.value)||0;if(q<=0)return;
+    const m={color:b.querySelector('.mname')?.value||'',type:b.querySelector('.mtype')?.value||'white'};
+    const melUnit=b.querySelector('.mmethod')?.value==='sheets'?'sheets':'sq ft';
+    lines.push({label:melLabel(m)+' Melamine',qty:`${qty3(q)} ${melUnit}`});
+  });
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');const w=parseFloat(b.querySelector('.dwidth')?.value)||0;const hh=parseFloat(b.querySelector('.dheight')?.value)||0;const sqEl=b.querySelector('.dsqft');let sqft=parseFloat(sqEl?.value)||0;if(w>0&&hh>0){sqft=w*hh/144;if(sqEl&&document.activeElement!==sqEl)sqEl.value=sqft.toFixed(2);}
     if(sqft>0){const sname=sel?.options[sel.selectedIndex]?.text?.split('—')[0]?.trim()||'Doors';lines.push({label:`${sname} Doors`,qty:`${qty3(sqft)} sq ft`});}
@@ -2110,8 +2148,13 @@ function getProposalData(){
   const subtotal=sale,afterDisc=subtotal-disc,total=afterDisc+tax,deposit=total/2;
   const today=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   const hrs=vn('hlp-hrs',P.hlpHrs);
-  const melQty=parseFloat(document.getElementById('mel-qty')?.value)||0;
-  const melColor=melQty>0?(document.getElementById('mel-type')?.value==='white'?'White':'Color'):'';
+  const melColors=[];
+  document.querySelectorAll('#mel-items .item-block').forEach(b=>{
+    if((parseFloat(b.querySelector('.mqty')?.value)||0)<=0)return;
+    const l=melLabel({color:b.querySelector('.mname')?.value||'',type:b.querySelector('.mtype')?.value||'white'});
+    if(!melColors.includes(l))melColors.push(l);
+  });
+  const melColor=melColors.join(', ');
   const payments=jobPayments(job),paid=paidTotal(job),balance=total-paid;
   return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,plansPdf:proposalPlansPdf,subtotal,afterDisc,total,deposit,today,hrs,melColor,propNum:ensurePropNum(job),payments,paid,balance,lines:buildProposalLines()};
 }
@@ -2861,11 +2904,10 @@ function mTab(name){
 }
 function resetPricing(){
   const wasRestoring=isRestoring;isRestoring=true;
-  melC=0;melSl=0;doorC=0;doorSl=0;drwC=0;drwSl=0;hwC=0;hwSl=0;hlpC=0;spC=0;spSl=0;doorIdx=0;drwIdx=0;hwIdx=0;spIdx=0;
-  document.getElementById('door-items').innerHTML='';document.getElementById('drawer-items').innerHTML='';document.getElementById('hw-items').innerHTML='';document.getElementById('special-items').innerHTML='';
-  document.getElementById('mel-qty').value='';document.getElementById('hlp-hrs').value=P.hlpHrs;
+  melC=0;melSl=0;doorC=0;doorSl=0;drwC=0;drwSl=0;hwC=0;hwSl=0;hlpC=0;spC=0;spSl=0;melIdx=0;doorIdx=0;drwIdx=0;hwIdx=0;spIdx=0;
+  document.getElementById('mel-items').innerHTML='';document.getElementById('door-items').innerHTML='';document.getElementById('drawer-items').innerHTML='';document.getElementById('hw-items').innerHTML='';document.getElementById('special-items').innerHTML='';
+  document.getElementById('hlp-hrs').value=P.hlpHrs;
   document.getElementById('hlp-rate').value=P.hlpRate;document.getElementById('lead-pct').value=P.leadPct;document.getElementById('owner-pct').value=0;
-  document.getElementById('mel-type').value='white';document.getElementById('mel-method').value='sqft';melTypeChange();
   ['mel-badge','doors-badge','drawers-badge','hw-badge','labor-badge'].forEach(id=>document.getElementById(id).textContent='$0');
   document.getElementById('order-badge').textContent='0 items';
   document.getElementById('order-list-content').innerHTML='<p style="font-size:12px;color:var(--muted)">Nothing to order yet — add doors, drawers, hardware, or special items above.</p>';
@@ -2878,11 +2920,14 @@ function loadPricingForJob(jid){
   const pw=window._pw;
   if(pw&&pw.id===jid&&pw.data)pricingData[jid]=JSON.parse(JSON.stringify(pw.data));
   const pd=pricingData[jid];if(!pd?.inputs)return;const inp=pd.inputs;isRestoring=true;
-  const mtEl=document.getElementById('mel-type'),mmEl=document.getElementById('mel-method');
-  if(mtEl)mtEl.value=inp.melType||'white';if(mmEl)mmEl.value=inp.melMethod||'sqft';melTypeChange();
-  if(inp.melQty)document.getElementById('mel-qty').value=inp.melQty;
-  if(inp.melCost)document.getElementById('mel-cost').value=inp.melCost;
-  if(inp.melSell)document.getElementById('mel-sell').value=inp.melSell;
+  melRowsFrom(inp).forEach(m=>{addMel();const b=document.getElementById('mel-'+melIdx);if(!b)return;
+    const nEl=b.querySelector('.mname');if(nEl)nEl.value=m.color||'';
+    const tEl=b.querySelector('.mtype');if(tEl)tEl.value=m.type||'white';
+    const mEl=b.querySelector('.mmethod');if(mEl)mEl.value=m.method||'sqft';
+    melTypeChange(b.id);
+    const qEl=b.querySelector('.mqty');if(qEl&&m.qty)qEl.value=m.qty;
+    const cEl=b.querySelector('.mcost');if(cEl&&m.cost)cEl.value=m.cost;
+    const sEl=b.querySelector('.msell');if(sEl&&m.sell)sEl.value=m.sell;});
   (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl){const mv=String(d.mu||P.dMu);if(![...muEl.options].some(o=>o.value===mv))muEl.add(new Option(d.mu+'x',mv));muEl.value=mv;}const countEl=b.querySelector('.dcount');if(countEl)countEl.value=d.count||1;const heightEl=b.querySelector('.dheight');if(heightEl)heightEl.value=d.height||'';const widthEl=b.querySelector('.dwidth');if(widthEl)widthEl.value=d.width||'';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
   (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('.dtype');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;const depthEl=b.querySelector('.ddepth');if(depthEl){const dv=String(d.depth||14);if(![...depthEl.options].some(o=>o.value===dv))depthEl.add(new Option(dv+'"',dv));depthEl.value=dv;}const slEl=b.querySelector('.dslide');if(slEl)slEl.value=d.slide||'sc';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';
     const wEl2=b.querySelector('.dsecw');if(wEl2)wEl2.value=String(d.secW||'24');
