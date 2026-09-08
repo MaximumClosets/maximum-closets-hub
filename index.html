@@ -75,6 +75,7 @@ table.lv tbody tr.lv-arch{opacity:.55}
 .ag-item.today{background:rgba(235,90,70,0.75)}
 .ag-item.tmrw{background:rgba(242,165,0,0.75)}
 .ag-item.soon{background:rgba(0,121,191,0.55)}
+.ag-item.wake{background:rgba(155,92,196,0.8)}
 .ag-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.7);flex-shrink:0}
 .board{display:flex;gap:10px;padding:10px;overflow-x:auto;align-items:flex-start;min-height:calc(100vh - 80px)}
 .board::-webkit-scrollbar{height:6px}
@@ -113,11 +114,13 @@ table.lv tbody tr.lv-arch{opacity:.55}
 .l-inprog{background:#07232b;border:1.5px solid #0e4f60;color:#3aadca}
 .l-finalpay{background:#280d0d;border:1.5px solid #601a1a;color:#b05050}
 .l-done{background:#0d2b1a;border:1.5px solid #1a5c38;color:#4aad78}
+.l-repeat,.lopt.repeat{background:#2b2308;border:1.5px solid #8f7511;color:#e0b040}
+.l-sure,.lopt.sure{background:#2c0a1d;border:1.5px solid #7a1f4d;color:#e05a95}
 .card-name{font-weight:600;font-size:13px;color:var(--text);line-height:1.3}
 .card-val{font-size:11px;font-weight:700;color:var(--green2);margin-top:3px}
 .card-src{font-size:10px;color:var(--muted);margin-top:2px}
 .card-meta{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
-.chip{font-size:10px;color:var(--muted);background:#f0f1f3;padding:2px 5px;border-radius:3px}
+.chip{font-size:10px;color:var(--muted);background:#f0f1f3;padding:2px 5px;border-radius:3px;white-space:nowrap}
 .age-pill{display:inline-block;font-size:10px;font-weight:700;color:#fff;background:#172b4d;padding:1px 6px;border-radius:9px;letter-spacing:.2px}
 .chip.ov{color:#eb5a46;background:#ffedeb}
 .chip.today{color:#fff;background:#eb5a46;font-weight:700}
@@ -320,6 +323,10 @@ html[data-theme="light"] .l-inprog,
 html[data-theme="light"] .lopt.inprog{background:#e0f0f5;border-color:#a2d0dc;color:#24788c}
 html[data-theme="light"] .l-finalpay,
 html[data-theme="light"] .lopt.finalpay{background:#f8e5e2;border-color:#e4aca5;color:#99372e}
+html[data-theme="light"] .l-repeat,
+html[data-theme="light"] .lopt.repeat{background:#fbf0cd;border-color:#d9bd63;color:#7d6203}
+html[data-theme="light"] .l-sure,
+html[data-theme="light"] .lopt.sure{background:#fbe3ef;border-color:#e9a6c8;color:#96256a}
 html[data-theme="light"] .modal,
 html[data-theme="light"] .set-modal{background:#ffffff}
 html[data-theme="light"] .f input,
@@ -383,6 +390,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   </select>
   <button class="mc-fbtn" onclick="mcSetTag('OVERDUE',this)">⚠️ Overdue</button>
   <button class="mc-fbtn" onclick="mcSetTag('PLANS',this)">📐 Needs Plans</button>
+  <button class="mc-fbtn" onclick="mcSetTag('SURE',this)">⭐ Sure Things</button>
   <button class="mc-fclear" onclick="mcClear()">Clear</button>
 </div>
 <div class="board" id="board"></div>
@@ -472,6 +480,8 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <div class="lopt design" data-v="design" onclick="toggleLbl(this)">Needs go back</div>
         <div class="lopt inprog" data-v="inprog" onclick="toggleLbl(this)">In Progress</div>
         <div class="lopt finalpay" data-v="finalpay" onclick="toggleLbl(this)">Final Payment Due</div>
+        <div class="lopt repeat" data-v="repeat" onclick="toggleLbl(this)">Repeat Customer</div>
+        <div class="lopt sure" data-v="sure" onclick="toggleLbl(this)">Sure Thing</div>
       </div>
     </div>
     <div class="f"><label>Notes</label><textarea id="f-notes" placeholder="Any notes about this job…"></textarea></div>
@@ -634,10 +644,11 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <div class="mtpane" id="mp-move">
     <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Move to stage</p>
     <div class="move-btns" id="mv-btns"></div>
-    <div style="display:flex;gap:6px;margin-top:8px">
+    <div style="display:flex;gap:6px;margin-top:8px" id="mv-arch">
       <button class="btn" style="flex:1" onclick="archiveJob('postponed')">😴 Postponed</button>
       <button class="btn" style="flex:1" onclick="archiveJob('dead')">❌ Dead</button>
     </div>
+    <button class="btn" id="mv-restore" style="width:100%;margin-top:8px;display:none" onclick="restoreJob(editId)">♻️ Bring back to the board</button>
     <button class="btn btn-d" style="width:100%;margin-top:8px" onclick="deleteJob()">🗑 Delete Job</button>
   </div>
 </div>
@@ -1061,7 +1072,7 @@ function saveP(obj){try{localStorage.setItem('mc-p',JSON.stringify(obj));}catch(
 
 const STAGES=['Lead / Customer','Measure / Consult','Estimate Sent','Deposit Paid','Install Scheduled','Install','Done'];
 const SCOLS=['#6b778c','#f2a500','#eb5a46','#61bd4f','#00c2e0','#0079bf','#1a5c38'];
-const LBLS={new:{c:'l-new',t:'New Lead'},plans:{c:'l-plans',t:'Need Plans Sent'},followup:{c:'l-followup',t:'Follow Up Soon'},ontrack:{c:'l-ontrack',t:'Final Payment Received'},design:{c:'l-design',t:'Needs go back'},inprog:{c:'l-inprog',t:'In Progress'},finalpay:{c:'l-finalpay',t:'Final Payment Due'},done:{c:'l-done',t:'Done'}};
+const LBLS={new:{c:'l-new',t:'New Lead'},plans:{c:'l-plans',t:'Need Plans Sent'},followup:{c:'l-followup',t:'Follow Up Soon'},ontrack:{c:'l-ontrack',t:'Final Payment Received'},design:{c:'l-design',t:'Needs go back'},inprog:{c:'l-inprog',t:'In Progress'},finalpay:{c:'l-finalpay',t:'Final Payment Due'},done:{c:'l-done',t:'Done'},repeat:{c:'l-repeat',t:'Repeat Customer'},sure:{c:'l-sure',t:'Sure Thing'}};
 const CL={
   0:[{n:'New Lead',items:['Get full name, phone & email','Understand scope (rooms, style, timeline)','Schedule measure / consult']}],
   1:[{n:'Measure & Design',items:['Measure all spaces + take photos','Note client preferences (color, style, hardware)','Draft design in KCD','Price job in pricing tab','Send estimate to client']}],
@@ -1221,6 +1232,10 @@ function renderSchedList(jid){
       <button class="sch-del" onclick="deleteSchedItem('${jid}','${it.id}')">×</button></div>`;
   }).join('');
 }
+// A postponed job can carry a date to look at it again. Due ones surface in the
+// agenda bar and on the archive button; the job itself stays off the board until
+// James restores it by hand.
+function checkBackDue(j){return !!(j.archived&&j.checkBackAt&&Date.now()>=j.checkBackAt);}
 function renderAgenda(){
   const ag=document.getElementById('agenda');if(!ag)return;
   const today=new Date();today.setHours(0,0,0,0);
@@ -1234,8 +1249,10 @@ function renderAgenda(){
     });
   });
   all.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
-  if(!all.length){ag.innerHTML='<span class="agenda-empty">No upcoming tasks this week</span>';return;}
-  ag.innerHTML=all.map(it=>`<span class="ag-item ${dayClass(it.date)}" data-jid="${it.jobId}"><span class="ag-dot"></span>${dayLabel(it.date)}${it.time?' '+it.time:''} — ${it.type}: ${it.jobName}${it.note?' · '+it.note:''}</span>`).join('');
+  const wake=jobs.filter(checkBackDue).sort((a,b)=>a.checkBackAt-b.checkBackAt)
+    .map(j=>`<span class="ag-item wake" data-jid="${j.id}"><span class="ag-dot"></span>😴 Check back: ${driveEsc(j.name)}</span>`).join('');
+  if(!all.length&&!wake){ag.innerHTML='<span class="agenda-empty">No upcoming tasks this week</span>';return;}
+  ag.innerHTML=wake+all.map(it=>`<span class="ag-item ${dayClass(it.date)}" data-jid="${it.jobId}"><span class="ag-dot"></span>${dayLabel(it.date)}${it.time?' '+it.time:''} — ${it.type}: ${it.jobName}${it.note?' · '+it.note:''}</span>`).join('');
   ag.querySelectorAll('.ag-item').forEach(el=>attachTap(el,()=>openEdit(el.dataset.jid)));
 }
 
@@ -2584,7 +2601,7 @@ function openArchive(){
   const REASON={postponed:'😴 Postponed',dead:'❌ Dead'};
   const list=jobs.filter(j=>j.archived).sort((a,b)=>(b.archivedAt||b.doneAt||0)-(a.archivedAt||a.doneAt||0));
   const el=document.getElementById('arch-list');
-  el.innerHTML=list.length?list.map(j=>`<div class="srow" style="align-items:center"><span class="sl" style="flex:1;text-align:left">${j.name}${j.sale>0?' — $'+j.sale.toLocaleString():''}${j.archiveReason?' <span class="chip">'+REASON[j.archiveReason]+' '+new Date(j.archivedAt||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>':''}</span><button class="mv-btn" onclick="restoreJob('${j.id}')">Restore</button></div>`).join(''):'<p style="font-size:12px;color:#aaa">No archived jobs. Jobs auto-archive 2 weeks after being marked Done, unless still labeled "Final Payment Due". You can also archive a job by hand from its card as 😴 Postponed or ❌ Dead.</p>';
+  el.innerHTML=list.length?list.map(j=>`<div class="srow" style="align-items:center"><span class="sl" style="flex:1;text-align:left">${j.name}${j.sale>0?' — $'+j.sale.toLocaleString():''}${j.archiveReason?' <span class="chip">'+REASON[j.archiveReason]+' '+new Date(j.archivedAt||Date.now()).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>':''}${j.checkBackAt?' <span class="chip"'+(checkBackDue(j)?' style="background:#9b5cc4;color:#fff"':'')+'>⏰ '+(checkBackDue(j)?'Check back now':'Check back '+new Date(j.checkBackAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}))+'</span>':''}</span><button class="mv-btn" onclick="snoozeJob('${j.id}')">⏰ Remind</button><button class="mv-btn" onclick="restoreJob('${j.id}')">Restore</button></div>`).join(''):'<p style="font-size:12px;color:#aaa">No archived jobs. Jobs auto-archive 2 weeks after being marked Done, unless still labeled "Final Payment Due". You can also archive a job by hand from its card as 😴 Postponed or ❌ Dead, and set a date to check back on it.</p>';
   document.getElementById('arch-overlay').classList.add('open');
 }
 function closeArchive(){document.getElementById('arch-overlay').classList.remove('open');}
@@ -2720,20 +2737,36 @@ function archiveJob(reason){
   const word=reason==='dead'?'dead':'postponed';
   if(!confirm('Move this job to Archived as '+word+'? You can restore it any time.'))return;
   job.archived=true;job.archivedManual=true;job.archiveReason=reason;job.archivedAt=Date.now();
-  saveData();closeModal();render();
+  delete job.checkBackAt;
+  if(reason==='postponed'){
+    const n=Math.round(parseFloat(prompt('Check back on this one in how many days? 30, 60 or 90 are typical — leave it blank for no reminder.','30')));
+    if(n>0)job.checkBackAt=Date.now()+n*86400000;
+  }
+  saveData();closeModal();render();renderAgenda();
+}
+// Set or push out the reminder on an already-archived job, so a "not yet" costs one tap.
+function snoozeJob(id){
+  const job=jobs.find(j=>j.id===id);if(!job)return;
+  const n=Math.round(parseFloat(prompt('Check back on this one in how many days?','30')));
+  if(!(n>0))return;
+  job.checkBackAt=Date.now()+n*86400000;
+  saveData();render();renderAgenda();openArchive();
 }
 function restoreJob(id){
   const job=jobs.find(j=>j.id===id);if(!job)return;
   job.archived=false;
-  delete job.archivedManual;delete job.archiveReason;delete job.archivedAt;
+  delete job.archivedManual;delete job.archiveReason;delete job.archivedAt;delete job.checkBackAt;
   if(job.stage===6)job.doneAt=Date.now();else delete job.doneAt;
-  saveData();render();openArchive();
+  saveData();render();renderAgenda();
+  // Restore is reachable from the archive box and from the job card — go back to whichever was used
+  if(document.getElementById('arch-overlay').classList.contains('open'))openArchive();else closeModal();
 }
 // ── BOARD SEARCH / FILTER ── purely a view filter; decides which cards render() draws, so it re-applies on every redraw and never fights the live board.
 let mcFilter={q:'',owner:'ALL',tag:'ALL'};
 function mcMatch(j){
   if(mcFilter.owner!=='ALL'){const o=ASSIGN_LABEL(j.assignedTo);if(o!==mcFilter.owner)return false;}
   if(mcFilter.tag==='PLANS'&&!(j.labels||[]).includes('plans'))return false;
+  if(mcFilter.tag==='SURE'){const L=j.labels||[];if(!L.includes('sure')&&!L.includes('repeat'))return false;}
   if(mcFilter.tag==='OVERDUE'&&!(j.date&&new Date(j.date+'T12:00:00')<new Date()&&j.stage<5))return false;
   if(mcFilter.q){
     const hay=[j.name,j.source,j.refBy,j.notes,j.phone,j.email,j.addr,(j.labels||[]).map(l=>LBLS[l]?LBLS[l].t:'').join(' ')].join(' ').toLowerCase();
@@ -2914,6 +2947,7 @@ function render(){
   const cl=jobs.filter(j=>j.stage===6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   document.getElementById('hstats').textContent=`${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
   const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
+  if(ac&&ac.parentElement)ac.parentElement.style.background=jobs.some(checkBackDue)?'rgba(242,165,0,0.85)':'rgba(255,255,255,0.15)';
   if(lvView==='list')renderList();
   if(editId)renderOrderList();   // keeps the open card's order list live when the other phone ticks a box
 }
@@ -3011,6 +3045,9 @@ function openEdit(id){
   document.getElementById('f-notes').value=job.notes||'';
   document.querySelectorAll('.lopt').forEach(el=>el.classList.toggle('on',selLbls.includes(el.dataset.v)));
   document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');
+  const mvA=document.getElementById('mv-arch'),mvR=document.getElementById('mv-restore');
+  if(mvA)mvA.style.display=job.archived?'none':'flex';
+  if(mvR)mvR.style.display=job.archived?'block':'none';
   document.getElementById('p-notes').value='';document.getElementById('p-addr').value='';document.getElementById('p-disc').value='';
   docMode='proposal';
   resetPricing();loadPricingForJob(id);renderSchedList(id);cpOpen(id);mTab('info');
