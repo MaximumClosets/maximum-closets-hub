@@ -1667,14 +1667,14 @@ function orderListResend(jid){
   const job=jobs.find(j=>j.id===jid);if(!job)return;
   const rows=orderRowsForJob(jid);
   job.orderList=orderItemsFrom(rows,job.orderList);
+  saveData();render();renderOrderList();
+  if(!orderListEmail(jid,true))return;
   job.orderSig=orderSig(rows);job.orderAskedSig='';
   saveData();render();renderOrderList();
-  orderListEmail(jid,true);
 }
 function orderListEmail(jid,resend){
-  const job=jobs.find(j=>j.id===jid);if(!job||!job.orderList)return;
-  job.orderSentAt=Date.now();saveData();renderOrderList();
-  orderListSend(job,resend);
+  const job=jobs.find(j=>j.id===jid);if(!job||!job.orderList)return false;
+  return orderListSend(job,resend);
 }
 function toggleOrderItem(i){
   const job=jobs.find(j=>j.id===editId);
@@ -1698,6 +1698,13 @@ function renderOrderList(){
   </div>`;
 }
 function orderEmailTo(){return 'james@maximumclosets.com';}
+// Order lists come to James. Ask each time so Pete or anyone else only gets one when
+// James types them in, and so the choice never sticks around for the next job.
+function orderAskTo(){
+  const ans=prompt('Who should get this order list? Separate addresses with a comma.',orderEmailTo());
+  if(ans===null)return'';
+  return ans.split(',').map(x=>x.trim()).filter(Boolean).join(',');
+}
 function orderEmailBody(job,resend){
   const lines=(job.orderList||[]).map(it=>'• '+it.d+' — '+it.q).join('\n');
   return (resend?'UPDATED order list':'Order list')+' for '+(job.name||'this job')+'.\n\n'+lines+'\n\nThe same list is attached as a PDF.\n\nMaximum Closets';
@@ -1735,18 +1742,20 @@ function buildOrderListPdf(job){
   return{blob:pdf.output('blob'),filename:'Maximum-Closets-Order-List-'+cust+'.pdf'};
 }
 function orderListSend(job,resend){
-  const to=orderEmailTo();
-  if(!to){alert('No order-list email addresses yet — add them in ⚙️ Settings → Order List Emails. The list is saved on the card either way.');return;}
-  // Open Gmail first (inside the click) so pop-up blockers leave it alone, same as the proposal email
+  const to=orderAskTo();
+  if(!to)return false;
+  // Open Gmail right after the prompt so pop-up blockers leave it alone, same as the proposal email
   window.open('https://mail.google.com/mail/u/0/?view=cm&fs=1&to='+encodeURIComponent(to)
     +'&su='+encodeURIComponent((resend?'UPDATED Order List — ':'Order List — ')+(job.name||''))
     +'&body='+encodeURIComponent(orderEmailBody(job,resend)),'_blank');
+  job.orderSentAt=Date.now();saveData();renderOrderList();render();
   try{
-    if(!window.jspdf){alert('PDF tools are still loading — reopen the card and use the resend button in a moment.');return;}
+    if(!window.jspdf){alert('PDF tools are still loading — reopen the card and use the resend button in a moment.');return true;}
     const {blob,filename}=buildOrderListPdf(job);
     triggerDownload(blob,filename);
     setTimeout(()=>alert('The order list downloaded as "'+filename+'". Attach that PDF to the Gmail window that just opened.'),400);
   }catch(err){console.error(err);alert('The Gmail window opened, but building the order list PDF failed: '+((err&&err.message)||''));}
+  return true;
 }
 function calcLabor(){
   const hrsEl=document.getElementById('hlp-hrs');
