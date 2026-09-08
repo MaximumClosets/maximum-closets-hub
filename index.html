@@ -1226,6 +1226,7 @@ function renderAgenda(){
   const today=new Date();today.setHours(0,0,0,0);
   const all=[];
   jobs.forEach(job=>{
+    if(job.archived)return;
     (schedData[job.id]||[]).forEach(it=>{
       const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);
       const diff=Math.round((d-today)/86400000);
@@ -2907,9 +2908,9 @@ function render(){
       ce.appendChild(card);
     });
   });
-  const active=jobs.filter(j=>j.stage<6);
+  const active=jobs.filter(j=>j.stage<6&&!j.archived);
   const pip=active.reduce((s,j)=>s+(j.sale||0),0);
-  const com=jobs.filter(j=>j.stage>=3&&j.stage<6).reduce((s,j)=>s+(j.sale||0),0);
+  const com=jobs.filter(j=>j.stage>=3&&j.stage<6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   const cl=jobs.filter(j=>j.stage===6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   document.getElementById('hstats').textContent=`${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
   const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
