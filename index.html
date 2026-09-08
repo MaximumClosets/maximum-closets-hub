@@ -1428,10 +1428,11 @@ function calcDoors(){
 function addDrawer(){
   drwIdx++;const id='drw-'+drwIdx;const div=document.createElement('div');div.className='item-block';div.id=id;
   div.innerHTML=`<div class="ititle">Drawer ${drwIdx}</div><button class="rm" onclick="rmItem('${id}','drw')">×</button>
-    <div class="f g2"><div><label>Type</label><select class="dtype" onchange="drwTypeChange('${id}')">
+    <div class="f g3 drw-tq-row"><div><label>Type</label><select class="dtype" onchange="drwTypeChange('${id}')">
       <option value="wf">White Flat ($${P.drwWC}→$${P.drwWS})</option>
       <option value="sh">Shaker ($${P.drwSC}→$${P.drwSS})</option>
       <option value="pb">Pull-Out Basket ($${P.pbC}→$${P.pbS})</option></select></div>
+    <div class="drw-width-cell"><label>Width (in)</label><input type="number" class="dwidth2" placeholder="0" oninput="calcDrawers()" inputmode="decimal"/></div>
     <div><label>Qty</label><input type="number" class="dqty" placeholder="0" oninput="calcDrawers()" inputmode="decimal"/></div></div>
     <div class="f g2 drw-slide-row"><div><label>Slide Depth (in)</label><select class="ddepth" onchange="calcDrawers()">
       <option value="12">12"</option><option value="14" selected>14"</option><option value="16">16"</option><option value="18">18"</option><option value="20">20"</option><option value="22">22"</option><option value="24">24"</option></select></div>
@@ -1452,7 +1453,8 @@ function addDrawer(){
 function drwTypeChange(id){
   const b=document.getElementById(id);if(!b)return;
   const pb=b.querySelector('.dtype')?.value==='pb';
-  b.querySelectorAll('.drw-slide-row,.drw-hw-row').forEach(el=>el.style.display=pb?'none':'');
+  b.querySelectorAll('.drw-slide-row,.drw-hw-row,.drw-width-cell').forEach(el=>el.style.display=pb?'none':'');
+  const tqRow=b.querySelector('.drw-tq-row');if(tqRow)tqRow.className='f '+(pb?'g2':'g3')+' drw-tq-row';
   const pr=b.querySelector('.drw-pb-row');if(pr)pr.style.display=pb?'':'none';
   if(pb){const c=b.querySelector('.dcost'),s=b.querySelector('.dsell');
     if(c&&!c.value)c.value=Number(P.pbC||0).toFixed(2);
@@ -1598,7 +1600,7 @@ function orderRowsFrom(inp){
     if(q>0){
       const sk=slide+'|'+depth;slidePairs[sk]=(slidePairs[sk]||0)+q;
       if(hw==='handle')handles+=q;else if(hw==='latch')latches+=q;
-      const bk=style+'|'+depth;drawerBoxes[bk]=(drawerBoxes[bk]||0)+q;
+      const bk=style+'|'+depth+'|'+(parseFloat(d.width)||0);drawerBoxes[bk]=(drawerBoxes[bk]||0)+q;
     }
   });
   (inp.specialItems||[]).forEach(sp=>{
@@ -1614,13 +1616,13 @@ function orderRowsFrom(inp){
   if(latches>0)rows.push(['Push Latches (Concealed)',latches]);
   if(hinges>0)rows.push(['Hinges',hinges]);
   doorCuts.forEach(r=>rows.push(r));
-  const byTypeDepth=(order)=>(a,b)=>{const[ta,da]=a.split('|'),[tb,db]=b.split('|');
-    return order.indexOf(ta)-order.indexOf(tb)||parseFloat(da)-parseFloat(db);};
+  const byTypeDepth=(order)=>(a,b)=>{const[ta,da,wa]=a.split('|'),[tb,db,wb]=b.split('|');
+    return order.indexOf(ta)-order.indexOf(tb)||parseFloat(da)-parseFloat(db)||(parseFloat(wa)||0)-(parseFloat(wb)||0);};
   const slideName={sc:'Soft-Close',po:'Push-to-Open'},boxName={wf:'White Flat',sh:'Shaker'};
   Object.keys(slidePairs).sort(byTypeDepth(['sc','po'])).forEach(k=>{const[t,d]=k.split('|');
     rows.push([`${d}" ${slideName[t]} Slide Pairs`,slidePairs[k]]);});
-  Object.keys(drawerBoxes).sort(byTypeDepth(['wf','sh'])).forEach(k=>{const[t,d]=k.split('|');
-    rows.push([`${d}" Deep ${boxName[t]} Drawer Boxes`,drawerBoxes[k]]);});
+  Object.keys(drawerBoxes).sort(byTypeDepth(['wf','sh'])).forEach(k=>{const[t,d,w]=k.split('|');
+    rows.push([parseFloat(w)>0?`${d}" Deep x ${w}"W ${boxName[t]} Drawers`:`${d}" Deep ${boxName[t]} Drawers`,drawerBoxes[k]]);});
   Object.keys(pullOuts).sort((a,b)=>parseFloat(a)-parseFloat(b)).forEach(w=>
     rows.push([`Wire Pull-Out Basket — ${w}" Section`,pullOuts[w]]));
   if(flanges>0)rows.push(['Chrome Rod Flanges',flanges]);
@@ -1818,7 +1820,7 @@ function readPricingInputs(){
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{
     drawers.push({type:b.querySelector('.dtype')?.value||'wf',qty:parseFloat(b.querySelector('.dqty')?.value)||0,
       depth:parseFloat(b.querySelector('.ddepth')?.value)||14,slide:b.querySelector('.dslide')?.value||'sc',hw:b.querySelector('.dhw')?.value||'handle',
-      secW:b.querySelector('.dsecw')?.value||'24',cost:parseFloat(b.querySelector('.dcost')?.value)||0,sell:parseFloat(b.querySelector('.dsell')?.value)||0});
+      width:parseFloat(b.querySelector('.dwidth2')?.value)||0,secW:b.querySelector('.dsecw')?.value||'24',cost:parseFloat(b.querySelector('.dcost')?.value)||0,sell:parseFloat(b.querySelector('.dsell')?.value)||0});
   });
   const hardware=[];
   document.querySelectorAll('#hw-items .item-block').forEach(b=>{
@@ -1898,7 +1900,7 @@ function autoDesc(){
   if(doorParts.length)parts.push(doorParts.join(' + ')+' doors');
   let drwCount=0;
   document.querySelectorAll('#drawer-items .item-block').forEach(b=>{drwCount+=parseFloat(b.querySelector('.dqty')?.value)||0;});
-  if(drwCount>0)parts.push(`${drwCount} drawer box${drwCount>1?'es':''}`);
+  if(drwCount>0)parts.push(`${drwCount} drawer${drwCount>1?'s':''}`);
   const hrs=vn('hlp-hrs',8);
   let desc='This proposal covers a custom closet system';
   if(parts.length)desc+=' built with '+parts.join(', ');
@@ -2113,7 +2115,9 @@ function buildProposalLines(){
     const t=b.querySelector('.dtype')?.value,q=parseFloat(b.querySelector('.dqty')?.value)||0;
     if(q<=0)return;
     if(t==='pb'){lines.push({label:`Wire Pull-Out Basket — ${b.querySelector('.dsecw')?.value||'24'}" Section`,qty:q});return;}
-    lines.push({label:`${t==='sh'?'Shaker':'White Flat'} Drawer Boxes`,qty:q});
+    const dw=parseFloat(b.querySelector('.dwidth2')?.value)||0,dd=b.querySelector('.ddepth')?.value||'';
+    const dName=`${t==='sh'?'Shaker':'White Flat'} Drawers`;
+    lines.push({label:dw>0?`${dName} — ${dw}"W x ${dd}"D`:dName,qty:q});
   });
   document.querySelectorAll('#hw-items .item-block').forEach(b=>{
     const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
@@ -2989,6 +2993,7 @@ function loadPricingForJob(jid){
     const sEl=b.querySelector('.msell');if(sEl&&m.sell)sEl.value=m.sell;});
   (inp.doors||[]).forEach(d=>{addDoor();const b=document.getElementById('dr-'+doorIdx);if(b){const sel=b.querySelector('select');if(sel)sel.value=d.style;const sqftEl=b.querySelector('.dsqft');if(sqftEl)sqftEl.value=d.sqft;const muEl=b.querySelector('.dmu');if(muEl){const mv=String(d.mu||P.dMu);if(![...muEl.options].some(o=>o.value===mv))muEl.add(new Option(d.mu+'x',mv));muEl.value=mv;}const countEl=b.querySelector('.dcount');if(countEl)countEl.value=d.count||1;const heightEl=b.querySelector('.dheight');if(heightEl)heightEl.value=d.height||'';const widthEl=b.querySelector('.dwidth');if(widthEl)widthEl.value=d.width||'';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';}});
   (inp.drawers||[]).forEach(d=>{addDrawer();const b=document.getElementById('drw-'+drwIdx);if(b){const sel=b.querySelector('.dtype');if(sel)sel.value=d.type;const qEl=b.querySelector('.dqty');if(qEl)qEl.value=d.qty;const depthEl=b.querySelector('.ddepth');if(depthEl){const dv=String(d.depth||14);if(![...depthEl.options].some(o=>o.value===dv))depthEl.add(new Option(dv+'"',dv));depthEl.value=dv;}const slEl=b.querySelector('.dslide');if(slEl)slEl.value=d.slide||'sc';const hwEl=b.querySelector('.dhw');if(hwEl)hwEl.value=d.hw||'handle';
+    const dwEl=b.querySelector('.dwidth2');if(dwEl)dwEl.value=d.width||'';
     const wEl2=b.querySelector('.dsecw');if(wEl2)wEl2.value=String(d.secW||'24');
     const cEl2=b.querySelector('.dcost');if(cEl2&&d.cost)cEl2.value=d.cost;
     const sEl2=b.querySelector('.dsell');if(sEl2&&d.sell)sEl2.value=d.sell;
