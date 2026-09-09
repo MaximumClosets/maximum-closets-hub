@@ -294,6 +294,46 @@ table.lv tbody tr.lv-arch{opacity:.55}
 #lock .lerr{color:#ff6b6b;font-size:12px;font-weight:600;min-height:16px}
 #lock .lver{color:#3a3f55;font-size:10px;position:absolute;bottom:14px}
 
+/* ── MONEY / BOOKKEEPING — the job P&L strip, payment + cost rows, and the Money page ── */
+.jpl{display:flex;gap:6px;flex-wrap:wrap;padding:8px 15px;border-bottom:1px solid var(--border);background:rgba(74,173,120,0.07)}
+.jpl>div{flex:1;min-width:60px;text-align:center}
+.jpl .k{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.jpl .v{font-size:13px;font-weight:800;color:var(--text);white-space:nowrap}
+.jpl .v.good{color:var(--green)}
+.jpl .v.bad{color:var(--red)}
+.mrow{border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:7px}
+.mrow .top{display:flex;align-items:center;gap:8px}
+.mrow .amt{font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.mrow .meta{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.45}
+.mrow .x{margin-left:auto;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:2px 5px;flex-shrink:0}
+.mrow .dep{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:7px;flex-wrap:wrap}
+.mrow .dep input[type=checkbox]{width:15px;height:15px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
+.mrow .dep input[type=date]{background:var(--input-bg);color:var(--text);border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-size:11px;font-family:inherit}
+.mrow.undep{border-color:var(--orange)}
+.mhd{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px}
+.moneyview{padding:12px 14px 34px;max-width:840px;margin:0 auto}
+.mny-ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.mny-ctrls input,.mny-ctrls select{background:var(--input-bg);color:var(--text);border:1.5px solid var(--border);border-radius:6px;padding:6px 9px;font-size:13px;font-family:inherit;outline:none}
+.mny-ctrls label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.mny-card{background:var(--card-bg);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.mny-card h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:9px}
+.mny-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:9px;margin-bottom:12px}
+.mny-tile{background:var(--card-bg);border:1.5px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.mny-tile .k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:3px}
+.mny-tile .v{font-size:21px;font-weight:800;color:var(--text)}
+.mny-tile .v.good{color:var(--green)}
+.mny-tile .v.bad{color:var(--red)}
+.mny-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)}
+.mny-row:last-child{border-bottom:none}
+.mny-row.tot{font-weight:800}
+.mny-row .n{color:var(--muted)}
+.mny-big{border-radius:var(--r);padding:14px;text-align:center;margin-top:10px;background:linear-gradient(135deg,#1a5c38,#2e7d4f);color:#fff}
+.mny-big.off{background:linear-gradient(135deg,#8a3b12,#c0392b)}
+.mny-big .k{font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.85}
+.mny-big .v{font-size:32px;font-weight:800;letter-spacing:-1px}
+.mny-big .s{font-size:11px;opacity:.85;margin-top:3px}
+.mny-empty{font-size:12px;color:var(--muted)}
+.mny-job{color:var(--text);font-weight:700;cursor:pointer;text-decoration:underline}
 /* ── LIGHT THEME (toggled per-device via ☀️/🌙 button) ── */
 html[data-theme="light"]{
   color-scheme:light;
@@ -371,6 +411,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <span title="Sync status"><span class="sync-dot syncing" id="sync-dot"></span></span>
     <button class="hadd" onclick="lockDevice()" title="Lock this device" style="background:rgba(255,255,255,0.15)">🔒</button>
     <button class="hadd" onclick="openArchive()" title="Archived jobs" style="background:rgba(255,255,255,0.15)">📦 <span id="arch-count">0</span></button>
+    <button class="hadd" id="money-btn" onclick="showMoney()" title="Money — what came in, what went out" style="background:rgba(255,255,255,0.15)">💵 Money</button>
     <button class="hadd" id="view-btn" onclick="toggleView()" title="Switch between the board and a list of every job" style="background:rgba(255,255,255,0.15)">📋 List</button>
     <button class="hadd" id="theme-btn" onclick="toggleTheme()" title="Switch to light theme" style="background:rgba(255,255,255,0.15)">☀️</button>
     <button class="hadd" onclick="openSettings()" style="background:rgba(255,255,255,0.15)">⚙️</button>
@@ -414,6 +455,26 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <div class="lv-wrap"><table class="lv"><thead><tr id="lv-head"></tr></thead><tbody id="lv-body"></tbody></table></div>
 </div>
 
+<!-- MONEY PAGE — month dashboard, cash reconciliation, CSV export. Reachable at #money. -->
+<div class="moneyview" id="moneyview" style="display:none">
+  <div class="mny-ctrls">
+    <label>Month <input type="month" id="mny-month" onchange="mnySetMonth(this.value)"></label>
+    <button class="mc-fbtn" onclick="mnyShiftMonth(-1)">‹ Prev</button>
+    <button class="mc-fbtn" onclick="mnyShiftMonth(1)">Next ›</button>
+    <button class="mc-fbtn" onclick="mnySetMonth(mnyThisMonth())">This month</button>
+  </div>
+  <div id="mny-body"></div>
+  <div class="mny-card">
+    <h3>⬇️ Export to CSV (opens in Excel)</h3>
+    <div class="mny-ctrls" style="margin-bottom:9px">
+      <label>From <input type="date" id="mny-from"></label>
+      <label>To <input type="date" id="mny-to"></label>
+    </div>
+    <button class="gen-btn" onclick="exportMoneyCsv()">⬇️ Export this date range</button>
+    <p class="mny-empty" style="margin-top:7px">One row per payment and one row per cost, with every field filled in. The dates start out matching the month above — change them for any other range.</p>
+  </div>
+</div>
+
 <!-- JOB MODAL -->
 <div class="overlay" id="overlay">
 <div class="modal">
@@ -429,6 +490,8 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <div class="mtab" onclick="mTab('payments')">💵 Payments</div>
     <div class="mtab" onclick="mTab('move')">Move</div>
   </div>
+  <!-- Job P&L — money in vs money out on this job, always on screen while the card is open -->
+  <div class="jpl" id="job-pl" style="display:none"></div>
 
   <!-- INFO -->
   <div class="mtpane on" id="mp-info">
@@ -622,19 +685,45 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     <div class="fld" style="margin-top:16px"><label>Sent history</label><div id="sent-history"></div></div>
   </div>
 
-  <!-- PAYMENTS -->
+  <!-- PAYMENTS & COSTS -->
   <div class="mtpane" id="mp-payments">
-    <div id="pay-summary" style="background:var(--card,#f4f5f7);border-radius:9px;padding:12px 14px;margin-bottom:12px"></div>
-    <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Record a payment</p>
-    <div class="f g2"><div><label>Date</label><input type="date" id="pay-date"/></div>
-      <div><label>Amount</label><input type="number" id="pay-amt" step=".01" inputmode="decimal" placeholder="0.00"/></div></div>
-    <div class="f g2"><div><label>Method</label><select id="pay-method"><option>Check</option><option>Cash</option><option>Zelle</option><option>Card</option><option>Other</option></select></div>
+    <div id="pay-summary" style="background:var(--col-bg);border:1.5px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:12px"></div>
+
+    <p class="mhd" style="margin-top:0">Money in — record a payment</p>
+    <div class="f g2"><div><label>Date *</label><input type="date" id="pay-date"/></div>
+      <div><label>Amount *</label><input type="number" id="pay-amt" step=".01" inputmode="decimal" placeholder="0.00"/></div></div>
+    <div class="f g2"><div><label>How they paid *</label><select id="pay-method">
+        <option value="">— pick one —</option>
+        <option>Cash</option><option>Check</option><option>Zelle</option><option>Venmo</option><option>Credit Card</option><option>Other</option>
+      </select></div>
       <div><label>Type</label><select id="pay-kind"><option value="deposit">Deposit</option><option value="final">Final Payment</option><option value="other">Other</option></select></div></div>
+    <div class="f" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <input type="checkbox" id="pay-dep" onchange="payDepToggle()" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0"/>
+      <label for="pay-dep" style="font-size:13px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0;margin:0">Deposited — this hit the business bank account</label>
+    </div>
+    <div class="f" id="pay-dep-wrap" style="display:none"><label>Deposit date</label><input type="date" id="pay-dep-date"/></div>
     <div class="f"><label>Note (check #, etc.)</label><input type="text" id="pay-note" placeholder="optional"/></div>
     <button class="gen-btn" style="margin-top:4px" onclick="addPayment()">＋ Add Payment</button>
-    <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px">Payments received</p>
+    <p class="mhd">Payments received</p>
     <div id="pay-list"></div>
-    <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px">Documents</p>
+
+    <p class="mhd">Money out — record a cost</p>
+    <div class="f g2"><div><label>Date *</label><input type="date" id="cost-date"/></div>
+      <div><label>Amount *</label><input type="number" id="cost-amt" step=".01" inputmode="decimal" placeholder="0.00"/></div></div>
+    <div class="f"><label>Vendor</label><input type="text" id="cost-vendor" placeholder="e.g. Richelieu"/></div>
+    <div class="f g2"><div><label>Category</label><select id="cost-cat">
+        <option>Material</option><option>Fabrication</option><option>Labor</option><option>Other</option>
+      </select></div>
+      <div><label>Paid by *</label><select id="cost-by">
+        <option value="">— pick one —</option>
+        <option>Business account</option><option>Business card</option><option>Cash</option><option>James personal</option><option>Peter personal</option>
+      </select></div></div>
+    <div class="f"><label>Note</label><input type="text" id="cost-note" placeholder="optional"/></div>
+    <button class="gen-btn" style="margin-top:4px;background:#0079bf" onclick="addCost()">＋ Add Cost</button>
+    <p class="mhd">Costs out</p>
+    <div id="cost-list"></div>
+
+    <p class="mhd">Documents</p>
     <button class="gen-btn" style="background:#0079bf" onclick="previewDoc('invoice')">🧾 Preview Invoice</button>
     <button class="gen-btn" style="background:#1a5c38;margin-top:8px" onclick="previewDoc('receipt')">✅ Preview Receipt</button>
     <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:7px">Same layout as your proposal — with the balance and payment history filled in</p>
@@ -921,6 +1010,7 @@ function boot(){
       if(pw.id&&pw.data)pricingData[pw.id]=pw.data;
     }
     migratePlansToIdb();
+    if(window.seedMoneyDemo)window.seedMoneyDemo();
     render();renderAgenda();
     setSyncDot('on');
   });
@@ -934,6 +1024,7 @@ function boot(){
       if(data.p)P=Object.assign({},DEF,data.p);
       migratePlansToIdb();
     }
+    if(window.seedMoneyDemo)window.seedMoneyDemo();
     render();renderAgenda();
     setSyncDot('on');
   }).catch(()=>{
@@ -2131,27 +2222,74 @@ function buildProposalLines(){
   });
   return lines;
 }
-// ── PAYMENTS ── payments live on the job itself so they sync and survive like everything else
-function jobPayments(job){return (job&&job.payments)||[];}
-function paidTotal(job){return jobPayments(job).reduce((s,p)=>s+(parseFloat(p.amt)||0),0);}
+// ── MONEY (bookkeeping) ─────────────────────────────────────────────────────
+// Payments in and costs out both live ON the job itself, so they sync, back up and
+// get deleted with the job. There is no separate ledger that could drift out of sync.
+// Amounts are stored as plain numbers; dates are stored as ISO text (YYYY-MM-DD).
+const PAY_METHODS=['Cash','Check','Zelle','Venmo','Credit Card','Other'];
+const COST_CATS=['Material','Fabrication','Labor','Other'];
+const PAID_BY=['Business account','Business card','Cash','James personal','Peter personal'];
+
+function jobPayments(job){return (job&&Array.isArray(job.payments))?job.payments:[];}
+function jobCosts(job){return (job&&Array.isArray(job.costs))?job.costs:[];}
+function paidTotal(job){return jobPayments(job).reduce((s,p)=>s+num(p.amt),0);}
+function costTotal(job){return jobCosts(job).reduce((s,c)=>s+num(c.amt),0);}
+function num(v){const n=parseFloat(v);return isFinite(n)?n:0;}
 function money(n){return '$'+(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function money0(n){return '$'+Math.round(n||0).toLocaleString('en-US');}
+function isoDate(v){return (typeof v==='string'&&/^\d{4}-\d{2}-\d{2}/.test(v))?v.slice(0,10):'';}
+function niceDate(v){const d=isoDate(v);return d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';}
+
+// Tidy up older records so every amount is a number and every method is one of the six.
+// Runs on every load because a sync from another device replaces the whole jobs list.
+const METHOD_FIX={'Card':'Credit Card','Credit card':'Credit Card','CC':'Credit Card','Check ':'Check'};
+function migrateMoney(){
+  let changed=false;
+  jobs.forEach(job=>{
+    if(job.payments&&!Array.isArray(job.payments)){job.payments=Object.values(job.payments);changed=true;}
+    if(job.costs&&!Array.isArray(job.costs)){job.costs=Object.values(job.costs);changed=true;}
+    jobPayments(job).forEach(p=>{
+      if(typeof p.amt!=='number'){p.amt=num(p.amt);changed=true;}
+      if(METHOD_FIX[p.method]){p.method=METHOD_FIX[p.method];changed=true;}
+      if(p.deposited===undefined){p.deposited=false;changed=true;}
+      if(p.depositDate===undefined){p.depositDate='';changed=true;}
+    });
+    jobCosts(job).forEach(c=>{if(typeof c.amt!=='number'){c.amt=num(c.amt);changed=true;}});
+  });
+  return changed;
+}
+
 // The proposal number is created once and stored, so an invoice and its proposal always match
 function ensurePropNum(job){
   if(!job.propNum){job.propNum='MC-'+Date.now().toString().slice(-6);saveData();}
   return job.propNum;
 }
+
+function payDepToggle(){
+  const on=document.getElementById('pay-dep').checked;
+  const wrap=document.getElementById('pay-dep-wrap');
+  wrap.style.display=on?'':'none';
+  const d=document.getElementById('pay-dep-date');
+  if(on&&d&&!d.value)d.value=document.getElementById('pay-date').value||todayStr();
+}
 function addPayment(){
   const job=jobs.find(j=>j.id===editId);if(!job){alert('Save the job first.');return;}
-  const amt=parseFloat(document.getElementById('pay-amt').value)||0;
+  const date=document.getElementById('pay-date').value;
+  if(!date){alert('Pick the date this payment came in.');return;}
+  const amt=num(document.getElementById('pay-amt').value);
   if(amt<=0){alert('Enter an amount.');return;}
-  const date=document.getElementById('pay-date').value||todayStr();
   const method=document.getElementById('pay-method').value;
+  if(!method){alert('Pick how they paid — cash, check, Zelle, Venmo, credit card or other. Nothing is guessed for you.');return;}
+  const deposited=document.getElementById('pay-dep').checked;
+  const depositDate=deposited?(document.getElementById('pay-dep-date').value||''):'';
   const kind=document.getElementById('pay-kind').value;
-  const note=document.getElementById('pay-note').value||'';
-  if(!job.payments)job.payments=[];
-  job.payments.push({id:uid(),date,amt,method,kind,note});
-  job.payments.sort((a,b)=>a.date.localeCompare(b.date));
+  const note=document.getElementById('pay-note').value.trim();
+  if(!Array.isArray(job.payments))job.payments=[];
+  job.payments.push({id:uid(),date,amt,method,kind,deposited,depositDate,note});
+  job.payments.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   document.getElementById('pay-amt').value='';document.getElementById('pay-note').value='';
+  document.getElementById('pay-method').value='';
+  document.getElementById('pay-dep').checked=false;document.getElementById('pay-dep-date').value='';payDepToggle();
   saveData();renderPayments();render();
 }
 function deletePayment(pid){
@@ -2160,21 +2298,259 @@ function deletePayment(pid){
   job.payments=jobPayments(job).filter(p=>p.id!==pid);
   saveData();renderPayments();render();
 }
+// Tick / untick "deposited" straight from the list, and set the date it landed.
+function setPayDeposited(pid,on){
+  const job=jobs.find(j=>j.id===editId);if(!job)return;
+  const pay=jobPayments(job).find(p=>p.id===pid);if(!pay)return;
+  pay.deposited=!!on;
+  if(on&&!pay.depositDate)pay.depositDate=todayStr();
+  if(!on)pay.depositDate='';
+  saveData();renderPayments();render();
+}
+function setPayDepositDate(pid,v){
+  const job=jobs.find(j=>j.id===editId);if(!job)return;
+  const pay=jobPayments(job).find(p=>p.id===pid);if(!pay)return;
+  pay.depositDate=isoDate(v);
+  saveData();renderPayments();
+}
+
+function addCost(){
+  const job=jobs.find(j=>j.id===editId);if(!job){alert('Save the job first.');return;}
+  const date=document.getElementById('cost-date').value;
+  if(!date){alert('Pick the date of this cost.');return;}
+  const amt=num(document.getElementById('cost-amt').value);
+  if(amt<=0){alert('Enter an amount.');return;}
+  const paidBy=document.getElementById('cost-by').value;
+  if(!paidBy){alert('Pick who paid for this — business account, business card, cash, James personal or Peter personal.');return;}
+  const vendor=document.getElementById('cost-vendor').value.trim();
+  const category=document.getElementById('cost-cat').value;
+  const note=document.getElementById('cost-note').value.trim();
+  if(!Array.isArray(job.costs))job.costs=[];
+  job.costs.push({id:uid(),date,amt,vendor,category,paidBy,note});
+  job.costs.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  ['cost-amt','cost-vendor','cost-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cost-by').value='';
+  saveData();renderPayments();render();
+}
+function deleteCost(cid){
+  const job=jobs.find(j=>j.id===editId);if(!job)return;
+  if(!confirm('Remove this cost?'))return;
+  job.costs=jobCosts(job).filter(c=>c.id!==cid);
+  saveData();renderPayments();render();
+}
+
+// The small P&L strip that sits under the tabs while a job card is open.
+function renderJobPL(){
+  const el=document.getElementById('job-pl');if(!el)return;
+  const job=jobs.find(j=>j.id===editId);
+  if(!job){el.style.display='none';return;}
+  const total=num(job.sale),paid=paidTotal(job),costs=costTotal(job);
+  const profit=total-costs,marg=total>0?Math.round(profit/total*100):0;
+  el.style.display='flex';
+  el.innerHTML=`<div><div class="k">Job total</div><div class="v">${money0(total)}</div></div>
+    <div><div class="k">Received</div><div class="v good">${money0(paid)}</div></div>
+    <div><div class="k">Costs out</div><div class="v bad">${money0(costs)}</div></div>
+    <div><div class="k">Profit</div><div class="v ${profit<0?'bad':'good'}">${money0(profit)}</div></div>
+    <div><div class="k">Margin</div><div class="v">${total>0?marg+'%':'—'}</div></div>`;
+}
+
 function renderPayments(){
   const job=jobs.find(j=>j.id===editId);if(!job)return;
-  const total=job.sale||0,paid=paidTotal(job),bal=total-paid;
+  const total=num(job.sale),paid=paidTotal(job),bal=total-paid;
   const dateEl=document.getElementById('pay-date');if(dateEl&&!dateEl.value)dateEl.value=todayStr();
+  const cDateEl=document.getElementById('cost-date');if(cDateEl&&!cDateEl.value)cDateEl.value=todayStr();
+  // Job total / paid to date / balance due — the one place the balance is worked out.
   const sum=document.getElementById('pay-summary');
   if(sum)sum.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>Job Total</span><span>${money(total)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>Paid</span><span style="color:#1a5c38;font-weight:700">${money(paid)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;border-top:1px solid var(--border);padding-top:6px"><span>${bal<=0.005?'Paid in Full':'Balance Due'}</span><span style="color:${bal<=0.005?'#1a5c38':'#c0392b'}">${money(Math.max(0,bal))}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>Paid to date</span><span style="color:var(--green);font-weight:700">${money(paid)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;border-top:1px solid var(--border);padding-top:6px"><span>${bal<=0.005?'Paid in Full':'Balance Due'}</span><span style="color:${bal<=0.005?'var(--green)':'var(--red)'}">${money(Math.max(0,bal))}</span></div>
     ${total?`<div style="font-size:11px;color:var(--muted);margin-top:5px">50% deposit would be ${money(total/2)}</div>`:'<div style="font-size:11px;color:var(--muted);margin-top:5px">Add pricing in the Pricing tab to see a balance.</div>'}`;
-  const list=document.getElementById('pay-list');if(!list)return;
-  const ps=jobPayments(job);
-  list.innerHTML=ps.length?ps.map(p=>`<div class="srow" style="align-items:center">
-    <span class="sl" style="flex:1;text-align:left">${new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — <strong>${money(parseFloat(p.amt)||0)}</strong> · ${p.method}${p.note?' · '+p.note:''}</span>
-    <button class="mv-btn" onclick="deletePayment('${p.id}')">✕</button></div>`).join(''):'<p style="font-size:12px;color:var(--muted)">No payments recorded yet.</p>';
+  const list=document.getElementById('pay-list');
+  if(list){
+    const ps=jobPayments(job);
+    list.innerHTML=ps.length?ps.map(p=>{
+      const cashUndep=p.method==='Cash'&&!p.deposited;
+      return `<div class="mrow${cashUndep?' undep':''}">
+        <div class="top"><span class="amt">${money(num(p.amt))}</span>
+          <span style="font-size:12px;color:var(--text)">${driveEsc(p.method||'—')}</span>
+          <button class="x" title="Remove this payment" onclick="deletePayment('${p.id}')">✕</button></div>
+        <div class="meta">${niceDate(p.date)}${p.kind?' · '+driveEsc(PAY_KIND[p.kind]||p.kind):''}${p.note?' · '+driveEsc(p.note):''}</div>
+        <div class="dep"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" ${p.deposited?'checked':''} onchange="setPayDeposited('${p.id}',this.checked)"> Deposited</label>
+          ${p.deposited?`<input type="date" value="${isoDate(p.depositDate)}" onchange="setPayDepositDate('${p.id}',this.value)" title="Date it hit the bank">`:(cashUndep?'<span style="color:var(--orange);font-weight:700">⚠️ cash still in hand</span>':'')}</div>
+      </div>`;}).join(''):'<p class="mny-empty">No payments recorded yet.</p>';
+  }
+  const clist=document.getElementById('cost-list');
+  if(clist){
+    const cs=jobCosts(job);
+    clist.innerHTML=cs.length?cs.map(c=>`<div class="mrow">
+      <div class="top"><span class="amt">${money(num(c.amt))}</span>
+        <span style="font-size:12px;color:var(--text)">${driveEsc(c.category||'Other')}</span>
+        <button class="x" title="Remove this cost" onclick="deleteCost('${c.id}')">✕</button></div>
+      <div class="meta">${niceDate(c.date)}${c.vendor?' · '+driveEsc(c.vendor):''} · paid by ${driveEsc(c.paidBy||'—')}${c.note?' · '+driveEsc(c.note):''}</div>
+    </div>`).join(''):'<p class="mny-empty">No costs recorded yet.</p>';
+  }
+  renderJobPL();
 }
+const PAY_KIND={deposit:'Deposit',final:'Final Payment',other:'Other'};
+
+// ── MONEY PAGE (#money) — the month dashboard, cash reconciliation and CSV export ──
+function mnyThisMonth(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+let mnyMonth=mnyThisMonth();
+function mnyMonthLabel(m){const[y,mo]=String(m).split('-');return new Date(+y,+mo-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});}
+function mnyMonthStart(m){return m+'-01';}
+function mnyMonthEnd(m){const[y,mo]=String(m).split('-').map(Number);return m+'-'+String(new Date(y,mo,0).getDate()).padStart(2,'0');}
+function mnySetMonth(v){
+  if(!/^\d{4}-\d{2}$/.test(v||''))return;
+  mnyMonth=v;
+  const f=document.getElementById('mny-from'),t=document.getElementById('mny-to');
+  if(f)f.value=mnyMonthStart(mnyMonth);
+  if(t)t.value=mnyMonthEnd(mnyMonth);
+  renderMoney();
+}
+function mnyShiftMonth(n){
+  const[y,mo]=mnyMonth.split('-').map(Number);
+  const d=new Date(y,mo-1+n,1);
+  mnySetMonth(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+}
+// Every payment and every cost across every job, flattened, so the dashboard can add them up.
+// Archived jobs are included — the money still happened.
+function moneyRows(){
+  const out=[];
+  jobs.forEach(job=>{
+    jobPayments(job).forEach(p=>out.push({kind:'payment',job,id:p.id,date:isoDate(p.date),amt:num(p.amt),
+      method:p.method||'',payKind:PAY_KIND[p.kind]||p.kind||'',deposited:!!p.deposited,depositDate:isoDate(p.depositDate),note:p.note||''}));
+    jobCosts(job).forEach(c=>out.push({kind:'cost',job,id:c.id,date:isoDate(c.date),amt:num(c.amt),
+      vendor:c.vendor||'',category:c.category||'',paidBy:c.paidBy||'',note:c.note||''}));
+  });
+  return out.sort((a,b)=>a.date.localeCompare(b.date));
+}
+function mnyInRange(r,from,to){return r.date&&r.date>=from&&r.date<=to;}
+function mnyBreakdown(rows,key,keys){
+  const map={};keys.forEach(k=>map[k]=0);
+  rows.forEach(r=>{const k=(r[key]||'Other');map[k]=(map[k]||0)+r.amt;});
+  return Object.keys(map).map(k=>({k,v:map[k]}));
+}
+function renderMoney(){
+  const body=document.getElementById('mny-body');if(!body)return;
+  const sel=document.getElementById('mny-month');if(sel&&sel.value!==mnyMonth)sel.value=mnyMonth;
+  const from=mnyMonthStart(mnyMonth),to=mnyMonthEnd(mnyMonth);
+  const all=moneyRows();
+  const inMonth=all.filter(r=>mnyInRange(r,from,to));
+  const pays=inMonth.filter(r=>r.kind==='payment'),costs=inMonth.filter(r=>r.kind==='cost');
+  const received=pays.reduce((s,r)=>s+r.amt,0),out=costs.reduce((s,r)=>s+r.amt,0),profit=received-out;
+  // Cash reconciliation — cash taken in this month vs the part of it that reached the bank.
+  const cash=pays.filter(r=>r.method==='Cash');
+  const cashIn=cash.reduce((s,r)=>s+r.amt,0);
+  const cashDep=cash.filter(r=>r.deposited).reduce((s,r)=>s+r.amt,0);
+  const cashDiff=cashIn-cashDep;
+  // Undeposited cash across all time, not just this month — old cash must not vanish off this page.
+  const openCash=all.filter(r=>r.kind==='payment'&&r.method==='Cash'&&!r.deposited);
+  const openCashTot=openCash.reduce((s,r)=>s+r.amt,0);
+  const rowsHtml=(list,empty)=>list.filter(x=>x.v>0.005).length
+    ? list.filter(x=>x.v>0.005).sort((a,b)=>b.v-a.v).map(x=>`<div class="mny-row"><span class="n">${driveEsc(x.k)}</span><span>${money(x.v)}</span></div>`).join('')
+    : `<p class="mny-empty">${empty}</p>`;
+  body.innerHTML=`
+    <div class="mny-tiles">
+      <div class="mny-tile"><div class="k">Received</div><div class="v good">${money0(received)}</div></div>
+      <div class="mny-tile"><div class="k">Costs out</div><div class="v bad">${money0(out)}</div></div>
+      <div class="mny-tile"><div class="k">Gross profit</div><div class="v ${profit<0?'bad':'good'}">${money0(profit)}</div></div>
+    </div>
+    <p class="mny-empty" style="margin:-4px 0 12px">${mnyMonthLabel(mnyMonth)} · gross profit is money received minus costs out for the month.</p>
+
+    <div class="mny-card"><h3>Received — how it came in</h3>
+      ${rowsHtml(mnyBreakdown(pays,'method',PAY_METHODS),'No payments recorded in this month.')}
+      ${received>0.005?`<div class="mny-row tot"><span>Total received</span><span>${money(received)}</span></div>`:''}
+    </div>
+
+    <div class="mny-card"><h3>Costs out — where it went</h3>
+      ${rowsHtml(mnyBreakdown(costs,'category',COST_CATS),'No costs recorded in this month.')}
+      ${out>0.005?`<div class="mny-row tot"><span>Total costs out</span><span>${money(out)}</span></div>`:''}
+      ${out>0.005?`<h3 style="margin-top:12px">Who paid for it</h3>`+rowsHtml(mnyBreakdown(costs,'paidBy',PAID_BY),''):''}
+    </div>
+
+    <div class="mny-card"><h3>💵 Cash reconciliation — ${mnyMonthLabel(mnyMonth)}</h3>
+      <div class="mny-row"><span class="n">Cash received</span><span>${money(cashIn)}</span></div>
+      <div class="mny-row"><span class="n">Of that, marked deposited</span><span>${money(cashDep)}</span></div>
+      <div class="mny-big ${cashDiff>0.005?'off':''}">
+        <div class="k">Cash taken in, not yet in the bank</div>
+        <div class="v">${money(cashDiff)}</div>
+        <div class="s">${cashDiff>0.005?'This much cash from this month has not been marked as deposited.':'Every cash payment this month is marked deposited.'}</div>
+      </div>
+    </div>
+
+    <div class="mny-card"><h3>Cash not deposited — every month, not just this one</h3>
+      ${openCash.length?openCash.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="mny-row">
+        <span><span class="mny-job" onclick="openEdit('${r.job.id}')">${driveEsc(r.job.name||'(no name)')}</span>
+          <span class="n"> · ${niceDate(r.date)}${r.note?' · '+driveEsc(r.note):''}</span></span>
+        <span style="white-space:nowrap;font-weight:700">${money(r.amt)}</span></div>`).join('')
+        +`<div class="mny-row tot"><span>Total cash still in hand</span><span>${money(openCashTot)}</span></div>`
+      :'<p class="mny-empty">Nothing outstanding — every cash payment on every job is marked deposited.</p>'}
+    </div>`;
+}
+function exportMoneyCsv(){
+  const from=document.getElementById('mny-from').value||mnyMonthStart(mnyMonth);
+  const to=document.getElementById('mny-to').value||mnyMonthEnd(mnyMonth);
+  if(from>to){alert('The "From" date is after the "To" date — swap them and try again.');return;}
+  const rows=moneyRows().filter(r=>mnyInRange(r,from,to));
+  if(!rows.length){alert('There is nothing recorded between '+from+' and '+to+' yet.');return;}
+  const head=['Type','Date','Customer','Job Stage','Amount','Payment Method','Payment Type','Deposited','Deposit Date',
+    'Vendor','Category','Paid By','Note','Job Total','Job Address'];
+  const body=rows.map(r=>r.kind==='payment'
+    ?['Payment received',csvDate(r.date),r.job.name,STAGES[r.job.stage]||'',csvMoney(r.amt),r.method,r.payKind,
+      r.deposited?'Yes':'No',csvDate(r.depositDate),'','','',r.note,csvMoney(r.job.sale),r.job.addr]
+    :['Cost paid',csvDate(r.date),r.job.name,STAGES[r.job.stage]||'',csvMoney(r.amt),'','','','',
+      r.vendor,r.category,r.paidBy,r.note,csvMoney(r.job.sale),r.job.addr]);
+  const csv=[head,...body].map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n';
+  triggerDownload(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),'Maximum_Closets_money_'+from+'_to_'+to+'.csv');
+}
+// Blank the payment / cost entry boxes so nothing carries over from the last job you had open.
+function resetMoneyForm(){
+  ['pay-amt','pay-note','pay-dep-date','cost-amt','cost-vendor','cost-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const m=document.getElementById('pay-method');if(m)m.value='';
+  const b=document.getElementById('cost-by');if(b)b.value='';
+  const k=document.getElementById('pay-kind');if(k)k.value='deposit';
+  const c=document.getElementById('cost-cat');if(c)c.value='Material';
+  const d=document.getElementById('pay-dep');if(d)d.checked=false;
+  const w=document.getElementById('pay-dep-wrap');if(w)w.style.display='none';
+  ['pay-date','cost-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=todayStr();});
+}
+
+// ── SAMPLE JOB ── one throwaway job with two payments and two costs, added once so the
+// Money page has something to show. Delete it from its card (Move tab → 🗑 Delete Job)
+// and it will not come back.
+const DEMO_JOB_ID='money-demo-job';
+function seedMoneyDemo(){
+  if(P.moneyDemoSeeded)return;
+  if(!jobs.some(j=>j.id===DEMO_JOB_ID)){
+    const d=new Date(),ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const day=n=>ym+'-'+String(n).padStart(2,'0');
+    jobs.unshift({id:DEMO_JOB_ID,name:'TEST JOB — delete me',stage:5,assignedTo:'James',source:'Other',
+      phone:'',email:'',addr:'1 Sample Street, Amityville NY 11701',
+      notes:'Sample job so you can see the Money page working. Delete it whenever you like — open this card, go to the Move tab and tap Delete Job.',
+      labels:[],sale:6000,cost:0,stageAt:Date.now(),createdAt:Date.now(),
+      payments:[
+        {id:'demo-p1',date:day(3),amt:3000,method:'Check',kind:'deposit',deposited:true,depositDate:day(4),note:'Check #1042 — deposit'},
+        {id:'demo-p2',date:day(18),amt:1500,method:'Cash',kind:'final',deposited:false,depositDate:'',note:'Cash on install day — still in hand'}
+      ],
+      costs:[
+        {id:'demo-c1',date:day(5),amt:820,vendor:'Richelieu',category:'Material',paidBy:'Business card',note:'Melamine and hardware'},
+        {id:'demo-c2',date:day(17),amt:400,vendor:'Miguel',category:'Labor',paidBy:'Cash',note:'Helper, install day'}
+      ]});
+    // One priced line so the $6,000 job total is real — the total is always worked out from
+    // the Pricing tab, so a job with no pricing would drop back to $0 the moment you close it.
+    pricingData[DEMO_JOB_ID]={inputs:{melamine:[],doors:[],drawers:[],hardware:[],
+      specialItems:[{itemIdx:'other',customName:'Sample walk-in closet (test data)',qty:1,cost:1220,sell:6000,hamperWidth:'24'}],
+      hlpHrs:0,hlpRate:P.hlpRate,leadPct:P.leadPct,ownerPct:0,
+      addr:'1 Sample Street, Amityville NY 11701',pDisc:'',pTax:'',
+      pNotes:'This is sample data — delete this job whenever you like.',
+      pDesc:'Sample walk-in closet, added so the Money page has something to show.',pPlans:false}};
+    saveData();
+  }
+  P.moneyDemoSeeded=true;saveP(P);
+  if(window.fbSave)window.fbSave();
+}
+
+
 function getProposalData(){
   const job=jobs.find(j=>j.id===editId);if(!job)return null;
   const sale=melSl+doorSl+drwSl+hwSl+spSl;if(!sale){alert('Add pricing in the Pricing tab first.');return null;}
@@ -2876,26 +3252,46 @@ function renderList(){
   if(cnt)cnt.textContent=`${rows.length} job${rows.length===1?'':'s'} · $${Math.round(tot).toLocaleString()} total · $${Math.round(owed).toLocaleString()} owed`;
 }
 function applyView(){
-  const list=lvView==='list';
-  const b=document.getElementById('board'),lv=document.getElementById('listview'),btn=document.getElementById('view-btn');
-  if(b)b.style.display=list?'none':'';
+  const list=lvView==='list',mny=lvView==='money';
+  const b=document.getElementById('board'),lv=document.getElementById('listview'),mv=document.getElementById('moneyview');
+  const btn=document.getElementById('view-btn'),mbtn=document.getElementById('money-btn'),fil=document.getElementById('mc-filter');
+  if(b)b.style.display=(list||mny)?'none':'';
   if(lv)lv.style.display=list?'':'none';
+  if(mv)mv.style.display=mny?'':'none';
+  if(fil)fil.style.display=mny?'none':'';          // the board search bar means nothing on the Money page
   if(btn)btn.textContent=list?'🗂 Board':'📋 List';
+  if(mbtn)mbtn.style.background=mny?'rgba(74,173,120,0.85)':'rgba(255,255,255,0.15)';
+  // Keep the address bar in step so #money can be bookmarked, without leaving a stray '#' behind.
+  try{const want=mny?'#money':'';if(location.hash!==want&&(mny||location.hash==='#money'))history.replaceState(null,'',location.pathname+location.search+want);}catch(e){}
   if(list)renderList();
+  if(mny){
+    const f=document.getElementById('mny-from'),t=document.getElementById('mny-to');
+    if(f&&!f.value)f.value=mnyMonthStart(mnyMonth);
+    if(t&&!t.value)t.value=mnyMonthEnd(mnyMonth);
+    renderMoney();
+  }
 }
-function toggleView(){
-  lvView=lvView==='list'?'board':'list';
+function setView(v){
+  lvView=v;
   try{localStorage.setItem('mc-view',lvView);}catch(e){}
   applyView();
 }
+function toggleView(){setView(lvView==='list'?'board':'list');}
+// The Money page. It also answers to the #money link, so you can bookmark it.
+function showMoney(){setView(lvView==='money'?'board':'money');}
 function initView(){
   try{
-    const v=localStorage.getItem('mc-view');if(v==='list')lvView='list';
+    const v=localStorage.getItem('mc-view');if(v==='list'||v==='money')lvView=v;
     const st=(localStorage.getItem('mc-sort')||'').split(':');
     if(st.length===2&&st[0])lvSort={k:st[0],d:st[1]==='asc'?'asc':'desc'};
   }catch(e){}
+  if((location.hash||'').replace('#','')==='money')lvView='money';
   applyView();
 }
+window.addEventListener('hashchange',()=>{
+  const want=(location.hash||'').replace('#','')==='money'?'money':(lvView==='money'?'board':lvView);
+  if(want!==lvView)setView(want);
+});
 // Small "📅 Aug 24 · 13 days ago" line shown on Lead / Customer cards only. Text only, no colouring.
 function leadAgeLine(job){
   const raw=job.stageAt||job.createdAt||(job.date?job.date+'T12:00:00':0);
@@ -2910,7 +3306,7 @@ function leadAgeLine(job){
   return `<div class="card-src">📅 ${ds} · <span class="age-pill">${age}</span></div>`;
 }
 function render(){
-  if(sweepJobs())saveData();
+  if(migrateMoney()|sweepJobs())saveData();
   const board=document.getElementById('board');board.innerHTML='';
   STAGES.forEach((stage,si)=>{
     const sj=jobs.filter(j=>j.stage===si&&!j.archived&&mcMatch(j));
@@ -2953,7 +3349,8 @@ function render(){
   const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
   if(ac&&ac.parentElement)ac.parentElement.style.background=jobs.some(checkBackDue)?'rgba(242,165,0,0.85)':'rgba(255,255,255,0.15)';
   if(lvView==='list')renderList();
-  if(editId)renderOrderList();   // keeps the open card's order list live when the other phone ticks a box
+  if(lvView==='money')renderMoney();
+  if(editId){renderOrderList();renderJobPL();}   // keeps the open card's order list live when the other phone ticks a box
 }
 
 function mTab(name){
@@ -3029,11 +3426,12 @@ function openAdd(stage=0){
   document.getElementById('f-assigned').value=WHO_LABEL[WHO_KEY(getWho())];
   document.querySelectorAll('.lopt').forEach(el=>el.classList.remove('on'));
   document.getElementById('p-addr').value='';document.getElementById('p-notes').value='';document.getElementById('p-disc').value='';
-  document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';
+  document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';resetMoneyForm();
   proposalImages=[];renderProposalImagePreview();
   proposalPlansPdf=null;renderPlansPdfPreview();
   customerPhotos=[];cpDirty=false;clearTimeout(cpTimer);renderCustomerPhotos();
   driveState.kcd.editing=false;driveState.pdf.editing=false;driveRenderBox('kcd');driveRenderBox('pdf');
+  const jpl=document.getElementById('job-pl');if(jpl)jpl.style.display='none';
   mTab('info');document.getElementById('overlay').classList.add('open');
   setTimeout(()=>document.getElementById('f-name').focus(),100);
 }
@@ -3055,9 +3453,11 @@ function openEdit(id){
   if(mvR)mvR.style.display=job.archived?'block':'none';
   document.getElementById('p-notes').value='';document.getElementById('p-addr').value='';document.getElementById('p-disc').value='';
   docMode='proposal';
+  resetMoneyForm();
   resetPricing();loadPricingForJob(id);renderSchedList(id);cpOpen(id);mTab('info');
   if(job.addr)document.getElementById('p-addr').value=job.addr;
   driveState.kcd.editing=false;driveState.pdf.editing=false;driveRenderBox('kcd');driveRenderBox('pdf');
+  renderJobPL();
   document.getElementById('overlay').classList.add('open');
 }
 function toggleLbl(el){const v=el.dataset.v;el.classList.toggle('on');selLbls=selLbls.includes(v)?selLbls.filter(l=>l!==v):[...selLbls,v];}
@@ -3283,6 +3683,7 @@ function closeModal(){
     if(window.fbFlush)window.fbFlush();
   }
   document.getElementById('overlay').classList.remove('open');editId=null;
+  const jpl=document.getElementById('job-pl');if(jpl)jpl.style.display='none';
 }
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
 
