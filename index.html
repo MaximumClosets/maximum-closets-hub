@@ -464,14 +464,12 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     </div>
     <div class="f"><label>Labels</label>
       <div class="lbl-pick">
-        <div class="lopt new" data-v="new" onclick="toggleLbl(this)">New Lead</div>
         <div class="lopt plans" data-v="plans" onclick="toggleLbl(this)">Need Plans Sent</div>
         <div class="lopt followup" data-v="followup" onclick="toggleLbl(this)">Follow Up Soon</div>
         <div class="lopt ontrack" data-v="ontrack" onclick="toggleLbl(this)">Final Payment Received</div>
         <div class="lopt design" data-v="design" onclick="toggleLbl(this)">Needs go back</div>
         <div class="lopt inprog" data-v="inprog" onclick="toggleLbl(this)">In Progress</div>
         <div class="lopt finalpay" data-v="finalpay" onclick="toggleLbl(this)">Final Payment Due</div>
-        <div class="lopt repeat" data-v="repeat" onclick="toggleLbl(this)">Repeat Customer</div>
         <div class="lopt sure" data-v="sure" onclick="toggleLbl(this)">Sure Thing</div>
       </div>
     </div>
@@ -3050,7 +3048,15 @@ function openEdit(id){
   driveState.kcd.editing=false;driveState.pdf.editing=false;driveRenderBox('kcd');driveRenderBox('pdf');
   document.getElementById('overlay').classList.add('open');
 }
-function toggleLbl(el){const v=el.dataset.v;el.classList.toggle('on');selLbls=selLbls.includes(v)?selLbls.filter(l=>l!==v):[...selLbls,v];}
+function toggleLbl(el){
+  const v=el.dataset.v,wasOn=el.classList.contains('on');
+  // Final Payment Due is separate — it only controls archive exemption, so it toggles on its own
+  if(v==='finalpay'){el.classList.toggle('on',!wasOn);selLbls=wasOn?selLbls.filter(l=>l!=='finalpay'):[...selLbls,'finalpay'];return;}
+  // Every other label is single-select — picking one replaces whatever was picked before
+  const keep=selLbls.filter(l=>l==='finalpay');
+  selLbls=wasOn?keep:[...keep,v];
+  document.querySelectorAll('.lopt').forEach(x=>{if(x.dataset.v!=='finalpay')x.classList.toggle('on',selLbls.includes(x.dataset.v));});
+}
 
 // ── DRIVE FILE PICKERS — link each job to files in the shared Drive (KCD .job file + plans PDF) ──
 const DRIVE_CFG={
