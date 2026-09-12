@@ -2876,20 +2876,28 @@ function render(){
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
       const pr=getProgress(job.id,si);const hasL=(CL[si]||[]).length>0&&pr.tot>0;
-      const op=orderProgress(job);const opChip=op.tot?`<span class="chip">📦 ${op.done}/${op.tot}</span>`:'';
-      const phChip=job.photoCount>0?`<span class="chip">📷 ${job.photoCount}</span>`:'';
+      const op=orderProgress(job);
+      // A card at rest should be boring. The date chip only earns its place when the job is overdue or due inside a week.
+      const dayOff=job.date?Math.round((new Date(new Date(job.date+'T12:00:00').setHours(0,0,0,0))-new Date(new Date().setHours(0,0,0,0)))/86400000):null;
+      const upSch=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});
+      // Most useful first, capped at three, so one glance tells you what is wrong or due.
+      const chips=[];
+      if(ds&&(ov||(dayOff!==null&&dayOff>=0&&dayOff<=7)))chips.push(`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`);
+      upSch.forEach(it=>chips.push(`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`));
+      if(hasL)chips.push(`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`);
+      if(op.tot)chips.push(`<span class="chip">📦 ${op.done}/${op.tot}</span>`);
+      if(job.photoCount>0)chips.push(`<span class="chip">📷 ${job.photoCount}</span>`);
+      const chipRow=chips.length?`<div class="card-meta">${chips.slice(0,3).join(' ')}${chips.length>3?` <span class="chip">+${chips.length-3}</span>`:''}</div>`:'';
       card.innerHTML=`<button class="card-pri${job.pri?' on':''}" title="${job.pri?'Priority — tap to clear':'Flag as priority'}" onclick="event.stopPropagation();togglePri('${job.id}')" ontouchend="event.stopPropagation()"><span class="pri-g">⚡</span></button>
         <button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
-        ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
-        ${(()=>{const pd=paidTotal(job),tot=job.sale||0;if(!pd)return'';const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;})()}
-        ${job.source?`<div class="card-src">📌 ${job.source}${job.refBy?` — ${job.refBy}`:''}</div>`:''}
-        ${job.notes?`<div class="card-src" style="font-style:italic">${job.notes.slice(0,50)}${job.notes.length>50?'…':''}</div>`:''}
-        ${ds||hasL||opChip||phChip?`<div class="card-meta">${ds?`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`:''} ${hasL?`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`:''} ${opChip}${phChip?' '+phChip:''}</div>`:''}
+        ${(()=>{const pd=paidTotal(job),tot=job.sale||0;
+          if(pd>0){const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;}
+          return tot>0?`<div class="card-val">$${tot.toLocaleString()}</div>`:'';})()}
+        ${chipRow}
         ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="openKcdFile('${job.id}',this,event)" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
-        ${(()=>{const up=(schedData[job.id]||[]).filter(it=>{const today=new Date();today.setHours(0,0,0,0);const d=new Date(it.date+'T12:00:00');d.setHours(0,0,0,0);return Math.round((d-today)/86400000)>=-1&&Math.round((d-today)/86400000)<=1;});return up.length?`<div class="card-meta" style="margin-top:4px">${up.map(it=>`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`).join('')}</div>`:''})()}
         ${si<=1?leadAgeLine(job):''}`;
       ce.appendChild(card);
     });
