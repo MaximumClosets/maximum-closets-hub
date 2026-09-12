@@ -91,16 +91,6 @@ table.lv tbody tr.lv-arch{opacity:.55}
 .card{background:var(--card-bg);border-radius:8px;padding:9px 26px 9px 10px;margin-bottom:7px;box-shadow:var(--shadow);cursor:pointer;position:relative}
 .card:hover{box-shadow:0 3px 10px rgba(0,0,0,0.18)}
 .card.reviewed{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow);background:linear-gradient(0deg,rgba(57,255,158,0.1),rgba(57,255,158,0.1)),var(--card-bg)}
-/* Assigned-to owner: 7px colored left stripe + a subtle colour wash + a soft glow, keeping the dark card background so text/checkbox stay readable. */
-.card.owner-james{border-left:7px solid #4a8fbf;padding-left:3px;background:linear-gradient(0deg,rgba(74,143,191,0.14),rgba(74,143,191,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(74,143,191,0.6),0 0 10px rgba(74,143,191,0.22),var(--shadow)}
-.card.owner-user2{border-left:7px solid #ff4d4d;padding-left:3px;background:linear-gradient(0deg,rgba(255,77,77,0.14),rgba(255,77,77,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(255,77,77,0.6),0 0 10px rgba(255,77,77,0.22),var(--shadow)}
-.card.owner-user3{border-left:7px solid #f0c419;padding-left:3px;background:linear-gradient(0deg,rgba(240,196,25,0.14),rgba(240,196,25,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(240,196,25,0.6),0 0 10px rgba(240,196,25,0.22),var(--shadow)}
-/* Reviewed owner cards keep the green reviewed ring so the completed-today checkbox stays visible. */
-.card.reviewed.owner-james,.card.reviewed.owner-user2,.card.reviewed.owner-user3{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow)}
-.own-badge{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#0d1016;padding:1px 6px;border-radius:3px;margin-bottom:5px}
-.card.owner-james .own-badge{background:#4a8fbf}
-.card.owner-user2 .own-badge{background:#ff4d4d}
-.card.owner-user3 .own-badge{background:#f0c419}
 .card-check{position:absolute;top:7px;right:7px;width:19px;height:19px;border-radius:50%;border:1.5px solid var(--border);background:none;color:transparent;font-size:11px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .card-check:hover{border-color:var(--green)}
 .card-check.on{background:#39ff9e;border-color:#39ff9e;color:#0d1016}
@@ -382,12 +372,6 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <div class="agenda" id="agenda"><span class="agenda-empty">No upcoming tasks</span></div>
 <div class="mc-filter" id="mc-filter">
   <input type="text" id="mc-q" placeholder="🔍 Search name, source, notes, phone…" oninput="mcSetQ(this.value)">
-  <select id="mc-owner" onchange="mcSetOwner(this.value)">
-    <option value="ALL">Everyone</option>
-    <option value="James">James</option>
-    <option value="User 2">User 2</option>
-    <option value="User 3">User 3</option>
-  </select>
   <button class="mc-fbtn" onclick="mcSetTag('OVERDUE',this)">⚠️ Overdue</button>
   <button class="mc-fbtn" onclick="mcSetTag('PLANS',this)">📐 Needs Plans</button>
   <button class="mc-fbtn" onclick="mcSetTag('SURE',this)">⭐ Sure Things</button>
@@ -456,11 +440,6 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       </div>
     </div>
     <div class="f" id="f-refby-wrap" style="display:none"><label>Referred by</label><input type="text" id="f-refby" placeholder="e.g. Mike Delaney" /></div>
-    <div class="f"><label>Assigned To</label>
-      <select id="f-assigned">
-        <option value="James">James</option><option value="User 2">User 2</option><option value="User 3">User 3</option>
-      </select>
-    </div>
     <div class="f"><label>📐 KCD Job File</label><div id="kcd-box"></div></div>
     <div class="f"><label>📄 Plans PDF (opens on phone)</label><div id="pdf-box"></div></div>
     <div class="f"><label>🖼️ Customer Photos</label>
@@ -746,18 +725,6 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <div class="srow"><span class="sl">Lead installer %</span><input type="number" id="sl-lp" step=".5" inputmode="decimal"/><span class="su">%</span></div>
       </div>
     </div>
-    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-who')">This Device<span>▾</span></div>
-      <div class="set-bd" id="s-who">
-        <div class="srow"><span class="sl">Who uses this device?</span>
-          <select id="set-who" onchange="setWho(this.value)" style="width:auto;padding:6px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:#d0d4e2">
-            <option value="james">James</option>
-            <option value="user2">User 2</option>
-            <option value="user3">User 3</option>
-          </select>
-        </div>
-        <p style="font-size:11px;color:var(--muted);margin-top:4px">New jobs you create are assigned to <span id="set-who-name">James</span>. This only tints cards — everyone can still see and edit every job.</p>
-      </div>
-    </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-gdrive')">Google Drive (KCD + plans)<span>▾</span></div>
       <div class="set-bd" id="s-gdrive">
         <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Lets each job card link to its <b>.job</b> file in <b>1_DOTJ_JOBS</b> and its plans <b>PDF</b> in <b>1_PDF_MAX</b>. Paste your Google OAuth Client ID here (one-time), then Save.</p>
@@ -807,19 +774,6 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <button class="save-p" onclick="createLeadFromPaste()">✅ Create Lead Card</button>
       <button class="save-p" style="background:var(--border);color:var(--muted);margin-top:8px" onclick="pasteBackToStep1()">← Back to paste</button>
     </div>
-  </div>
-</div>
-</div>
-
-<!-- WHO IS THIS DEVICE (one-time prompt; sits above the lock screen) -->
-<div class="set-overlay" id="who-overlay" style="z-index:1100">
-<div class="set-modal" style="max-width:360px">
-  <div class="mh"><h3>Who's using this device?</h3></div>
-  <div style="padding:16px 15px">
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">This just tints new job cards by owner. Everyone still sees and can edit every job.</p>
-    <button class="save-p" style="margin-top:0;background:#4a8fbf" onclick="setWho('james')">James</button>
-    <button class="save-p" style="margin-top:10px;background:#ff4d4d" onclick="setWho('user2')">User 2</button>
-    <button class="save-p" style="margin-top:10px;background:#f0c419;color:#0d1016" onclick="setWho('user3')">User 3</button>
   </div>
 </div>
 </div>
@@ -1129,23 +1083,6 @@ function saveData(){
   try{localStorage.setItem('mc-pd',JSON.stringify(pricingData));}catch(e){}
   try{localStorage.setItem('mc-sched',JSON.stringify(schedData));}catch(e){}
   if(window.fbSave)window.fbSave();
-}
-
-// ── WHO IS WHO (shared helpers so every place that shows an owner agrees) ──
-const WHO_LABEL={james:'James',user2:'User 2',user3:'User 3'};
-function WHO_KEY(v){return (v==='user2'||v==='pete')?'user2':(v==='user3'?'user3':'james');}
-function ASSIGN_LABEL(v){return (v==='User 2'||v==='Pete')?'User 2':(v==='User 3'?'User 3':'James');}
-function ASSIGN_KEY(v){return (v==='User 2'||v==='Pete')?'user2':(v==='User 3'?'user3':'james');}
-try{if(localStorage.getItem('mc-who')==='pete')localStorage.setItem('mc-who','user2');}catch(e){}
-
-// ── WHO IS THIS DEVICE (per-device, localStorage only — NOT synced, NOT a permission) ──
-function getWho(){try{return localStorage.getItem('mc-who')||'';}catch(e){return'';}}
-function setWho(v){
-  const who=WHO_KEY(v);
-  try{localStorage.setItem('mc-who',who);}catch(e){}
-  const o=document.getElementById('who-overlay');if(o)o.classList.remove('open');
-  const sw=document.getElementById('set-who');if(sw)sw.value=who;
-  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=WHO_LABEL[who];
 }
 
 function todayStr(){
@@ -2261,7 +2198,7 @@ async function driveUploadPdf(blob,filename,folderId){
 // Log first and upload afterwards: the record must survive even when Drive is unreachable.
 function recordSend(d,mode,method){
   const log=jobSentLog(editId);
-  const rec={v:log.length+1,at:new Date().toISOString(),mode,method,who:getWho()||'james',
+  const rec={v:log.length+1,at:new Date().toISOString(),mode,method,
     total:d.total,subtotal:d.subtotal,disc:d.disc,tax:d.tax,deposit:d.deposit,paid:d.paid,balance:d.balance,
     plans:plansAreAttached()?{name:plansStatus.name||'',source:plansStatus.source,modifiedTime:plansStatus.modifiedTime||''}:null,
     lines:(d.lines||[]).map(l=>({l:l.label,q:l.qty}))};
@@ -2309,7 +2246,7 @@ function renderSentHistory(){
       :r.archive==='skipped'?'<span style="color:var(--muted)">PDF not filed (Drive not connected)</span>'
       :'<span style="color:var(--muted)">filing to Drive…</span>';
     return `<div style="background:var(--input-bg);border:1.5px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:7px;font-size:12px;line-height:1.6">
-      <div style="display:flex;gap:8px;align-items:baseline"><b style="color:var(--text)">v${r.v} · ${r.mode}</b><span style="color:var(--muted);font-size:11px">${when} · ${WHO_LABEL[WHO_KEY(r.who)]} · ${r.method}</span></div>
+      <div style="display:flex;gap:8px;align-items:baseline"><b style="color:var(--text)">v${r.v} · ${r.mode}</b><span style="color:var(--muted);font-size:11px">${when} · ${r.method}</span></div>
       <div style="color:var(--text)">${money(r.total)} · ${plans}</div>
       <div style="color:var(--muted);font-size:11px">${driveEsc(sentDiff(r,prev))}</div>
       <div style="margin-top:3px">${link}</div></div>`;
@@ -2592,8 +2529,6 @@ function sweepJobs(){
     }
     if(!j.stageAt){j.stageAt=now;changed=true;}
     if(MIG_SOURCE[j.source]){j.source=MIG_SOURCE[j.source];changed=true;}
-    if(j.assignedTo==='Jed'){j.assignedTo='James';changed=true;}
-    if(j.assignedTo==='Pete'){j.assignedTo='User 2';changed=true;}
     if(j.stage===6){
       if(!j.doneAt){j.doneAt=now;changed=true;}
       else if(!j.archived&&!(j.labels||[]).includes('finalpay')&&(now-j.doneAt)>ARCHIVE_MS){j.archived=true;changed=true;}
@@ -2632,10 +2567,10 @@ function csvMoney(v){
 function exportArchivedCsv(){
   const list=jobs.filter(j=>j.archived);
   if(!list.length){alert('There are no archived jobs to export yet.');return;}
-  const head=['name','phone','email','addr','stage','assignedTo','source','refBy','labels','date','stageAt','doneAt','archiveReason','archivedAt','sale','cost','profit','total paid','balance','propNum','notes'];
+  const head=['name','phone','email','addr','stage','source','refBy','labels','date','stageAt','doneAt','archiveReason','archivedAt','sale','cost','profit','total paid','balance','propNum','notes'];
   const rows=list.map(j=>{
     const sale=parseFloat(j.sale)||0,cost=parseFloat(j.cost)||0,paid=paidTotal(j);
-    return[j.name,j.phone,j.email,j.addr,STAGES[j.stage]||'',j.assignedTo,j.source,j.refBy,
+    return[j.name,j.phone,j.email,j.addr,STAGES[j.stage]||'',j.source,j.refBy,
       (j.labels||[]).map(l=>LBLS[l]?LBLS[l].t:l).join(';'),
       csvDate(j.date),csvDate(j.stageAt),csvDate(j.doneAt),j.archiveReason,csvDate(j.archivedAt),
       csvMoney(j.sale),csvMoney(j.cost),csvMoney(sale-cost),csvMoney(paid),csvMoney(sale-paid),
@@ -2731,7 +2666,7 @@ function createLeadFromPaste(){
   const notes=[extra.join('\n'),msg].filter(Boolean).join(extra.length&&msg?'\n\n':'');
   const nj={id:uid(),name:name,stage:0,source:'Website',labels:['new'],
     email:g('pl-email'),phone:g('pl-phone'),addr:'',notes:notes,date:'',
-    assignedTo:WHO_LABEL[WHO_KEY(getWho())],refBy:'',sale:0,cost:0,stageAt:Date.now(),createdAt:Date.now()};
+    refBy:'',sale:0,cost:0,stageAt:Date.now(),createdAt:Date.now()};
   jobs.unshift(nj);
   saveData();render();
   closePaste();
@@ -2766,9 +2701,8 @@ function restoreJob(id){
   if(document.getElementById('arch-overlay').classList.contains('open'))openArchive();else closeModal();
 }
 // ── BOARD SEARCH / FILTER ── purely a view filter; decides which cards render() draws, so it re-applies on every redraw and never fights the live board.
-let mcFilter={q:'',owner:'ALL',tag:'ALL'};
+let mcFilter={q:'',tag:'ALL'};
 function mcMatch(j){
-  if(mcFilter.owner!=='ALL'){const o=ASSIGN_LABEL(j.assignedTo);if(o!==mcFilter.owner)return false;}
   if(mcFilter.tag==='PLANS'&&!(j.labels||[]).includes('plans'))return false;
   if(mcFilter.tag==='SURE'){const L=j.labels||[];if(!L.includes('sure')&&!L.includes('repeat'))return false;}
   if(mcFilter.tag==='OVERDUE'&&!(j.date&&new Date(j.date+'T12:00:00')<new Date()&&j.stage<5))return false;
@@ -2779,14 +2713,12 @@ function mcMatch(j){
   return true;
 }
 function mcSetQ(v){mcFilter.q=(v||'').trim().toLowerCase();render();}
-function mcSetOwner(v){mcFilter.owner=v;render();}
 function mcSetTag(t,btn){mcFilter.tag=mcFilter.tag===t?'ALL':t;document.querySelectorAll('#mc-filter .mc-fbtn').forEach(b=>b.classList.remove('active'));if(mcFilter.tag!=='ALL'&&btn)btn.classList.add('active');render();}
-function mcClear(){mcFilter={q:'',owner:'ALL',tag:'ALL'};const i=document.getElementById('mc-q');if(i)i.value='';const s=document.getElementById('mc-owner');if(s)s.value='ALL';document.querySelectorAll('#mc-filter .mc-fbtn').forEach(b=>b.classList.remove('active'));render();}
+function mcClear(){mcFilter={q:'',tag:'ALL'};const i=document.getElementById('mc-q');if(i)i.value='';document.querySelectorAll('#mc-filter .mc-fbtn').forEach(b=>b.classList.remove('active'));render();}
 // ── LIST VIEW ── every job in one sortable table, so nothing can hide on the board.
 // Uses the same mcMatch() filter as the board, plus its own stage / archived controls.
-const OWN_COLS={james:'#4a8fbf',user2:'#ff4d4d',user3:'#f0c419'};
 const LV_COLS=[
-  {k:'name',t:'Customer'},{k:'stage',t:'Stage'},{k:'owner',t:'Assigned'},{k:'source',t:'Source'},
+  {k:'name',t:'Customer'},{k:'stage',t:'Stage'},{k:'source',t:'Source'},
   {k:'date',t:'Appointment'},{k:'days',t:'Days in stage'},{k:'sale',t:'Sale'},{k:'balance',t:'Balance'},
   {k:'labels',t:'Labels'},{k:'files',t:'Files'}
 ];
@@ -2800,7 +2732,6 @@ function lvVal(j,k){
   switch(k){
     case 'name':return (j.name||'').toLowerCase();
     case 'stage':return j.stage||0;
-    case 'owner':return ASSIGN_LABEL(j.assignedTo);
     case 'source':return ((j.source||'')+' '+(j.refBy||'')).toLowerCase();
     case 'date':return j.date||'';
     case 'days':return lvDays(j);
@@ -2853,7 +2784,6 @@ function renderList(){
   let tot=0,owed=0;
   const html=rows.map(job=>{
     const bal=lvBal(job);tot+=job.sale||0;if(bal>0.005)owed+=bal;
-    const own=ASSIGN_KEY(job.assignedTo);
     const lbls=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join(' ');
     const chips=[(job.kcdFile&&job.kcdFile.link)?'<span class="chip">📐 KCD</span>':'',
       (job.pdfFile&&job.pdfFile.link)?'<span class="chip">📄 PDF</span>':'',
@@ -2861,7 +2791,6 @@ function renderList(){
     return `<tr class="${job.archived?'lv-arch':''}" onclick="openEdit('${job.id}')">
       <td><span class="lv-name">${driveEsc(job.name)}</span>${job.archived?'<span class="lv-tag">ARCHIVED</span>':''}</td>
       <td><span class="lv-dot" style="background:${SCOLS[job.stage]||'#6b778c'}"></span>${STAGES[job.stage]||''}</td>
-      <td><span class="own-badge" style="background:${OWN_COLS[own]}">${WHO_LABEL[own]}</span></td>
       <td>${driveEsc(job.source||'—')}${job.refBy?' — '+driveEsc(job.refBy):''}</td>
       <td>${job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—'}</td>
       <td>${lvDays(job)}</td>
@@ -2921,8 +2850,7 @@ function render(){
     const ce=col.querySelector(`#col-${si}`);
     sj.forEach(job=>{
       const reviewed=job.reviewedDate===todayStr();
-      const owner=ASSIGN_KEY(job.assignedTo);
-      const card=document.createElement('div');card.className=`card owner-${owner}${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
+      const card=document.createElement('div');card.className=`card${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
       const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
@@ -2930,7 +2858,6 @@ function render(){
       const op=orderProgress(job);const opChip=op.tot?`<span class="chip">📦 ${op.done}/${op.tot}</span>`:'';
       const phChip=job.photoCount>0?`<span class="chip">📷 ${job.photoCount}</span>`:'';
       card.innerHTML=`<button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
-        <span class="own-badge">${WHO_LABEL[owner]}</span>
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
         ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
@@ -3026,7 +2953,6 @@ function openAdd(stage=0){
   ['f-name','f-phone','f-email','f-addr','f-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-stage').value=stage;document.getElementById('f-source').value='';document.getElementById('f-date').value='';
   document.getElementById('f-refby').value='';toggleRefBy();
-  document.getElementById('f-assigned').value=WHO_LABEL[WHO_KEY(getWho())];
   document.querySelectorAll('.lopt').forEach(el=>el.classList.remove('on'));
   document.getElementById('p-addr').value='';document.getElementById('p-notes').value='';document.getElementById('p-disc').value='';
   document.getElementById('mv-btns').innerHTML='';resetPricing();document.getElementById('sch-list').innerHTML='';
@@ -3045,7 +2971,6 @@ function openEdit(id){
   document.getElementById('f-email').value=job.email||'';document.getElementById('f-stage').value=job.stage;
   document.getElementById('f-source').value=migSource(job.source)||'';document.getElementById('f-date').value=job.date||'';
   document.getElementById('f-refby').value=job.refBy||'';toggleRefBy();
-  document.getElementById('f-assigned').value=ASSIGN_LABEL(job.assignedTo);
   document.getElementById('f-addr').value=job.addr||'';
   document.getElementById('f-notes').value=job.notes||'';
   document.querySelectorAll('.lopt').forEach(el=>el.classList.toggle('on',selLbls.includes(el.dataset.v)));
@@ -3224,8 +3149,7 @@ function captureInfoFields(){
   return{name:document.getElementById('f-name').value.trim(),labels:[...selLbls],stage:parseInt(document.getElementById('f-stage').value),
     source:document.getElementById('f-source').value,date:document.getElementById('f-date').value,
     phone:document.getElementById('f-phone').value.trim(),email:document.getElementById('f-email').value.trim(),addr:document.getElementById('f-addr').value.trim(),notes:document.getElementById('f-notes').value.trim(),
-    refBy:document.getElementById('f-source').value==='Other'?document.getElementById('f-refby').value.trim():'',
-    assignedTo:ASSIGN_LABEL(document.getElementById('f-assigned').value)};
+    refBy:document.getElementById('f-source').value==='Other'?document.getElementById('f-refby').value.trim():''};
 }
 function doorsMissingDims(){
   return[...document.querySelectorAll('#door-items .item-block')].some(b=>{
@@ -3289,9 +3213,6 @@ document.getElementById('overlay').addEventListener('click',e=>{if(e.target===do
 function openSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','spb-c':'pbC','spb-s':'pbS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
-  const w=WHO_KEY(getWho());
-  const sw=document.getElementById('set-who');if(sw)sw.value=w;
-  const swn=document.getElementById('set-who-name');if(swn)swn.textContent=WHO_LABEL[w];
   const gc=document.getElementById('set-gclient');if(gc)gc.value=P.gClientId||'';
   document.getElementById('set-overlay').classList.add('open');
 }
@@ -3328,8 +3249,6 @@ applyThemeUI();
 
 loadP();
 render();renderAgenda();initView();
-// One-time prompt: ask who this device belongs to (tints new cards by owner)
-if(!getWho()){const wo=document.getElementById('who-overlay');if(wo)wo.classList.add('open');}
 </script>
 </body>
 </html>
