@@ -383,7 +383,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <div class="agenda" id="agenda"><span class="agenda-empty">No upcoming tasks</span></div>
 <div class="mc-filter" id="mc-filter">
   <input type="text" id="mc-q" placeholder="🔍 Search name, source, notes, phone…" oninput="mcSetQ(this.value)">
-  <button class="mc-fbtn" onclick="mcSetTag('PRI',this)">⚡ Priority</button>
+  <button class="mc-fbtn" onclick="mcSetTag('PRI',this)">⚡ Needs Attention</button>
   <button class="mc-fbtn" onclick="mcSetTag('OVERDUE',this)">⚠️ Overdue</button>
   <button class="mc-fbtn" onclick="mcSetTag('PLANS',this)">📐 Needs Plans</button>
   <button class="mc-fbtn" onclick="mcSetTag('SURE',this)">⭐ Sure Things</button>
@@ -1101,23 +1101,32 @@ function todayStr(){
   const d=new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-// Why a card is red. Reads job state only — never a date or an elapsed time, so nothing here
-// can flag, clear or escalate a card on a timer. Manual ⚡ always wins.
-function needsAttn(job){
-  if(job.pri)return 'manual';
-  if(job.archived||job.stage===6)return '';
-  const paid=paidTotal(job)>0||job.stage>=3;
-  if(!paid)return '';
+// The money-on-the-table rule. Only runs from Deposit Paid onward, because that is the first
+// stage where the app will build an order list — below it a card could go red asking for
+// something you had no way to give it. Reads job state only, never a date or an elapsed time,
+// so nothing here can flag, clear or escalate a card on a timer.
+function autoAttn(job){
+  if(job.archived||job.stage<ORDER_STAGE||job.stage===6)return '';
   const op=orderProgress(job);
-  if(op.tot===0)return 'nolist';      // deposit in, order list never built
+  if(op.tot===0)return 'nolist';      // deposit taken, materials never listed
   if(op.done<op.tot)return 'unordered';
   return '';
 }
-// The ⚡ button is the manual flag only. Nothing in the app may set, clear or escalate it on a timer.
+// Why a card is red. Your ⚡ always wins, in both directions: flag it on, or quiet it down.
+function needsAttn(job){
+  if(job.pri)return 'manual';
+  if(job.attnOff)return '';
+  return autoAttn(job);
+}
+// One button, one meaning: red or not red, and it is always your tap. Never a timer.
 function togglePri(jid){
   const job=jobs.find(j=>j.id===jid);if(!job)return;
-  job.pri=!job.pri;
-  if(job.pri)job.priAt=Date.now();else delete job.priAt;
+  if(needsAttn(job)){                        // red now → quiet it
+    job.pri=false;delete job.priAt;
+    if(autoAttn(job))job.attnOff=true;
+  }else{                                     // quiet now → flag it
+    job.pri=true;job.priAt=Date.now();delete job.attnOff;
+  }
   saveData();render();
 }
 function toggleReviewed(jid){
@@ -2905,9 +2914,9 @@ function render(){
       if(job.photoCount>0)chips.push(`<span class="chip">📷 ${job.photoCount}</span>`);
       // Why the card is red leads the row and is exempt from the cap — a reason must never be hidden behind "+N".
       const attnChip=attn==='unordered'?`<span class="chip pri-chip">📦 Not ordered ${op.tot-op.done}/${op.tot}</span>`
-        :attn==='nolist'?`<span class="chip pri-chip">📦 No order list</span>`:'';
+        :attn==='nolist'?`<span class="chip pri-chip">📦 Nothing ordered yet</span>`:'';
       const chipRow=(attnChip||chips.length)?`<div class="card-meta">${attnChip}${attnChip&&chips.length?' ':''}${chips.slice(0,3).join(' ')}${chips.length>3?` <span class="chip">+${chips.length-3}</span>`:''}</div>`:'';
-      card.innerHTML=`<button class="card-pri${job.pri?' on':''}" title="${job.pri?'Priority — tap to clear':'Flag as priority'}" onclick="event.stopPropagation();togglePri('${job.id}')" ontouchend="event.stopPropagation()"><span class="pri-g">⚡</span></button>
+      card.innerHTML=`<button class="card-pri${attn?' on':''}" title="${attn?'Needs attention — tap to quiet it':'Flag as needs attention'}" onclick="event.stopPropagation();togglePri('${job.id}')" ontouchend="event.stopPropagation()"><span class="pri-g">⚡</span></button>
         <button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
@@ -2926,7 +2935,7 @@ function render(){
   const com=jobs.filter(j=>j.stage>=3&&j.stage<6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   const cl=jobs.filter(j=>j.stage===6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   const prin=active.filter(j=>needsAttn(j)).length;
-  document.getElementById('hstats').textContent=`${prin?`⚡ ${prin} priority · `:''}${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
+  document.getElementById('hstats').textContent=`${prin?`⚡ ${prin} need attention · `:''}${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
   const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
   if(ac&&ac.parentElement)ac.parentElement.style.background=jobs.some(checkBackDue)?'rgba(242,165,0,0.85)':'rgba(255,255,255,0.15)';
   if(lvView==='list')renderList();
