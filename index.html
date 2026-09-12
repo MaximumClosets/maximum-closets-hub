@@ -88,12 +88,22 @@ table.lv tbody tr.lv-arch{opacity:.55}
 .cards{padding:0 7px;overflow-y:auto;flex:1}
 .cards::-webkit-scrollbar{width:3px}
 .cards::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.1);border-radius:2px}
-.card{background:var(--card-bg);border-radius:8px;padding:9px 26px 9px 10px;margin-bottom:7px;box-shadow:var(--shadow);cursor:pointer;position:relative}
+.card{background:var(--card-bg);border-radius:8px;padding:9px 46px 9px 10px;margin-bottom:7px;box-shadow:var(--shadow);cursor:pointer;position:relative}
 .card:hover{box-shadow:0 3px 10px rgba(0,0,0,0.18)}
 .card.reviewed{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow);background:linear-gradient(0deg,rgba(57,255,158,0.1),rgba(57,255,158,0.1)),var(--card-bg)}
+/* Priority flag (manual only — nothing in the app sets or clears this on a timer): 7px red left stripe + a red wash + a soft glow, so a flagged card is the one thing that stands out. */
+.card.pri{border-left:7px solid #ff4d4d;padding-left:3px;background:linear-gradient(0deg,rgba(255,77,77,0.14),rgba(255,77,77,0.14)),var(--card-bg);box-shadow:0 0 0 1px rgba(255,77,77,0.6),0 0 10px rgba(255,77,77,0.22),var(--shadow)}
+/* Reviewed still wins over the red so the completed-today ring stays visible on a flagged card. */
+.card.reviewed.pri{box-shadow:0 0 0 2px #39ff9e inset,0 0 8px rgba(57,255,158,0.45),var(--shadow)}
 .card-check{position:absolute;top:7px;right:7px;width:19px;height:19px;border-radius:50%;border:1.5px solid var(--border);background:none;color:transparent;font-size:11px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
 .card-check:hover{border-color:var(--green)}
 .card-check.on{background:#39ff9e;border-color:#39ff9e;color:#0d1016}
+.card-pri{position:absolute;top:7px;right:30px;width:19px;height:19px;border-radius:50%;border:1.5px solid var(--border);background:none;padding:0;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.card-pri .pri-g{font-size:10px;line-height:1;filter:grayscale(1);opacity:.5}
+.card-pri:hover{border-color:#ff4d4d}
+.card-pri:hover .pri-g{opacity:.9}
+.card-pri.on{background:#ff4d4d;border-color:#ff4d4d}
+.card-pri.on .pri-g{filter:brightness(0);opacity:1}
 .card-lbls{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px}
 .lbl{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase}
 .l-new{background:#0d2b1a;border:1.5px solid #1a5c38;color:#4aad78}
@@ -372,6 +382,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <div class="agenda" id="agenda"><span class="agenda-empty">No upcoming tasks</span></div>
 <div class="mc-filter" id="mc-filter">
   <input type="text" id="mc-q" placeholder="🔍 Search name, source, notes, phone…" oninput="mcSetQ(this.value)">
+  <button class="mc-fbtn" onclick="mcSetTag('PRI',this)">⚡ Priority</button>
   <button class="mc-fbtn" onclick="mcSetTag('OVERDUE',this)">⚠️ Overdue</button>
   <button class="mc-fbtn" onclick="mcSetTag('PLANS',this)">📐 Needs Plans</button>
   <button class="mc-fbtn" onclick="mcSetTag('SURE',this)">⭐ Sure Things</button>
@@ -1088,6 +1099,13 @@ function saveData(){
 function todayStr(){
   const d=new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// Priority is a manual flag only. Nothing in the app may set, clear or escalate it on a timer.
+function togglePri(jid){
+  const job=jobs.find(j=>j.id===jid);if(!job)return;
+  job.pri=!job.pri;
+  if(job.pri)job.priAt=Date.now();else delete job.priAt;
+  saveData();render();
 }
 function toggleReviewed(jid){
   const job=jobs.find(j=>j.id===jid);if(!job)return;
@@ -2703,6 +2721,7 @@ function restoreJob(id){
 // ── BOARD SEARCH / FILTER ── purely a view filter; decides which cards render() draws, so it re-applies on every redraw and never fights the live board.
 let mcFilter={q:'',tag:'ALL'};
 function mcMatch(j){
+  if(mcFilter.tag==='PRI'&&!j.pri)return false;
   if(mcFilter.tag==='PLANS'&&!(j.labels||[]).includes('plans'))return false;
   if(mcFilter.tag==='SURE'){const L=j.labels||[];if(!L.includes('sure')&&!L.includes('repeat'))return false;}
   if(mcFilter.tag==='OVERDUE'&&!(j.date&&new Date(j.date+'T12:00:00')<new Date()&&j.stage<5))return false;
@@ -2843,6 +2862,8 @@ function render(){
   const board=document.getElementById('board');board.innerHTML='';
   STAGES.forEach((stage,si)=>{
     const sj=jobs.filter(j=>j.stage===si&&!j.archived&&mcMatch(j));
+    // Flagged cards ride at the top of the column, newest flag first. View order only — the jobs list itself is untouched.
+    sj.sort((a,b)=>((b.pri?1:0)-(a.pri?1:0))||((a.pri&&b.pri)?((b.priAt||0)-(a.priAt||0)):0));
     const col=document.createElement('div');col.className='col';
     col.innerHTML=`<div class="col-hd"><div class="col-dot" style="background:${SCOLS[si]}"></div><h2>${stage}</h2><span class="col-cnt">${sj.length}</span></div>
       <div class="cards" id="col-${si}"></div><div class="col-add" onclick="openAdd(${si})">＋ Add a card</div>`;
@@ -2850,14 +2871,15 @@ function render(){
     const ce=col.querySelector(`#col-${si}`);
     sj.forEach(job=>{
       const reviewed=job.reviewedDate===todayStr();
-      const card=document.createElement('div');card.className=`card${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
+      const card=document.createElement('div');card.className=`card${job.pri?' pri':''}${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
       const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
       const pr=getProgress(job.id,si);const hasL=(CL[si]||[]).length>0&&pr.tot>0;
       const op=orderProgress(job);const opChip=op.tot?`<span class="chip">📦 ${op.done}/${op.tot}</span>`:'';
       const phChip=job.photoCount>0?`<span class="chip">📷 ${job.photoCount}</span>`:'';
-      card.innerHTML=`<button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
+      card.innerHTML=`<button class="card-pri${job.pri?' on':''}" title="${job.pri?'Priority — tap to clear':'Flag as priority'}" onclick="event.stopPropagation();togglePri('${job.id}')" ontouchend="event.stopPropagation()"><span class="pri-g">⚡</span></button>
+        <button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
         <div class="card-name">${job.name}</div>
         ${job.sale>0?`<div class="card-val">$${job.sale.toLocaleString()}${job.cost>0?' · profit $'+(job.sale-job.cost).toLocaleString():''}</div>`:''}
@@ -2876,7 +2898,8 @@ function render(){
   const pip=active.reduce((s,j)=>s+(j.sale||0),0);
   const com=jobs.filter(j=>j.stage>=3&&j.stage<6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   const cl=jobs.filter(j=>j.stage===6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
-  document.getElementById('hstats').textContent=`${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
+  const prin=active.filter(j=>j.pri).length;
+  document.getElementById('hstats').textContent=`${prin?`⚡ ${prin} priority · `:''}${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
   const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
   if(ac&&ac.parentElement)ac.parentElement.style.background=jobs.some(checkBackDue)?'rgba(242,165,0,0.85)':'rgba(255,255,255,0.15)';
   if(lvView==='list')renderList();
