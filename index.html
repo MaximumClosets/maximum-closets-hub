@@ -123,6 +123,7 @@ table.lv tbody tr.lv-arch{opacity:.55}
 .chip{font-size:10px;color:var(--muted);background:#f0f1f3;padding:2px 5px;border-radius:3px;white-space:nowrap}
 .age-pill{display:inline-block;font-size:10px;font-weight:700;color:#fff;background:#172b4d;padding:1px 6px;border-radius:9px;letter-spacing:.2px}
 .chip.ov{color:#eb5a46;background:#ffedeb}
+.chip.pri-chip{background:#ff4d4d;color:#0d1016;font-weight:700}
 .chip.today{color:#fff;background:#eb5a46;font-weight:700}
 .chip.kcd{background:var(--green-bg);border:1px solid var(--green-border);color:var(--green);cursor:pointer;font-weight:700}
 .kcd-cur{display:flex;align-items:center;gap:8px;background:var(--input-bg);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);flex-wrap:wrap}
@@ -1100,7 +1101,19 @@ function todayStr(){
   const d=new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-// Priority is a manual flag only. Nothing in the app may set, clear or escalate it on a timer.
+// Why a card is red. Reads job state only — never a date or an elapsed time, so nothing here
+// can flag, clear or escalate a card on a timer. Manual ⚡ always wins.
+function needsAttn(job){
+  if(job.pri)return 'manual';
+  if(job.archived||job.stage===6)return '';
+  const paid=paidTotal(job)>0||job.stage>=3;
+  if(!paid)return '';
+  const op=orderProgress(job);
+  if(op.tot===0)return 'nolist';      // deposit in, order list never built
+  if(op.done<op.tot)return 'unordered';
+  return '';
+}
+// The ⚡ button is the manual flag only. Nothing in the app may set, clear or escalate it on a timer.
 function togglePri(jid){
   const job=jobs.find(j=>j.id===jid);if(!job)return;
   job.pri=!job.pri;
@@ -2721,7 +2734,7 @@ function restoreJob(id){
 // ── BOARD SEARCH / FILTER ── purely a view filter; decides which cards render() draws, so it re-applies on every redraw and never fights the live board.
 let mcFilter={q:'',tag:'ALL'};
 function mcMatch(j){
-  if(mcFilter.tag==='PRI'&&!j.pri)return false;
+  if(mcFilter.tag==='PRI'&&!needsAttn(j))return false;
   if(mcFilter.tag==='PLANS'&&!(j.labels||[]).includes('plans'))return false;
   if(mcFilter.tag==='SURE'){const L=j.labels||[];if(!L.includes('sure')&&!L.includes('repeat'))return false;}
   if(mcFilter.tag==='OVERDUE'&&!(j.date&&new Date(j.date+'T12:00:00')<new Date()&&j.stage<5))return false;
@@ -2862,8 +2875,10 @@ function render(){
   const board=document.getElementById('board');board.innerHTML='';
   STAGES.forEach((stage,si)=>{
     const sj=jobs.filter(j=>j.stage===si&&!j.archived&&mcMatch(j));
-    // Flagged cards ride at the top of the column, newest flag first. View order only — the jobs list itself is untouched.
-    sj.sort((a,b)=>((b.pri?1:0)-(a.pri?1:0))||((a.pri&&b.pri)?((b.priAt||0)-(a.priAt||0)):0));
+    // Cards needing attention ride at the top of the column: money already in with materials outstanding
+    // first, then manual ⚡ flags newest first. View order only — the jobs list itself is untouched.
+    const attnRank=j=>{const a=needsAttn(j);return (a==='unordered'||a==='nolist')?0:(a==='manual'?1:2);};
+    sj.sort((a,b)=>(attnRank(a)-attnRank(b))||(attnRank(a)===1?((b.priAt||0)-(a.priAt||0)):0));
     const col=document.createElement('div');col.className='col';
     col.innerHTML=`<div class="col-hd"><div class="col-dot" style="background:${SCOLS[si]}"></div><h2>${stage}</h2><span class="col-cnt">${sj.length}</span></div>
       <div class="cards" id="col-${si}"></div><div class="col-add" onclick="openAdd(${si})">＋ Add a card</div>`;
@@ -2871,7 +2886,8 @@ function render(){
     const ce=col.querySelector(`#col-${si}`);
     sj.forEach(job=>{
       const reviewed=job.reviewedDate===todayStr();
-      const card=document.createElement('div');card.className=`card${job.pri?' pri':''}${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
+      const attn=needsAttn(job);
+      const card=document.createElement('div');card.className=`card${attn?' pri':''}${reviewed?' reviewed':''}`;attachTap(card,()=>openEdit(job.id));
       const lblsHtml=(job.labels||[]).map(l=>LBLS[l]?`<span class="lbl ${LBLS[l].c}">${LBLS[l].t}</span>`:'').join('');
       const ov=job.date&&new Date(job.date+'T12:00:00')<new Date()&&si<5;
       const ds=job.date?new Date(job.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
@@ -2885,9 +2901,12 @@ function render(){
       if(ds&&(ov||(dayOff!==null&&dayOff>=0&&dayOff<=7)))chips.push(`<span class="chip ${ov?'ov':''}">📅 ${ds}</span>`);
       upSch.forEach(it=>chips.push(`<span class="chip ${dayClass(it.date)}">📋 ${it.type} ${dayLabel(it.date)}</span>`));
       if(hasL)chips.push(`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`);
-      if(op.tot)chips.push(`<span class="chip">📦 ${op.done}/${op.tot}</span>`);
+      if(op.tot&&attn!=='unordered')chips.push(`<span class="chip">📦 ${op.done}/${op.tot}</span>`);
       if(job.photoCount>0)chips.push(`<span class="chip">📷 ${job.photoCount}</span>`);
-      const chipRow=chips.length?`<div class="card-meta">${chips.slice(0,3).join(' ')}${chips.length>3?` <span class="chip">+${chips.length-3}</span>`:''}</div>`:'';
+      // Why the card is red leads the row and is exempt from the cap — a reason must never be hidden behind "+N".
+      const attnChip=attn==='unordered'?`<span class="chip pri-chip">📦 Not ordered ${op.tot-op.done}/${op.tot}</span>`
+        :attn==='nolist'?`<span class="chip pri-chip">📦 No order list</span>`:'';
+      const chipRow=(attnChip||chips.length)?`<div class="card-meta">${attnChip}${attnChip&&chips.length?' ':''}${chips.slice(0,3).join(' ')}${chips.length>3?` <span class="chip">+${chips.length-3}</span>`:''}</div>`:'';
       card.innerHTML=`<button class="card-pri${job.pri?' on':''}" title="${job.pri?'Priority — tap to clear':'Flag as priority'}" onclick="event.stopPropagation();togglePri('${job.id}')" ontouchend="event.stopPropagation()"><span class="pri-g">⚡</span></button>
         <button class="card-check${reviewed?' on':''}" title="${reviewed?'Reviewed today — tap to un-check':'Mark as checked today'}" onclick="event.stopPropagation();toggleReviewed('${job.id}')" ontouchend="event.stopPropagation()">✓</button>
         ${lblsHtml?`<div class="card-lbls">${lblsHtml}</div>`:''}
@@ -2906,7 +2925,7 @@ function render(){
   const pip=active.reduce((s,j)=>s+(j.sale||0),0);
   const com=jobs.filter(j=>j.stage>=3&&j.stage<6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
   const cl=jobs.filter(j=>j.stage===6&&!j.archived).reduce((s,j)=>s+(j.sale||0),0);
-  const prin=active.filter(j=>j.pri).length;
+  const prin=active.filter(j=>needsAttn(j)).length;
   document.getElementById('hstats').textContent=`${prin?`⚡ ${prin} priority · `:''}${active.length} active · Pipeline $${pip.toLocaleString()} · Committed $${com.toLocaleString()} · Closed $${cl.toLocaleString()}`;
   const ac=document.getElementById('arch-count');if(ac)ac.textContent=jobs.filter(j=>j.archived).length;
   if(ac&&ac.parentElement)ac.parentElement.style.background=jobs.some(checkBackDue)?'rgba(242,165,0,0.85)':'rgba(255,255,255,0.15)';
