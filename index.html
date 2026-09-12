@@ -737,6 +737,12 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <div class="srow"><span class="sl">Lead installer %</span><input type="number" id="sl-lp" step=".5" inputmode="decimal"/><span class="su">%</span></div>
       </div>
     </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-split')">Who Did What<span>▾</span></div>
+      <div class="set-bd hide" id="s-split">
+        <div id="split-box"></div>
+        <p style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">Counted off every job still saved, archived ones included. <b>Cards</b> is who entered the job in the app, not who sold it. <b>Leads</b> is jobs whose source is that person's referral. <b>Proposals sent</b> is who sent the proposal or invoice from their own device — the closest thing here to doing the sales work. <b>Deposit or past</b> is jobs that got to Deposit Paid or further.</p>
+      </div>
+    </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-gdrive')">Google Drive (KCD + plans)<span>▾</span></div>
       <div class="set-bd" id="s-gdrive">
         <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Lets each job card link to its <b>.job</b> file in <b>1_DOTJ_JOBS</b> and its plans <b>PDF</b> in <b>1_PDF_MAX</b>. Paste your Google OAuth Client ID here (one-time), then Save.</p>
@@ -3273,6 +3279,7 @@ function openSettings(){
   const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','spb-c':'pbC','spb-s':'pbS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
   const gc=document.getElementById('set-gclient');if(gc)gc.value=P.gClientId||'';
+  renderSplit();
   document.getElementById('set-overlay').classList.add('open');
 }
 function closeSettings(){document.getElementById('set-overlay').classList.remove('open');}
@@ -3287,6 +3294,40 @@ function saveSettings(){
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
 }
 function toggleSet(id){document.getElementById(id).classList.toggle('hide');}
+
+// ── WHO DID WHAT ── reads the history already saved on every job, so old records still count
+// even though the app no longer asks who a new job belongs to. Nothing here changes any job.
+const SPLIT_WHO=[
+  {k:'james',label:'James (you)',names:['James','Jed'],ref:['James Referral','Jed Referral']},
+  {k:'user2',label:'Pete (User 2)',names:['User 2','Pete'],ref:['User 2 Referral','Pete Referral']},
+  {k:'user3',label:'User 3',names:['User 3'],ref:['User 3 Referral']}
+];
+function salesSplit(){
+  const known=SPLIT_WHO.reduce((a,w)=>a.concat(w.names),[]);
+  const rows=SPLIT_WHO.map(w=>({w:w,mine:jobs.filter(j=>w.names.indexOf(j.assignedTo)>=0),refs:jobs.filter(j=>w.ref.indexOf(j.source)>=0).length}));
+  const orphan=jobs.filter(j=>known.indexOf(j.assignedTo)<0);
+  let sentNone=0;
+  Object.keys(pricingData||{}).forEach(id=>{const l=(pricingData[id]||{}).sent||[];l.forEach(x=>{if(!x.who)sentNone++;});});
+  return rows.map(r=>{
+    let sent=0;
+    Object.keys(pricingData||{}).forEach(id=>{const l=(pricingData[id]||{}).sent||[];l.forEach(x=>{if(x.who===r.w.k)sent++;});});
+    const deals=r.mine.filter(j=>j.stage>=3);
+    return{label:r.w.label,cards:r.mine.length,refs:r.refs,sent:sent,deals:deals.length,
+      money:deals.reduce((a,j)=>a+(parseFloat(j.sale)||0),0)};
+  }).concat((orphan.length||sentNone)?[{label:'Not recorded',cards:orphan.length,refs:0,sent:sentNone,
+      deals:orphan.filter(j=>j.stage>=3).length,
+      money:orphan.filter(j=>j.stage>=3).reduce((a,j)=>a+(parseFloat(j.sale)||0),0),note:true}]:[]);
+}
+function renderSplit(){
+  const el=document.getElementById('split-box');if(!el)return;
+  const rows=salesSplit().filter((r,i)=>i<2||r.cards||r.refs||r.sent);
+  el.innerHTML=rows.map(r=>`<div style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:7px">
+    <div style="font-weight:700;color:var(--text);font-size:13px;margin-bottom:3px">${r.label}</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7">${r.cards} card${r.cards===1?'':'s'} entered · ${r.refs} lead${r.refs===1?'':'s'} referred · ${r.sent} proposal${r.sent===1?'':'s'} sent<br>
+    <b style="color:var(--text)">${r.deals}</b> reached deposit or past · <b style="color:var(--green)">$${Math.round(r.money).toLocaleString()}</b></div>
+    ${r.note?'<div style="font-size:10px;color:var(--muted);margin-top:4px;font-style:italic">Jobs saved without a name on them, including anything added after the name field was removed.</div>':''}
+  </div>`).join('');
+}
 
 // ── THEME TOGGLE (light / dark, remembered per device) ──
 function applyThemeUI(){
