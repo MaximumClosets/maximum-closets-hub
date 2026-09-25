@@ -741,6 +741,12 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <p style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">Counted off every job still saved, archived ones included. <b>Cards</b> is who entered the job in the app, not who sold it. <b>Leads</b> is jobs whose source is that person's referral. <b>Proposals sent</b> is who sent the proposal or invoice from their own device — the closest thing here to doing the sales work. <b>Deposit or past</b> is jobs that got to Deposit Paid or further.</p>
       </div>
     </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-export')">Export Data<span>▾</span></div>
+      <div class="set-bd hide" id="s-export">
+        <button class="mv-btn" onclick="exportAllJobsCsv()">⬇️ Export all jobs (CSV)</button>
+        <p style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">Every job you have, active and archived, as a spreadsheet file you can open in Excel or Google Sheets. Includes who each job is assigned to, the sale price and how much has actually been paid.</p>
+      </div>
+    </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-gdrive')">Google Drive (KCD + plans)<span>▾</span></div>
       <div class="set-bd" id="s-gdrive">
         <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Lets each job card link to its <b>.job</b> file in <b>1_DOTJ_JOBS</b> and its plans <b>PDF</b> in <b>1_PDF_MAX</b>. Paste your Google OAuth Client ID here (one-time), then Save.</p>
