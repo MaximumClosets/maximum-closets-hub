@@ -2631,9 +2631,11 @@ function exportArchivedCsv(){
 }
 function exportAllJobsCsv(){
   if(!jobs.length){alert('There are no jobs to export yet.');return;}
-  const head=['name','addr','stage','source','refBy','assignedTo','date','createdAt','doneAt','sale','total paid','propNum'];
+  const head=['name','addr','stage','source','refBy','assignedTo','date','createdAt','doneAt','sale','cost','profit','total paid','propNum'];
   const rows=jobs.map(j=>[j.name,j.addr,STAGES[j.stage]||'',j.source,j.refBy,j.assignedTo,
-    csvDate(j.date),csvDate(j.createdAt),csvDate(j.doneAt),csvMoney(j.sale),csvMoney(paidTotal(j)),j.propNum]);
+    csvDate(j.date),csvDate(j.createdAt),csvDate(j.doneAt),
+    csvMoney(j.sale),csvMoney(j.cost),csvMoney((parseFloat(j.sale)||0)-(parseFloat(j.cost)||0)),
+    csvMoney(paidTotal(j)),j.propNum]);
   const csv=[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n';
   triggerDownload(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),'MaximumHub_AllJobs_'+csvDate(Date.now())+'.csv');
 }
