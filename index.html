@@ -757,7 +757,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <!-- ARCHIVED JOBS -->
 <div class="set-overlay" id="arch-overlay">
 <div class="set-modal">
-  <div class="mh"><h3>📦 Archived Jobs</h3><button class="mv-btn" onclick="exportArchivedCsv()" style="margin-right:10px">⬇️ Export CSV</button><button class="mclose" onclick="closeArchive()">×</button></div>
+  <div class="mh"><h3>📦 Archived Jobs</h3><button class="mv-btn" onclick="exportArchivedCsv()" style="margin-right:10px">⬇️ Export CSV</button><button class="mv-btn" onclick="exportAllJobsCsv()" style="margin-right:10px">⬇️ Export all jobs (CSV)</button><button class="mclose" onclick="closeArchive()">×</button></div>
   <div style="padding:14px 15px" id="arch-list"></div>
 </div>
 </div>
@@ -2622,6 +2622,14 @@ function exportArchivedCsv(){
   });
   const csv=[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n';
   triggerDownload(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),'James_Work_archived_'+csvDate(Date.now())+'.csv');
+}
+function exportAllJobsCsv(){
+  if(!jobs.length){alert('There are no jobs to export yet.');return;}
+  const head=['name','addr','stage','source','refBy','assignedTo','date','createdAt','doneAt','sale','total paid','propNum'];
+  const rows=jobs.map(j=>[j.name,j.addr,STAGES[j.stage]||'',j.source,j.refBy,j.assignedTo,
+    csvDate(j.date),csvDate(j.createdAt),csvDate(j.doneAt),csvMoney(j.sale),csvMoney(paidTotal(j)),j.propNum]);
+  const csv=[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n';
+  triggerDownload(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),'MaximumHub_AllJobs_'+csvDate(Date.now())+'.csv');
 }
 
 // ── PASTE LEAD — parse a Website "New Estimate Request" email into a Lead card ──
