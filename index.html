@@ -747,6 +747,13 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <p style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">Every job you have, active and archived, as a spreadsheet file you can open in Excel or Google Sheets. Includes who each job is assigned to, the sale price and how much has actually been paid.</p>
       </div>
     </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-backup');loadBackupList()">Restore from backup<span>▾</span></div>
+      <div class="set-bd hide" id="s-backup">
+        <select id="bk-day" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--input-bg);color:var(--text);font-family:inherit;margin-bottom:8px"><option value="">Loading…</option></select>
+        <button class="mv-btn" onclick="restoreBackup()">↩️ Restore this day</button>
+        <p style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">A copy of the whole board is saved automatically the first time the app is opened each day. The last 14 days are kept. Restoring puts every job, price, schedule and checklist back the way it was that day, on every device. Customer photos are not touched.</p>
+      </div>
+    </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-gdrive')">Google Drive (KCD + plans)<span>▾</span></div>
       <div class="set-bd" id="s-gdrive">
         <p style="font-size:11px;color:var(--muted);margin-bottom:6px">Lets each job card link to its <b>.job</b> file in <b>1_DOTJ_JOBS</b> and its plans <b>PDF</b> in <b>1_PDF_MAX</b>. Paste your Google OAuth Client ID here (one-time), then Save.</p>
@@ -803,7 +810,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <!-- Firebase SDK + lock/sync -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, get, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, get, remove, update, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDElEwNEqIiA54oH4OpRoJcFY0TcseFCFc",
@@ -837,29 +844,77 @@ function setSyncDot(state){
 }
 
 // ── SAVE TO FIREBASE ──
+// Saves item by item (PATH/jobs/<id>, PATH/pricingData/<id>, PATH/schedData/<id>, PATH/clSt/<key>, PATH/p)
+// and only what changed on THIS device, so an old copy on a sleepy device can't wipe other devices' work.
+// Never touches PATH/photos or PATH/backups.
 // Use window._pw so both module and regular scripts share the same reference
 window._pw={id:null,data:null};
 let saveTimer=null;
+const SYNC_KEYS=['jobs','pricingData','schedData','clSt','p'];
+let _base={};          // 'jobs/<id>' → JSON of what the server last had for it
+let _seen={};          // which SYNC_KEYS have loaded from the server at least once
+let _raw={};           // last raw server value per key (used for the daily backup)
+let _ready=false;      // no saving until the whole board has loaded once
+function _jt(j){return j.createdAt||parseInt(String(j.id||'').slice(0,8),36)||0;}
+// Turn the jobs node (old array, or object keyed by id) into {id:job} without dropping any job
+function jobsToObj(v){
+  const out={},ents=Object.entries(v||{}).filter(([k,j])=>j&&typeof j==='object');
+  // jobs already saved under their own id win
+  ents.forEach(([k,j])=>{if(j.id&&k===String(j.id))out[k]=j;});
+  const byId=new Set(Object.keys(out));
+  ents.forEach(([k,j])=>{
+    if(j.id&&k===String(j.id))return;
+    if(j.id&&byId.has(String(j.id)))return; // old array copy of a job since saved under its id
+    let id=j.id&&!/[.#$\/\[\]]/.test(j.id)?String(j.id):'';
+    if(!id||out[id]){id=uid();j={...j,id};} // missing or duplicate id: give it a new one, never drop it
+    out[id]=j;
+  });
+  return out;
+}
+function jobsNeedMigrate(v){return !!v&&(Array.isArray(v)||Object.entries(v).some(([k,j])=>!j||k!==String(j.id)));}
+function _local(k){
+  if(k==='jobs'){const o={};jobs.forEach(j=>{if(j&&j.id)o[j.id]=j;});return o;}
+  if(k==='p')return{'':P};
+  return k==='pricingData'?pricingData:k==='schedData'?schedData:clSt;
+}
+function _changes(){
+  const u={};
+  SYNC_KEYS.forEach(k=>{const m=_local(k)||{};for(const id in m){
+    const pth=id?k+'/'+id:k,s=JSON.stringify(m[id]);
+    if(s===undefined||s===_base[pth])continue;
+    if(_base[pth]===undefined&&(s==='[]'||s==='{}'||s==='null'||s==='false'))continue;
+    u[pth]=JSON.parse(s);
+  }});
+  return u;
+}
+function _push(after){
+  if(!PATH)return;
+  if(!_ready){clearTimeout(saveTimer);saveTimer=setTimeout(()=>_push(after),1000);return;}
+  const u=_changes(),keys=Object.keys(u);
+  if(!keys.length){if(after)after();setSyncDot('on');return;}
+  keys.forEach(pth=>_base[pth]=JSON.stringify(u[pth]));
+  update(ref(db,PATH),u)
+    .then(()=>{if(after)after();setSyncDot('on');})
+    .catch(()=>{keys.forEach(pth=>delete _base[pth]);setSyncDot('off');});
+}
 window.fbSave=function(){
   if(!PATH)return;
   setSyncDot('syncing');
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{
-    const data={meta:{v:1},jobs,clSt,pricingData,schedData,p:P};
-    set(ref(db,PATH),data)
-      .then(()=>setSyncDot('on'))
-      .catch(()=>setSyncDot('off'));
-  },200);
+  saveTimer=setTimeout(()=>_push(),200);
 };
 // Immediate flush — used on card close so data is never lost
 window.fbFlush=function(){
   if(!PATH)return;
   clearTimeout(saveTimer);
   setSyncDot('syncing');
-  const snap={meta:{v:1},jobs,clSt,pricingData:JSON.parse(JSON.stringify(pricingData)),schedData,p:P};
-  set(ref(db,PATH),snap)
-    .then(()=>{window._pw={id:null,data:null};setSyncDot('on');})
-    .catch(()=>setSyncDot('off'));
+  _push(()=>{window._pw={id:null,data:null};});
+};
+// Delete one job: only its own keys, nothing else on the board
+window.fbDeleteJob=function(id){
+  if(!PATH||!id)return Promise.resolve();
+  ['jobs/','pricingData/','schedData/'].forEach(k=>delete _base[k+id]);
+  return update(ref(db,PATH),{['jobs/'+id]:null,['pricingData/'+id]:null,['schedData/'+id]:null,['photos/'+id]:null}).catch(()=>{});
 };
 
 // ── CUSTOMER PHOTOS — their own node, loaded only when a card is opened ──
@@ -880,42 +935,75 @@ window.fbPhotosDel=function(jobId){
 };
 
 // ── BOOT (runs after unlock): initial load + listen for changes from other devices ──
-function boot(){
-  onValue(ref(db,PATH),(snap)=>{
-    const data=snap.val();
-    if(!data)return;
-    if(data.jobs)jobs=data.jobs;
-    if(data.clSt)clSt=data.clSt;
-    if(data.schedData)schedData=data.schedData;
-    if(data.p)P=Object.assign({},DEF,data.p);
+// Listens to each part separately so photos and backups are never downloaded here.
+function applyRemote(k,val){
+  _raw[k]=val;
+  const dirty=_ready?_changes():{};   // this device's edits not sent yet — keep them
+  Object.keys(_base).forEach(pth=>{if(pth===k||pth.startsWith(k+'/'))delete _base[pth];});
+  const m=k==='p'?{'':val}:k==='jobs'?jobsToObj(val):(val||{});
+  for(const id in m){if(m[id]!=null)_base[id?k+'/'+id:k]=JSON.stringify(m[id]);}
+  for(const pth in dirty){if(pth===k)m['']=dirty[pth];else if(pth.startsWith(k+'/'))m[pth.slice(k.length+1)]=dirty[pth];}
+  if(k==='jobs')jobs=Object.values(m).sort((x,y)=>_jt(y)-_jt(x));
+  else if(k==='p'){if(m[''])P=Object.assign({},DEF,m['']);}
+  else if(k==='clSt')clSt=m;
+  else if(k==='schedData')schedData=m;
+  else{
     // Merge pricing — never overwrite the currently-open card OR the recently-flushed card
-    if(data.pricingData){
-      const localCard=editId?pricingData[editId]:null;
-      const pw=window._pw;
-      pricingData=data.pricingData;
-      if(editId&&localCard)pricingData[editId]=localCard;
-      if(pw.id&&pw.data)pricingData[pw.id]=pw.data;
-    }
+    const localCard=editId?pricingData[editId]:null;
+    const pw=window._pw;
+    pricingData=m;
+    if(editId&&localCard)pricingData[editId]=localCard;
+    if(pw.id&&pw.data)pricingData[pw.id]=pw.data;
+  }
+  // One-time switch of the old jobs list into jobs keyed by id (atomic, so nothing added meanwhile is lost)
+  if(k==='jobs'&&jobsNeedMigrate(val)){
+    runTransaction(ref(db,PATH+'/jobs'),cur=>{if(cur==null||!jobsNeedMigrate(cur))return;return JSON.parse(JSON.stringify(jobsToObj(cur)));}).catch(()=>{});
+  }
+  _seen[k]=true;
+  if(!_ready&&SYNC_KEYS.every(x=>_seen[x])){_ready=true;dailyBackup();}
+}
+function boot(){
+  SYNC_KEYS.forEach(k=>onValue(ref(db,PATH+'/'+k),(snap)=>{
+    applyRemote(k,snap.val());
     migratePlansToIdb();
     render();renderAgenda();
     setSyncDot('on');
-  });
-  get(ref(db,PATH)).then(snap=>{
-    const data=snap.val();
-    if(data){
-      if(data.jobs)jobs=data.jobs;
-      if(data.clSt)clSt=data.clSt;
-      if(data.pricingData)pricingData=data.pricingData;
-      if(data.schedData)schedData=data.schedData;
-      if(data.p)P=Object.assign({},DEF,data.p);
-      migratePlansToIdb();
-    }
-    render();renderAgenda();
-    setSyncDot('on');
-  }).catch(()=>{
+  }));
+  get(ref(db,PATH+'/meta')).catch(()=>{
     loadData();migratePlansToIdb();render();renderAgenda();setSyncDot('off');
   });
 }
+
+// ── DAILY BACKUP: first load each day copies the board (not photos) to PATH/backups/<date>, keeps 14 ──
+// PATH/backupList holds just the dates, so listing them never downloads the backups themselves.
+function dailyBackup(){
+  const day=todayStr();
+  get(ref(db,PATH+'/backupList')).then(s=>{
+    const list=s.val()||{};
+    const u={};
+    if(!list[day]&&_raw.jobs){
+      u['backups/'+day]={jobs:_raw.jobs,pricingData:_raw.pricingData||null,schedData:_raw.schedData||null,clSt:_raw.clSt||null,p:_raw.p||null,at:Date.now()};
+      u['backupList/'+day]={at:Date.now(),n:Object.keys(jobsToObj(_raw.jobs)).length};
+      list[day]=true;
+    }
+    Object.keys(list).sort().reverse().slice(14).forEach(d=>{u['backups/'+d]=null;u['backupList/'+d]=null;});
+    if(Object.keys(u).length)return update(ref(db,PATH),u);
+  }).catch(()=>{});
+}
+window.fbBackupList=function(){
+  if(!PATH)return Promise.resolve({});
+  return get(ref(db,PATH+'/backupList')).then(s=>s.val()||{}).catch(()=>({}));
+};
+// Restore: puts the chosen day's jobs, pricing, schedule, checklists and settings back. Photos are left alone.
+window.fbRestoreBackup=function(day){
+  if(!PATH||!day)return Promise.reject(new Error('Not connected'));
+  return get(ref(db,PATH+'/backups/'+day)).then(s=>{
+    const b=s.val();
+    if(!b||!b.jobs)throw new Error('That backup is empty');
+    clearTimeout(saveTimer);_ready=false;
+    return update(ref(db,PATH),{jobs:jobsToObj(b.jobs),pricingData:b.pricingData||null,schedData:b.schedData||null,clSt:b.clSt||null,p:b.p||null});
+  }).then(()=>location.reload());
+};
 
 // ── LOCK SCREEN ──
 const lockEl=document.getElementById('lock');
@@ -3269,10 +3357,10 @@ function saveCard(){
 function moveJob(si){if(!editId)return;const job=jobs.find(j=>j.id===editId);if(job){const entered=job.stage<ORDER_STAGE&&si>=ORDER_STAGE;job.stage=si;job.stageAt=Date.now();document.getElementById('f-stage').value=si;saveData();render();orderListSync(job,true,entered);closeModal();}}
 function deleteJob(){
   if(!editId||!confirm('Delete this job?'))return;
-  if(window.fbPhotosDel)window.fbPhotosDel(editId);
+  if(window.fbDeleteJob)window.fbDeleteJob(editId);
   idbPhotosDel(editId);
   customerPhotos=[];cpDirty=false;clearTimeout(cpTimer);
-  jobs=jobs.filter(j=>j.id!==editId);delete clSt[editId];delete pricingData[editId];
+  jobs=jobs.filter(j=>j.id!==editId);delete clSt[editId];delete pricingData[editId];delete schedData[editId];
   saveData();render();closeModal();
 }
 function closeModal(){
@@ -3320,6 +3408,19 @@ function saveSettings(){
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
 }
 function toggleSet(id){document.getElementById(id).classList.toggle('hide');}
+function loadBackupList(){
+  const sel=document.getElementById('bk-day');if(!sel||!window.fbBackupList)return;
+  window.fbBackupList().then(list=>{
+    const days=Object.keys(list).sort().reverse();
+    sel.innerHTML=days.length?days.map(d=>`<option value="${d}">${d}${list[d]&&list[d].n!=null?' — '+list[d].n+' jobs':''}</option>`).join(''):'<option value="">No backups yet</option>';
+  });
+}
+function restoreBackup(){
+  const d=document.getElementById('bk-day')?.value;
+  if(!d||!window.fbRestoreBackup)return;
+  if(!confirm('Restore the board to how it was on '+d+'?\n\nThis replaces the jobs, prices, schedules and checklists on every device with that day\'s copy. Anything added or changed since then will be gone. Photos are not touched.'))return;
+  window.fbRestoreBackup(d).catch(e=>alert('Restore failed: '+(e&&e.message||e)));
+}
 
 // ── WHO DID WHAT ── reads the history already saved on every job, so old records still count
 // even though the app no longer asks who a new job belongs to. Nothing here changes any job.
