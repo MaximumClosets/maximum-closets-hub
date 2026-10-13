@@ -277,7 +277,7 @@ table.lv tbody tr.lv-arch{opacity:.55}
 .prop-deposit{background:#eaf6ef;border:2px solid #1a5c38;border-radius:8px;padding:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
 .prop-deposit .dl{font-size:13px;color:#1a5c38;font-weight:600}
 .prop-deposit .da{font-size:20px;color:#1a5c38;font-weight:800}
-.prop-msg{background:#f4f5f7;border-radius:8px;padding:12px 14px;font-size:12px;color:#555;line-height:1.6;margin-bottom:20px;font-style:italic}
+.prop-msg{background:#f4f5f7;border-radius:8px;padding:12px 14px;font-size:12px;color:#555;line-height:1.6;margin-bottom:20px;font-style:italic;white-space:pre-line}
 .prop-terms{font-size:10px;color:#666;line-height:1.6;border-top:1px solid #e0e0e0;padding-top:14px}
 .prop-terms strong{color:#444}
 .prop-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;position:sticky;top:0;background:rgba(0,0,0,0.7);padding:8px;border-radius:8px;z-index:10}
@@ -516,6 +516,14 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <div class="pcard-bd hide" id="hw-bd"><div id="hw-items"></div><button class="add-line" onclick="addHw()">+ Add Hardware Item</button></div>
     </div>
     <div class="pcard">
+      <div class="pcard-hd" onclick="toggleP('shw')"><h4>Stock Hardware</h4><span id="shw-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
+      <div class="pcard-bd hide" id="shw-bd">
+        <div class="f"><label>Linear Feet</label><input type="number" id="shw-lf" placeholder="0" oninput="calcStockHw()" inputmode="decimal"/></div>
+        <div class="result"><span>Cost → Sale</span><strong id="shw-res">$0 → $0</strong></div>
+        <p class="tip" id="shw-tip">Priced per linear foot — change the rate in ⚙️ Settings → Stock Hardware.</p>
+      </div>
+    </div>
+    <div class="pcard">
       <div class="pcard-hd" onclick="toggleP('special')"><h4>Special Items</h4><span id="special-badge" style="background:rgba(255,255,255,0.2);padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700">$0</span></div>
       <div class="pcard-bd hide" id="special-bd"><div id="special-items"></div><button class="add-line" onclick="addSpecial()">+ Add Special Item</button></div>
     </div>
@@ -558,6 +566,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
           <div class="brow"><span>Doors</span><span class="cv" id="s-doors">$0</span></div>
           <div class="brow"><span>Drawers</span><span class="cv" id="s-drawers">$0</span></div>
           <div class="brow"><span>Hardware</span><span class="cv" id="s-hw">$0</span></div>
+          <div class="brow"><span>Stock Hardware</span><span class="cv" id="s-shw">$0</span></div>
           <div class="brow"><span>Special Items</span><span class="cv" id="s-sp">$0</span></div>
           <div class="brow"><span>Helper Labor</span><span class="cv" id="s-hlp">$0</span></div>
           <div class="brow"><span>Lead Install (<span id="s-lpct">8</span>%)</span><span class="cv" id="s-lead">$0</span></div>
@@ -586,7 +595,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <textarea id="p-desc" rows="3" placeholder="Describe the scope of work for the customer…" oninput="savePropFields()" style="width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;color:#d0d4e2;background:var(--input-bg);font-family:inherit;resize:vertical"></textarea>
       <button onclick="autoDesc()" style="margin-top:5px;width:100%;padding:8px;background:#22263a;border:1.5px solid var(--border);border-radius:7px;color:var(--green);font-size:12px;font-weight:700;cursor:pointer">✨ Auto-fill from pricing</button>
     </div>
-    <div class="f"><label>Message to Customer</label><textarea id="p-notes" class="prop-inp" rows="2" placeholder="Thank you for choosing Maximum Closets!" oninput="savePropFields()"></textarea></div>
+    <div class="f"><label>Message to Customer</label><textarea id="p-notes" class="prop-inp" rows="7" placeholder="Fills in automatically from the job card" oninput="savePropFields()"></textarea></div>
     <div class="f">
       <label>3D Renders / Photos</label>
       <input type="file" id="p-imgs" multiple accept="image/*" onchange="addProposalImages(this)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:13px;cursor:pointer"/>
@@ -605,9 +614,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <button class="btn btn-p" style="width:100%;padding:11px;font-size:14px" onclick="savePropFieldsAndToast()">💾 Save</button>
       <p class="toast" id="prop-toast" style="margin-top:6px">✓ Saved!</p>
     </div>
-    <button class="gen-btn" onclick="previewProposal()">👁 Preview Proposal</button>
-    <button class="gen-btn" style="background:#0079bf;margin-top:8px" onclick="downloadFullProposalPdf(this)">📄 Download Full Proposal PDF</button>
-    <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:7px">No internet needed — generates instantly from your pricing data</p>
+    <button class="gen-btn" onclick="openSendProposal()">📨 Send Proposal</button>
     <div class="fld" style="margin-top:16px"><label>Sent history</label><div id="sent-history"></div></div>
   </div>
 
@@ -647,12 +654,41 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <div class="prop-overlay" id="prop-overlay">
   <div class="prop-actions">
     <button class="pa-close" onclick="closePropPreview()">✕ Close</button>
-    <button onclick="copyProposalEmail(this)" style="background:#555;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">📋 Copy email text</button>
-    <button onclick="sendProposalEmail(this)" style="background:#0079bf;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">✉️ Send via Gmail</button>
+    <button class="pa-send" onclick="copyProposalEmail(this)" style="background:#555;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">📋 Copy email text</button>
+    <button class="pa-send" onclick="sendProposalEmail(this)" style="background:#0079bf;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">✉️ Send via Gmail</button>
     <button id="pa-share" onclick="shareProposalPdf(this)" style="display:none;background:#1a5c38;color:#fff;flex:1;padding:10px;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">📲 Share</button>
   </div>
   <div id="plans-strip"></div>
   <div class="prop-doc" id="prop-doc"></div>
+</div>
+
+<!-- SEND PROPOSAL (one button: builds the PDF, uploads it, then email or text the link) -->
+<div class="set-overlay" id="send-overlay">
+<div class="set-modal">
+  <div class="mh"><h3>📨 Send Proposal</h3><button class="mclose" onclick="closeSendProposal()">×</button></div>
+  <div style="padding:6px 15px 0">
+    <div id="sp-status" style="font-size:13px;color:var(--text);margin-bottom:10px"></div>
+    <div id="sp-plans" style="font-size:12px;margin-bottom:10px"></div>
+    <div class="f"><label>Customer Email</label><input type="email" id="sp-email" inputmode="email" placeholder="customer@email.com"/></div>
+    <button class="gen-btn" id="sp-email-btn" style="background:#0079bf" onclick="sendViaEmail()" disabled>✉️ EMAIL</button>
+    <div class="f" style="margin-top:14px"><label>Customer Phone</label><input type="tel" id="sp-phone" inputmode="tel" placeholder="(631) 555-0000"/></div>
+    <button class="gen-btn" id="sp-text-btn" onclick="sendViaText(this)" disabled>💬 TEXT</button>
+    <div id="sp-link" style="font-size:11px;color:var(--muted);margin-top:12px;word-break:break-all"></div>
+    <p style="text-align:center;margin-top:10px"><a href="#" onclick="previewProposal();return false" style="font-size:12px;color:var(--muted);text-decoration:underline">Preview</a></p>
+  </div>
+</div>
+</div>
+
+<!-- CUSTOMER PROPOSAL PAGE (what the customer sees when they open the link: ?p=…) -->
+<div id="pv" style="display:none;position:fixed;inset:0;z-index:2000;overflow-y:auto;background:#f4f5f7;color:#222;font-family:inherit">
+  <div style="max-width:860px;margin:0 auto;padding:16px">
+    <div style="text-align:center;margin:6px 0 14px"><img id="pv-logo" alt="Maximum Closets" style="height:56px"/></div>
+    <div id="pv-head" style="text-align:center;font-size:15px;font-weight:700;margin-bottom:12px">Loading your proposal…</div>
+    <button id="pv-dl" onclick="pvDownload()" disabled style="display:block;width:100%;max-width:360px;margin:0 auto 18px;padding:14px;background:#1a5c38;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">⬇️ Download PDF</button>
+    <div id="pv-renders"></div>
+    <div id="pv-pages"></div>
+    <p style="text-align:center;font-size:12px;color:#666;margin:18px 0">Questions? Call or text 631-339-1303 · james@maximumclosets.com</p>
+  </div>
 </div>
 
 <!-- PHOTO LIGHTBOX -->
@@ -726,6 +762,12 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
         <div class="srow"><span class="sl">Handles Black</span><input type="number" id="shw-bc" step=".01" inputmode="decimal" style="width:60px"/><span class="su">→</span><input type="number" id="shw-bs" step=".5" inputmode="decimal" style="width:60px"/></div>
         <div class="srow"><span class="sl">Drawer Slides SC</span><input type="number" id="shw-dc" step=".01" inputmode="decimal" style="width:60px"/><span class="su">→</span><input type="number" id="shw-ds" step=".5" inputmode="decimal" style="width:60px"/></div>
         <div class="srow"><span class="sl">Closet Rod Chrome</span><input type="number" id="shw-rc" step=".01" inputmode="decimal" style="width:60px"/><span class="su">→</span><input type="number" id="shw-rs" step=".5" inputmode="decimal" style="width:60px"/></div>
+      </div>
+    </div>
+    <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-shw')">Stock Hardware (per linear foot)<span>▾</span></div>
+      <div class="set-bd" id="s-shw">
+        <div class="srow"><span class="sl">Cost / lin. ft</span><input type="number" id="sshw-c" step=".01" inputmode="decimal"/><span class="su">$/ft</span></div>
+        <div class="srow"><span class="sl">Sell / lin. ft</span><input type="number" id="sshw-s" step=".01" inputmode="decimal"/><span class="su">$/ft</span></div>
       </div>
     </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-labor')">Labor Defaults<span>▾</span></div>
@@ -934,6 +976,26 @@ window.fbPhotosDel=function(jobId){
   return remove(ref(db,PATH+'/photos/'+jobId)).catch(()=>{});
 };
 
+// ── PROPOSAL LINKS ── each job's customer link lives at boards/<random 64-hex>, the same shape as a
+// board, so it sits under the same database rules. Nobody can find it without the link.
+window.fbShareSave=async function(tok,meta,chunks,renders){
+  const base='boards/'+tok,ver=meta.ver;
+  for(let i=0;i<chunks.length;i++)await set(ref(db,base+'/c/'+ver+'/'+i),chunks[i]);
+  for(let i=0;i<renders.length;i++)await set(ref(db,base+'/r/'+ver+'/'+i),renders[i]);
+  const old=await get(ref(db,base+'/s')).then(x=>x.val()).catch(()=>null);
+  await set(ref(db,base+'/s'),{...meta,n:chunks.length,nr:renders.length});
+  if(old&&old.ver&&old.ver!==ver)update(ref(db,base),{['c/'+old.ver]:null,['r/'+old.ver]:null}).catch(()=>{});
+};
+window.fbShareLoad=async function(tok){
+  if(!/^[0-9a-f]{64}$/.test(tok))return null;
+  const base='boards/'+tok,meta=(await get(ref(db,base+'/s'))).val();
+  if(!meta||!meta.ver)return null;
+  const part=(k,n)=>Promise.all(Array.from({length:n||0},(_,i)=>get(ref(db,base+'/'+k+'/'+meta.ver+'/'+i)).then(x=>x.val()||'')));
+  const [c,r]=await Promise.all([part('c',meta.n),part('r',meta.nr)]);
+  return{meta,b64:c.join(''),renders:r.filter(Boolean)};
+};
+if(window.PV_TOKEN&&window.pvStart)window.pvStart();
+
 // ── BOOT (runs after unlock): initial load + listen for changes from other devices ──
 // Listens to each part separately so photos and backups are never downloaded here.
 function applyRemote(k,val){
@@ -1041,7 +1103,7 @@ window.lockDevice=function(){
 // Auto-unlock if this device was remembered
 let savedKey=null;
 try{savedKey=localStorage.getItem('mc-key');}catch(e){}
-if(savedKey){
+if(savedKey&&!window.PV_TOKEN){
   const p='boards/'+savedKey;
   get(ref(db,p+'/meta')).then(s=>{
     if(s.exists()){
@@ -1128,7 +1190,7 @@ const DEF = {
   sl12:4.92, sl14:5.06, sl16:6.04, sl18:8.04, sl20:8.80, sl22:7.77, sl24:9.50,
   po12:15, po14:15, po16:15, po18:20, po20:20, po22:20, po24:20,
   hgC:3.30, hgS:10, hnC:1.57, hnS:10, hbC:4.26, hbS:10, slC:5.06, slS:12, rdC:5.30, rdS:16,
-  hlpRate:20, leadPct:8, hlpHrs:8, gClientId:'', ordEmails:'james@maximumclosets.com'
+  hlpRate:20, leadPct:8, hlpHrs:8, shwC:null, shwS:null, gClientId:'', ordEmails:'james@maximumclosets.com'
 };
 let P = {...DEF};
 function loadP(){try{P=Object.assign({},DEF,JSON.parse(localStorage.getItem('mc-p')||'{}'));}catch(e){P={...DEF};}}
@@ -1388,7 +1450,7 @@ function renderCL(jid,si){
   });
 }
 
-let melC=0,melSl=0,doorC=0,doorSl=0,drwC=0,drwSl=0,hwC=0,hwSl=0,hlpC=0,spC=0,spSl=0;
+let melC=0,melSl=0,doorC=0,doorSl=0,drwC=0,drwSl=0,hwC=0,hwSl=0,hlpC=0,spC=0,spSl=0,shwC=0,shwSl=0;
 let melIdx=0,doorIdx=0,drwIdx=0,hwIdx=0,spIdx=0;
 const SPECIAL_ITEMS=[
   {l:'Valet Rod 12" Nickel',c:12.55},{l:'Valet Rod 12" Black',c:13.07},{l:'Valet Rod 12" Satin Brass',c:19.11},
@@ -1588,6 +1650,26 @@ function calcHw(){
   });
   document.getElementById('hw-badge').textContent=fmt(hwSl);calcAll();calcOrderList();
 }
+// ── STOCK HARDWARE ── basic hardware priced by the job's linear feet × the per-foot rate in Settings.
+// The rate starts out as the price most often used on the old unnamed "Custom Item" hardware lines.
+function stockHwRate(){
+  if(P.shwS==null){
+    const seen={};
+    Object.values(pricingData||{}).forEach(pd=>(((pd||{}).inputs||{}).hardware||[]).forEach(h=>{
+      if(h&&h.preset==='cu'&&(parseFloat(h.qty)||0)>0&&(parseFloat(h.sell)||0)>0){const k=h.sell+'|'+(h.cost||0);seen[k]=(seen[k]||0)+1;}
+    }));
+    const best=Object.keys(seen).sort((a,b)=>seen[b]-seen[a])[0];
+    if(best){const[sl,c]=best.split('|');P.shwS=parseFloat(sl)||0;P.shwC=parseFloat(c)||0;saveP(P);if(window.fbSave)window.fbSave();}
+  }
+  return{c:parseFloat(P.shwC)||0,s:parseFloat(P.shwS)||0};
+}
+function calcStockHw(){
+  const lf=vn('shw-lf',0),r=stockHwRate();
+  shwC=lf*r.c;shwSl=lf*r.s;
+  const res=document.getElementById('shw-res');if(res)res.textContent=fmt(shwC)+' → '+fmt(shwSl);
+  const tip=document.getElementById('shw-tip');if(tip)tip.textContent=r.s?`${fmtD(r.s)} per linear foot (cost ${fmtD(r.c)}) — change it in ⚙️ Settings → Stock Hardware.`:'⚠️ No per-foot rate set yet — add it in ⚙️ Settings → Stock Hardware.';
+  document.getElementById('shw-badge').textContent=fmt(shwSl);calcAll();
+}
 function addSpecial(){
   spIdx++;const id='sp-'+spIdx;
   const opts=SPECIAL_ITEMS.map((p,i)=>p.retired?'':`<option value="${i}">${p.l} — $${p.c.toFixed(2)}</option>`).join('')+`<option value="other">✎ Other (type your own)…</option>`;
@@ -1608,6 +1690,13 @@ function spPre(id){
   const nameRow=document.getElementById(id+'-name-row');
   const hamperRow=document.getElementById(id+'-hamper');
   if(v==='other'){
+    // A custom line has to have a name — it is what the customer reads on the proposal
+    const nmEl=document.getElementById(id+'-name');
+    if(nmEl&&!nmEl.value.trim()){
+      const nm=(prompt('Name for this custom item (this is what the customer sees):','')||'').trim();
+      if(!nm){document.getElementById(id+'-t').selectedIndex=0;spPre(id);return;}
+      nmEl.value=nm;
+    }
     if(nameRow)nameRow.style.display='';
     if(hamperRow)hamperRow.style.display='none';
     calcSpecial();return;   // custom item: leave cost/sell for manual entry
@@ -1859,22 +1948,22 @@ function calcLabor(){
   document.getElementById('hlp-res').textContent=fmt(hlpC);document.getElementById('labor-badge').textContent=fmt(hlpC);calcAll();
 }
 function calcAll(){
-  const sale=melSl+doorSl+drwSl+hwSl+spSl;
+  const sale=melSl+doorSl+drwSl+hwSl+spSl+shwSl;
   const lp=vn('lead-pct',P.leadPct)/100,op=vn('owner-pct',0)/100;
-  const lc=sale*lp,oc=sale*op,tot=melC+doorC+drwC+hwC+spC+hlpC+lc+oc;
+  const lc=sale*lp,oc=sale*op,tot=melC+doorC+drwC+hwC+spC+shwC+hlpC+lc+oc;
   const profit=sale-tot,margin=sale>0?(profit/sale*100):0;
   const profitEl=document.getElementById('profit-amt');
   if(profitEl){profitEl.textContent=(profit<0?'-':'')+fmtD(profit);profitEl.style.color=profit<0?'#ff6b6b':'white';}
   const setT=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
   setT('profit-marg',margin.toFixed(1)+'% margin');setT('s-kcd',fmtD(sale));setT('s-cost',fmtD(tot));
   setT('s-mel',fmtD(melC));setT('s-doors',fmtD(doorC));setT('s-drawers',fmtD(drwC));setT('s-hw',fmtD(hwC));
-  setT('s-sp',fmtD(spC));setT('s-hlp',fmtD(hlpC));setT('s-lead',fmtD(lc));setT('s-owner',fmtD(oc));setT('s-total',fmtD(tot));
+  setT('s-sp',fmtD(spC));setT('s-shw',fmtD(shwC));setT('s-hlp',fmtD(hlpC));setT('s-lead',fmtD(lc));setT('s-owner',fmtD(oc));setT('s-total',fmtD(tot));
   setT('s-lpct',vn('lead-pct',P.leadPct));setT('s-opct',vn('owner-pct',0));
   document.getElementById('profit-badge').textContent=(profit<0?'-':'')+fmt(profit)+' profit';
   if(editId){
     const job=jobs.find(j=>j.id===editId);
     if(job){job.sale=Math.round(sale);job.cost=Math.round(tot);}
-    pricingData[editId]={...(pricingData[editId]||{}),kcd:sale,melC,doorC,drwC,hwC,spC,hlpC,lc,oc,tot,profit};
+    pricingData[editId]={...(pricingData[editId]||{}),kcd:sale,melC,doorC,drwC,hwC,spC,shwC,hlpC,lc,oc,tot,profit};
     snapshotInputs();saveData();render();
   }
 }
@@ -1914,7 +2003,7 @@ function readPricingInputs(){
   });
   return{
     melamine,
-    doors,drawers,hardware,specialItems,
+    doors,drawers,hardware,specialItems,stockHwLf:parseFloat(document.getElementById('shw-lf')?.value)||0,
     hlpHrs:parseFloat(document.getElementById('hlp-hrs')?.value??''),hlpRate:parseFloat(document.getElementById('hlp-rate')?.value)||P.hlpRate,
     leadPct:parseFloat(document.getElementById('lead-pct')?.value)||P.leadPct,ownerPct:parseFloat(document.getElementById('owner-pct')?.value)||0,
     addr:document.getElementById('p-addr')?.value||'',pDisc:document.getElementById('p-disc')?.value||'',pTax:document.getElementById('p-tax')?.value||'',pNotes:document.getElementById('p-notes')?.value||'',pDesc:document.getElementById('p-desc')?.value||'',pPlans:document.getElementById('p-plans')?.checked||false
@@ -1963,9 +2052,8 @@ function autoDesc(){
   const parts=[];
   document.querySelectorAll('#mel-items .item-block').forEach(b=>{
     const q=parseFloat(b.querySelector('.mqty')?.value)||0;if(q<=0)return;
-    const unit=b.querySelector('.mmethod')?.value==='sheets'?'sheets':'sq ft';
     const nm=(b.querySelector('.mname')?.value||'').trim();
-    parts.push(`${qty3(q)} ${unit} of ${nm?nm+' ':''}melamine`);
+    const p=`${nm?nm+' ':''}melamine`;if(!parts.includes(p))parts.push(p);
   });
   const doorParts=[];
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
@@ -1982,6 +2070,7 @@ function autoDesc(){
   if(hrs>0)desc+=`. Installation is estimated at ${hrs} hours and includes all labor, hardware, and clean-up`;
   desc+='. All units are constructed from ¾" melamine with finished edges and installed to fit your exact space.';
   const el=document.getElementById('p-desc');if(el)el.value=desc;
+  fillDefaultMessage();
   savePropFields();
 }
 function addProposalImages(input){
@@ -2010,9 +2099,11 @@ function addPlansPdf(input){
   const file=input.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    proposalPlansPdf={name:file.name,dataUrl:e.target.result};
+    proposalPlansPdf={name:file.name,dataUrl:e.target.result,at:Date.now()};
     if(editId){idbPlansSet(editId,proposalPlansPdf);if(!pricingData[editId])pricingData[editId]={};pricingData[editId].plansPdfName=file.name;saveData();}
     renderPlansPdfPreview();
+    // Re-uploaded from the Send Proposal window: rebuild the proposal with the new plans
+    if(document.getElementById('send-overlay').classList.contains('open'))openSendProposal();
   };
   reader.readAsDataURL(file);
   input.value='';
@@ -2179,8 +2270,9 @@ function buildProposalLines(){
   document.querySelectorAll('#mel-items .item-block').forEach(b=>{
     const q=parseFloat(b.querySelector('.mqty')?.value)||0;if(q<=0)return;
     const m={color:b.querySelector('.mname')?.value||'',type:b.querySelector('.mtype')?.value||'white'};
-    const melUnit=b.querySelector('.mmethod')?.value==='sheets'?'sheets':'sq ft';
-    lines.push({label:melLabel(m)+' Melamine',qty:`${qty3(q)} ${melUnit}`});
+    // Sheet counts stay in the Order List only — the customer just sees the color
+    const label=melLabel(m)+' melamine closet system';
+    if(!lines.some(l=>l.label===label))lines.push({label,qty:''});
   });
   document.querySelectorAll('#door-items .item-block').forEach(b=>{
     const sel=b.querySelector('select');const w=parseFloat(b.querySelector('.dwidth')?.value)||0;const hh=parseFloat(b.querySelector('.dheight')?.value)||0;const sqEl=b.querySelector('.dsqft');let sqft=parseFloat(sqEl?.value)||0;if(w>0&&hh>0){sqft=w*hh/144;if(sqEl&&document.activeElement!==sqEl)sqEl.value=sqft.toFixed(2);}
@@ -2199,8 +2291,12 @@ function buildProposalLines(){
     const lbl=document.getElementById(bid+'-t')?.options[document.getElementById(bid+'-t').selectedIndex]?.text||'Hardware';
     if(q>0)lines.push({label:lbl,qty:q});
   });
+  const shwLf=vn('shw-lf',0);
+  if(shwLf>0)lines.push({label:'Stock Hardware',qty:`${qty3(shwLf)} lin. ft`});
   document.querySelectorAll('#special-items .item-block').forEach(b=>{
     const bid=b.id,q=parseFloat(document.getElementById(bid+'-q')?.value)||0;
+    // A custom line with no name never prints on the proposal
+    if(document.getElementById(bid+'-t')?.value==='other'&&!(document.getElementById(bid+'-name')?.value||'').trim())return;
     const lbl=spLabel(bid);
     if(q>0)lines.push({label:lbl,qty:q});
   });
@@ -2252,7 +2348,7 @@ function renderPayments(){
 }
 function getProposalData(){
   const job=jobs.find(j=>j.id===editId);if(!job)return null;
-  const sale=melSl+doorSl+drwSl+hwSl+spSl;if(!sale){alert('Add pricing in the Pricing tab first.');return null;}
+  const sale=melSl+doorSl+drwSl+hwSl+spSl+shwSl;if(!sale){alert('Add pricing in the Pricing tab first.');return null;}
   const disc=vn('p-disc',0),tax=vn('p-tax',0),addr=document.getElementById('p-addr')?.value||'',notes=document.getElementById('p-notes')?.value||'';
   const desc=document.getElementById('p-desc')?.value||'';
   const plans=document.getElementById('p-plans')?.checked||false;
@@ -2268,6 +2364,14 @@ function getProposalData(){
   const melColor=melColors.join(', ');
   const payments=jobPayments(job),paid=paidTotal(job),balance=total-paid;
   return{job,kcd:sale,disc,tax,addr,notes,desc,plans,images:proposalImages,plansPdf:proposalPlansPdf,subtotal,afterDisc,total,deposit,today,hrs,melColor,propNum:ensurePropNum(job),payments,paid,balance,lines:buildProposalLines()};
+}
+// Name, address, phone, then the email exactly once — even when the email also got typed into another field
+function preparedForLines(d){
+  const EM=/[^\s,;<>]+@[^\s,;<>]+\.[a-z]{2,}/ig;
+  const em=(d.job.email||'').trim()||((String(d.addr||'')+' '+String(d.job.phone||'')).match(EM)||[''])[0];
+  const out=[d.job.name,d.addr,d.job.phone].map(v=>String(v||'').replace(EM,'').replace(/^[\s,;]+|[\s,;]+$/g,'')).filter(Boolean);
+  if(em)out.push(em);
+  return out;
 }
 // mode: 'proposal' (default) | 'invoice' | 'receipt' — same layout, different header and money box
 function buildProposalHTML(d,mode){
@@ -2290,7 +2394,7 @@ function buildProposalHTML(d,mode){
   const taxRow=d.tax>0?`<div class="prop-trow"><span>Tax</span><span>${money(d.tax)}</span></div>`:'';
   return`<div class="prop-co"><div><img src="${LOGO_DATA_URL}" alt="Maximum Closets" style="height:60px;display:block;margin-bottom:4px"><div style="font-size:11px;color:#888;margin-top:3px">Custom Closet Installation · Long Island, NY</div></div>
     <div class="prop-co-info">james@maximumclosets.com<br>${DOCLBL} #${d.propNum}<br>${d.today}</div></div>
-    <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${d.job.name}${d.addr?'<br>'+d.addr:''}${d.job.phone?'<br>'+d.job.phone:''}${d.job.email?'<br>'+d.job.email:''}</p></div>
+    <div class="prop-meta"><div class="prop-meta-box"><h4>Prepared For</h4><p>${preparedForLines(d).join('<br>')}</p></div>
     <div class="prop-meta-box"><h4>Installation Details</h4><p>Est. Install Time: ${d.hrs} hours${d.melColor?'<br>Melamine Color: '+d.melColor:''}</p></div></div>
     <p class="prop-title">Line Items</p>
     <table class="prop-table"><thead><tr><th>What's Included</th><th style="text-align:right">Qty</th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="2" style="color:#aaa;font-style:italic">No line items</td></tr>'}</tbody></table>
@@ -2301,7 +2405,7 @@ function buildProposalHTML(d,mode){
     ${d.desc?`<div style="background:#f4f5f7;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#333;line-height:1.7"><strong style="color:#222;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
     ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(${d.images.length>1?2:1},1fr);gap:12px">${d.images.map(img=>`<div style="border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><img src="${img.dataUrl}" style="width:100%;height:auto;display:block"></div>`).join('')}</div></div>`:''}
     ${d.plans&&plansAreAttached()?`<div style="background:#eaf6ef;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1a5c38;font-weight:600">📐 Design plans / drawings are included with this proposal${plansStatus.modifiedTime?` <span style="font-weight:500">(drawings dated ${plansDateLabel(plansStatus.modifiedTime)})</span>`:''}</div>`:''}
-    ${plansAreAttached()?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><span style="color:#1a5c38;font-weight:600">${plansStatus.name||''}</span></div>`:''}
+    ${plansAreAttached()&&(mode!=='proposal'||d.plans)?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><span style="color:#1a5c38;font-weight:600">${plansStatus.name||''}</span></div>`:''}
     ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
     ${mode!=='proposal'?payHist:''}
     <div class="prop-terms"><strong>Terms & Conditions:</strong> ${terms}</div>`;
@@ -2399,7 +2503,22 @@ let plansStatus={source:'none',state:'idle'};
 function plansJobFile(){const j=jobs.find(x=>x.id===editId);return j&&j.pdfFile&&j.pdfFile.id?j.pdfFile:null;}
 function plansAreAttached(){return plansStatus.state==='ready'&&plansStatus.source!=='none';}
 function plansDateLabel(t){try{return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return '';}}
+// The newest plans PDF for this job in 1_PDF_MAX: the linked file or a newer revision of it
+// (e.g. "John_lisa_rev2.pdf"), or — when nothing is linked yet — a file named after the customer.
+async function plansNewestInFolder(){
+  const job=jobs.find(x=>x.id===editId);if(!job)return null;
+  const files=await driveLoadFiles('pdf',true);
+  const norm=s=>(s||'').toLowerCase().replace(/\.pdf$/i,'').replace(/[^a-z0-9]+/g,' ').trim();
+  const linked=job.pdfFile&&job.pdfFile.id?norm(job.pdfFile.name):'';
+  const nameOk=(job.name||'').trim().split(/\s+/).length>=2;
+  const cand=files.filter(f=>/\.pdf$/i.test(f.name)&&(linked?(f.id===job.pdfFile.id||norm(f.name).startsWith(linked)):(nameOk&&driveScore(job.name,f.name)>=1.35)));
+  cand.sort((a,b)=>String(b.modifiedTime||'').localeCompare(String(a.modifiedTime||'')));
+  const f=cand[0];if(!f)return null;
+  if(!job.pdfFile||job.pdfFile.id!==f.id){job.pdfFile={id:f.id,name:f.name,link:f.webViewLink};saveData();render();driveRenderBox('pdf');}
+  return f;
+}
 async function refreshPlansStatus(){
+  if(driveClientId()&&driveHasToken()){try{await plansNewestInFolder();}catch(e){console.error('Looking up the newest plans failed',e);}}
   const jf=plansJobFile(),hasLocal=!!(proposalPlansPdf&&proposalPlansPdf.dataUrl);
   if(jf&&driveClientId()&&!driveHasToken()){
     plansStatus={source:'drive',state:'needs-connect',name:jf.name};renderPlansStrip();return;
@@ -2433,8 +2552,7 @@ function renderPlansStrip(){
     `📐 Latest plans not loaded yet — <b>${driveEsc(st.name)}</b><br><button onclick="plansConnectDrive()" style="margin-top:6px;background:#0079bf;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer">Connect Drive &amp; attach latest plans</button>`));
   if(st.source==='drive'&&st.state==='ready')return void(el.innerHTML=wrap('#eaf6ef','#1a5c38','#12522f',
     `📐 Latest plans attached: <b>${driveEsc(st.name)}</b>${st.modifiedTime?' — updated '+plansDateLabel(st.modifiedTime):''}`));
-  if(st.source==='local'&&st.state==='ready')return void(el.innerHTML=wrap('#fff6e5','#e0a800','#7a5c00',
-    `📎 Attaching a saved copy from this device: <b>${driveEsc(st.name)}</b><br>This is not the live Drive file — if the drawings changed since you uploaded it, the customer gets the old version.${st.fellBack?'<br>(Could not reach Drive just now.)':''}`));
+  if(st.source==='local'&&st.state==='ready')return void(el.innerHTML=plansFreshUpload()?'':`<div style="font-size:12px;margin-bottom:10px">${plansOutdatedHtml()}</div>`);
   if(st.state==='error')return void(el.innerHTML=wrap('#fdecea','#c0392b','#922b21',
     `⚠️ Could not load the plans from Drive${st.err?' ('+driveEsc(st.err)+')':''}. <b>No plans will be attached.</b>`));
   if(wantsPlans)return void(el.innerHTML=wrap('#fdecea','#c0392b','#922b21',
@@ -2447,6 +2565,9 @@ function previewDoc(mode){
   const d=getProposalData();if(!d)return;
   if(mode==='receipt'&&d.balance>0.005&&!confirm('There is still a balance of $'+d.balance.toFixed(2)+' on this job. Send a receipt anyway?'))return;
   docMode=mode||'proposal';
+  // Proposals go out with the Send Proposal button, so their preview only needs Close
+  document.querySelectorAll('.pa-send').forEach(b=>b.style.display=docMode==='proposal'?'none':'');
+  document.getElementById('pa-share').style.display=(docMode!=='proposal'&&canSharePdf())?'':'none';
   document.getElementById('prop-doc').innerHTML=buildProposalHTML(d,docMode);
   clearArmedShare();
   plansStatus={source:'none',state:'idle'};renderPlansStrip();
@@ -2454,10 +2575,212 @@ function previewDoc(mode){
   refreshPlansStatus();
 }
 function previewProposal(){previewDoc('proposal');}
+// ── DEFAULT MESSAGE TO CUSTOMER ── filled from the job card only when the box is empty, never over typed words
+function custFirstName(job){return(((job&&job.name)||document.getElementById('f-name')?.value||'').trim().split(/\s+/)[0])||'';}
+function streetOnly(addr){return String(addr||'').split(',')[0].trim();}
+function propStreet(){const job=jobs.find(j=>j.id===editId);return streetOnly(document.getElementById('p-addr')?.value||document.getElementById('f-addr')?.value||(job&&job.addr));}
+function defaultCustomerMessage(){
+  const job=jobs.find(j=>j.id===editId),first=custFirstName(job),street=propStreet();
+  return `Hi ${first||'there'},\n\nThank you for choosing Maximum Closets! Attached is your proposal and design${street?' for '+street:''}. Please look it over and let us know if you'd like any changes. Once you approve, we'll get your install on the schedule.\n\nQuestions? Call or text 631-339-1303.\n\nJames Lowe\nMaximum Closets`;
+}
+function fillDefaultMessage(){
+  const el=document.getElementById('p-notes');if(!el||el.value.trim())return false;
+  el.value=defaultCustomerMessage();return true;
+}
+// ── SEND PROPOSAL ── one button: build the PDF, put it online behind a private link, then email or text that link.
+// Emailing a link instead of an attachment means nothing can be forgotten, too big, or stripped by spam filters.
+let spState=null;
+const SEND_TARGET=8*1024*1024, SEND_MAX=30*1024*1024;
+function isPhoneDevice(){return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));}
+function spStatus(html){const el=document.getElementById('sp-status');if(el)el.innerHTML=html;}
+function plansFreshUpload(){return !!(proposalPlansPdf&&proposalPlansPdf.at&&Date.now()-proposalPlansPdf.at<3600000);}
+// The one small line shown when the plans could not come from Drive
+function plansOutdatedHtml(){
+  const have=!!(proposalPlansPdf&&proposalPlansPdf.dataUrl);
+  return `<span style="color:#b9770e">${have?'Plans may be outdated – re-upload?':'Plans not found – upload?'}</span> <button onclick="document.getElementById('p-plans-pdf').click()" style="background:#22263a;border:1.5px solid var(--border);border-radius:6px;color:var(--text);padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer">${have?'Re-upload':'Upload'}</button>`;
+}
+function renderSendPlansLine(d){
+  const el=document.getElementById('sp-plans');if(!el)return;
+  if(!d.plans){el.innerHTML='';return;}
+  const st=plansStatus;
+  if(st.source==='drive'&&st.state==='ready')el.innerHTML=`<span style="color:var(--green)">📐 Latest plans attached: ${driveEsc(st.name)}${st.modifiedTime?' — updated '+plansDateLabel(st.modifiedTime):''}</span>`;
+  else if(st.source==='local'&&st.state==='ready'&&plansFreshUpload())el.innerHTML=`<span style="color:var(--green)">📐 Plans attached: ${driveEsc(st.name)} (just uploaded)</span>`;
+  else el.innerHTML=plansOutdatedHtml();
+}
+async function openSendProposal(){
+  const job=jobs.find(j=>j.id===editId);if(!job){alert('Save the job first.');return;}
+  fillDefaultMessage();savePropFields();
+  docMode='proposal';
+  let d=getProposalData();if(!d)return;
+  if(!window.jspdf||!window.html2canvas){alert('PDF tools are still loading — please wait a moment and tap again.');return;}
+  // Ask Google for Drive access now, while the tap is fresh, so the sign-in window isn't blocked
+  const tokenP=(d.plans&&driveClientId()&&!driveHasToken())?driveGetToken().catch(()=>null):Promise.resolve();
+  const run={jobId:job.id,link:'',d,built:null};spState=run;
+  document.getElementById('sp-email').value=job.email||'';
+  document.getElementById('sp-phone').value=job.phone||'';
+  document.getElementById('sp-email-btn').disabled=true;
+  const tb=document.getElementById('sp-text-btn');tb.disabled=true;tb.textContent=isPhoneDevice()?'💬 TEXT':'📋 Copy text message';
+  document.getElementById('sp-link').innerHTML='';document.getElementById('sp-plans').innerHTML='';
+  document.getElementById('send-overlay').classList.add('open');
+  try{
+    spStatus('⏳ Getting the latest plans…');
+    await tokenP;
+    if(d.plans){
+      await refreshPlansStatus();
+      // Drive not reachable: fall back to the copy saved on this device, and say so in one line
+      if(plansStatus.state!=='ready'&&proposalPlansPdf&&proposalPlansPdf.dataUrl)plansStatus={source:'local',state:'ready',name:proposalPlansPdf.name,fellBack:true};
+    }
+    if(spState!==run)return;
+    d=getProposalData();if(!d)throw new Error('no pricing');run.d=d;
+    renderSendPlansLine(d);
+    spStatus('⏳ Building the proposal PDF…');
+    const built=await buildSendablePdf(d);
+    if(spState!==run)return;
+    spStatus('⏳ Uploading…');
+    run.link=await publishProposal(job,d,built);run.built=built;
+    if(spState!==run)return;
+    spStatus(`✅ Ready (${(built.blob.size/1048576).toFixed(1)} MB). Choose Email or Text.`);
+    document.getElementById('sp-email-btn').disabled=false;tb.disabled=false;
+    document.getElementById('sp-link').innerHTML=`Customer link: <a href="${run.link}" target="_blank" style="color:#4aa3df">${run.link}</a>`;
+  }catch(err){
+    console.error(err);
+    if(spState===run)spStatus(`<span style="color:#ff6b6b">⚠️ Could not finish: ${driveEsc((err&&err.message)||'unknown error')}. Check the internet connection and tap Send Proposal again.</span>`);
+  }
+}
+function closeSendProposal(){document.getElementById('send-overlay').classList.remove('open');}
+// Build the PDF; if it comes out too big for a quick phone download, rebuild it smaller automatically
+async function buildSendablePdf(d){
+  const tries=[{fmt:'PNG',scale:3},{fmt:'JPEG',q:0.9,scale:3},{fmt:'JPEG',q:0.8,scale:2},{fmt:'JPEG',q:0.65,scale:1.5}];
+  let out=null;
+  for(let i=0;i<tries.length;i++){
+    if(i)spStatus('⏳ Shrinking the PDF so it opens fast on a phone…');
+    out=await buildProposalPdf(d,tries[i]);
+    if(out.blob.size<=SEND_TARGET)return out;
+  }
+  if(out.blob.size>SEND_MAX)throw new Error('the PDF is still '+Math.round(out.blob.size/1048576)+' MB after shrinking — the plans PDF is probably too large');
+  return out;
+}
+function shrinkDataUrl(dataUrl,max,q){
+  return new Promise(res=>{const im=new Image();im.onload=()=>{let w=im.width,h=im.height;const s=Math.min(1,max/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);
+    const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);res(c.toDataURL('image/jpeg',q));};im.onerror=()=>res(dataUrl);im.src=dataUrl;});
+}
+function blobToB64(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=()=>rej(r.error);r.readAsDataURL(blob);});}
+function randHex(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a).map(b=>b.toString(16).padStart(2,'0')).join('');}
+// Puts the PDF (and the renders, so they show big on the customer's screen) online under one private
+// link per job. Sending again updates what that same link shows.
+async function publishProposal(job,d,built){
+  const renders=[];
+  for(const im of (d.images||[]))renders.push(im.dataUrl.length>700000?await shrinkDataUrl(im.dataUrl,1400,0.75):im.dataUrl);
+  const meta={name:job.name||'',street:streetOnly(d.addr),file:built.filename,size:built.blob.size,at:Date.now(),ver:Date.now().toString(36)};
+  try{
+    if(!window.fbShareSave)throw new Error('not connected');
+    if(!job.shareTok){job.shareTok=randHex(32);saveData();}
+    const b64=await blobToB64(built.blob),chunks=[];
+    for(let i=0;i<b64.length;i+=900000)chunks.push(b64.slice(i,i+900000));
+    await window.fbShareSave(job.shareTok,meta,chunks,renders);
+    return location.origin+location.pathname+'?p='+job.shareTok;
+  }catch(err){
+    // Backup route: a Drive copy anyone with the link can open
+    console.error('Proposal link upload failed, trying Drive',err);
+    try{return await driveShareLink(built.blob,built.filename);}
+    catch(e2){throw new Error('upload failed ('+((err&&err.message)||'')+')');}
+  }
+}
+async function driveShareLink(blob,filename){
+  const f=await driveUploadPdf(blob,filename,await driveSentFolder());
+  const token=await driveGetToken();
+  const r=await fetch('https://www.googleapis.com/drive/v3/files/'+f.id+'/permissions',{method:'POST',
+    headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({role:'reader',type:'anyone'})});
+  if(!r.ok)throw new Error('share-'+r.status);
+  return f.webViewLink;
+}
+function sendViaEmail(){
+  const run=spState;if(!run||!run.link)return;
+  const job=jobs.find(j=>j.id===run.jobId);if(!job)return;
+  const to=document.getElementById('sp-email').value.trim();
+  if(to&&!job.email){job.email=to;document.getElementById('f-email').value=to;}
+  const street=streetOnly(run.d.addr);
+  const subject='Your Maximum Closets Proposal'+(street?' – '+street:'');
+  const msg=(document.getElementById('p-notes')?.value||defaultCustomerMessage()).trim();
+  const linkPara='View and download your proposal here:\n'+run.link;
+  const i=msg.indexOf('\n\nQuestions?');
+  const body=i>=0?msg.slice(0,i)+'\n\n'+linkPara+msg.slice(i):msg+'\n\n'+linkPara;
+  window.open('https://mail.google.com/mail/?authuser='+encodeURIComponent('james@maximumclosets.com')+'&view=cm&fs=1&to='+encodeURIComponent(to)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body),'_blank');
+  markProposalSent('email');
+}
+function sendViaText(btn){
+  const run=spState;if(!run||!run.link)return;
+  const job=jobs.find(j=>j.id===run.jobId);if(!job)return;
+  const phone=document.getElementById('sp-phone').value.trim();
+  if(phone&&!job.phone){job.phone=phone;document.getElementById('f-phone').value=phone;}
+  const msg=`Hi ${custFirstName(job)||'there'}, here's your Maximum Closets proposal: ${run.link} – James`;
+  if(isPhoneDevice()){
+    const sep=/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)?'&':'?';
+    location.href='sms:'+phone.replace(/[^\d+]/g,'')+sep+'body='+encodeURIComponent(msg);
+    markProposalSent('text');return;
+  }
+  const done=()=>{btn.textContent='✓ Copied — paste it into your text';setTimeout(()=>{btn.textContent='📋 Copy text message';},2500);markProposalSent('text');};
+  const fail=()=>alert('Could not copy automatically. Here is the text:\n\n'+msg);
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(msg).then(done).catch(()=>fallbackCopyText(msg,done,fail));
+  else fallbackCopyText(msg,done,fail);
+}
+// Log on the job card ("Proposal sent Oct 12 by email/text") and in Sent history
+function markProposalSent(via){
+  const run=spState,job=run&&jobs.find(j=>j.id===run.jobId);if(!job)return;
+  const day=todayStr(),prev=job.propSent;
+  const vias=(prev&&prev.day===day&&prev.via)?prev.via.split('/'):[];
+  if(!vias.includes(via))vias.push(via);
+  job.propSent={day,at:Date.now(),via:vias.join('/')};
+  if(run.built&&editId===run.jobId){docMode='proposal';logAndArchive(run.d,via,run.built.blob,run.built.filename);}
+  saveData();render();
+}
+// ── CUSTOMER PROPOSAL PAGE ── opened from the link (?p=…): no lock screen, just the proposal
+window.PV_TOKEN=(new URLSearchParams(location.search).get('p')||'').replace(/[^0-9a-f]/gi,'');
+let pvBlob=null,pvName='Maximum-Closets-Proposal.pdf';
+function pvLoadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load'));document.head.appendChild(s);});}
+async function pvStart(){
+  const pv=document.getElementById('pv');pv.style.display='block';
+  // Only the proposal on this page — the hub underneath stays hidden (and can't stretch a phone screen sideways)
+  [...document.body.children].forEach(el=>{if(el!==pv&&el.tagName!=='SCRIPT')el.style.display='none';});
+  document.getElementById('pv-logo').src=LOGO_DATA_URL;
+  document.title='Your Proposal – Maximum Closets';
+  const head=document.getElementById('pv-head');
+  let r=null;
+  try{r=await window.fbShareLoad(window.PV_TOKEN);}catch(e){console.error(e);}
+  if(!r){head.textContent='This proposal link is not available. Please call or text 631-339-1303.';return;}
+  head.textContent='Proposal for '+r.meta.name+(r.meta.street?' – '+r.meta.street:'');
+  const bin=atob(r.b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  pvBlob=new Blob([bytes],{type:'application/pdf'});pvName=r.meta.file||pvName;
+  document.getElementById('pv-dl').disabled=false;
+  if(r.renders.length)document.getElementById('pv-renders').innerHTML=`<p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin:0 0 10px">Your 3D Design</p>`+
+    r.renders.map(u=>`<img src="${u}" alt="3D render" style="width:100%;height:auto;display:block;border-radius:8px;margin-bottom:12px;background:#fff">`).join('');
+  const pages=document.getElementById('pv-pages');
+  try{
+    if(!window.pdfjsLib)await pvLoadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf=await pdfjsLib.getDocument({data:bytes.slice()}).promise;
+    pages.innerHTML=`<p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin:10px 0">Your Proposal &amp; Plans (${pdf.numPages} page${pdf.numPages>1?'s':''})</p>`;
+    const cv=document.createElement('canvas');
+    for(let n=1;n<=pdf.numPages;n++){
+      const pg=await pdf.getPage(n),base=pg.getViewport({scale:1});
+      const want=Math.min(pages.clientWidth||800,860)*Math.min(window.devicePixelRatio||1,2);
+      const vp=pg.getViewport({scale:Math.max(want/base.width,1)});
+      cv.width=Math.floor(vp.width);cv.height=Math.floor(vp.height);
+      const ctx=cv.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
+      await pg.render({canvasContext:ctx,viewport:vp}).promise;
+      const blob=await new Promise(res=>cv.toBlob(res,'image/jpeg',0.9));
+      const img=document.createElement('img');img.src=URL.createObjectURL(blob);img.alt='Page '+n;
+      img.style.cssText='width:100%;height:auto;display:block;background:#fff;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.12);margin-bottom:14px';
+      pages.appendChild(img);
+    }
+  }catch(e){console.error(e);pages.innerHTML='<p style="text-align:center;font-size:13px;color:#555">Tap <b>Download PDF</b> above to see the full proposal and plans.</p>';}
+}
+function pvDownload(){if(pvBlob)triggerDownload(pvBlob,pvName);}
 function dataUrlToBytes(dataUrl){const b64=dataUrl.split(',')[1]||'';const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return arr;}
 // Build the full proposal PDF — a pixel-for-pixel render of the same view shown on screen
 // (photos, pricing, terms) with the uploaded plans PDF appended. Returns {blob, filename}.
-async function buildProposalPdf(d){
+async function buildProposalPdf(d,opts){
+  opts=opts||{};
   // Render the exact same proposal HTML off-screen so the PDF matches the preview
   const holder=document.createElement('div');
   holder.style.cssText='position:fixed;left:-10000px;top:0;z-index:-1;background:#fff';
@@ -2467,7 +2790,7 @@ async function buildProposalPdf(d){
   doc.innerHTML=buildProposalHTML(d,docMode);
   holder.appendChild(doc);document.body.appendChild(holder);
   await Promise.all(Array.from(doc.querySelectorAll('img')).map(im=>im.complete?Promise.resolve():new Promise(r=>{im.onload=im.onerror=r;})));
-  const CANVAS_SCALE=3;
+  const CANVAS_SCALE=opts.scale||3;
   const canvas=await html2canvas(doc,{scale:CANVAS_SCALE,backgroundColor:'#fff',useCORS:true,logging:false,windowWidth:640});
   // Note the "don't cut me" blocks (renders, tables, the boxed sections) in canvas pixels, so the
   // page breaks below can be nudged up instead of slicing a render or a table in half.
@@ -2501,7 +2824,8 @@ async function buildProposalPdf(d){
     const ctx=pc.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,pc.width,pc.height);
     ctx.drawImage(canvas,0,donenPx,canvas.width,sliceH,0,0,canvas.width,sliceH);
     if(page>0)pdf.addPage();
-    pdf.addImage(pc.toDataURL('image/png'),'PNG',margin,margin,imgW,sliceH/pxPerPt);
+    if(opts.fmt==='JPEG')pdf.addImage(pc.toDataURL('image/jpeg',opts.q||0.85),'JPEG',margin,margin,imgW,sliceH/pxPerPt);
+    else pdf.addImage(pc.toDataURL('image/png'),'PNG',margin,margin,imgW,sliceH/pxPerPt);
     donenPx+=sliceH;page++;
   }
   let bytes=pdf.output('arraybuffer');
@@ -2509,7 +2833,8 @@ async function buildProposalPdf(d){
   // otherwise an older upload held on this device
   const planBytes=(plansStatus.source==='drive'&&plansStatus.state==='ready'&&plansStatus.bytes)?plansStatus.bytes
     :((proposalPlansPdf&&proposalPlansPdf.dataUrl)?dataUrlToBytes(proposalPlansPdf.dataUrl):null);
-  if(planBytes&&window.PDFLib){
+  // A proposal only carries the plans when "Plans / drawings included" is ticked
+  if(planBytes&&window.PDFLib&&(docMode!=='proposal'||d.plans)){
     try{
       const {PDFDocument}=window.PDFLib;
       const merged=await PDFDocument.load(bytes);
@@ -3036,6 +3361,7 @@ function render(){
           if(pd>0){const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;}
           return tot>0?`<div class="card-val">$${tot.toLocaleString()}</div>`:'';})()}
         ${chipRow}
+        ${job.propSent?`<div class="card-meta"><span class="chip">📨 Proposal sent ${new Date(job.propSent.at).toLocaleDateString('en-US',{month:'short',day:'numeric'})} by ${job.propSent.via}</span></div>`:''}
         ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="openKcdFile('${job.id}',this,event)" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
         ${si<=1?leadAgeLine(job):''}`;
@@ -3061,18 +3387,19 @@ function mTab(name){
   document.getElementById('mp-'+name).classList.add('on');
   if(name==='checklist'&&editId){const job=jobs.find(j=>j.id===editId);if(job)renderCL(job.id,job.stage);}
   if(name==='payments')renderPayments();
-  if(name==='proposal'){const pAddr=document.getElementById('p-addr');if(pAddr&&!pAddr.value){const fAddr=document.getElementById('f-addr')?.value||'';if(fAddr)pAddr.value=fAddr;}}
+  if(name==='proposal'){const pAddr=document.getElementById('p-addr');if(pAddr&&!pAddr.value){const fAddr=document.getElementById('f-addr')?.value||'';if(fAddr)pAddr.value=fAddr;}fillDefaultMessage();}
 }
 function resetPricing(){
   const wasRestoring=isRestoring;isRestoring=true;
-  melC=0;melSl=0;doorC=0;doorSl=0;drwC=0;drwSl=0;hwC=0;hwSl=0;hlpC=0;spC=0;spSl=0;melIdx=0;doorIdx=0;drwIdx=0;hwIdx=0;spIdx=0;
+  melC=0;melSl=0;doorC=0;doorSl=0;drwC=0;drwSl=0;hwC=0;hwSl=0;hlpC=0;spC=0;spSl=0;shwC=0;shwSl=0;melIdx=0;doorIdx=0;drwIdx=0;hwIdx=0;spIdx=0;
+  document.getElementById('shw-lf').value='';
   document.getElementById('mel-items').innerHTML='';document.getElementById('door-items').innerHTML='';document.getElementById('drawer-items').innerHTML='';document.getElementById('hw-items').innerHTML='';document.getElementById('special-items').innerHTML='';
   document.getElementById('hlp-hrs').value=P.hlpHrs;
   document.getElementById('hlp-rate').value=P.hlpRate;document.getElementById('lead-pct').value=P.leadPct;document.getElementById('owner-pct').value=0;
-  ['mel-badge','doors-badge','drawers-badge','hw-badge','labor-badge'].forEach(id=>document.getElementById(id).textContent='$0');
+  ['mel-badge','doors-badge','drawers-badge','hw-badge','shw-badge','labor-badge'].forEach(id=>document.getElementById(id).textContent='$0');
   document.getElementById('order-badge').textContent='0 items';
   document.getElementById('order-list-content').innerHTML='<p style="font-size:12px;color:var(--muted)">Nothing to order yet — add doors, drawers, hardware, or special items above.</p>';
-  ['profit-amt','s-kcd','s-cost','s-mel','s-doors','s-drawers','s-hw','s-hlp','s-lead','s-owner','s-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='$0';});
+  ['profit-amt','s-kcd','s-cost','s-mel','s-doors','s-drawers','s-hw','s-shw','s-hlp','s-lead','s-owner','s-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='$0';});
   document.getElementById('profit-badge').textContent='$0 profit';
   const pm=document.getElementById('profit-marg');if(pm)pm.textContent='0% margin';
   isRestoring=wasRestoring;
@@ -3097,6 +3424,7 @@ function loadPricingForJob(jid){
     const sEl2=b.querySelector('.dsell');if(sEl2&&d.sell)sEl2.value=d.sell;
     drwTypeChange(b.id);}});
   (inp.hardware||[]).forEach(h=>{addHw();const bid='hw-'+hwIdx;const sel=document.getElementById(bid+'-t');if(sel)sel.value=h.preset;const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=h.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=h.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=h.sell;});
+  if(inp.stockHwLf){const e=document.getElementById('shw-lf');if(e)e.value=inp.stockHwLf;}
   if(inp.hlpHrs!==undefined){const e=document.getElementById('hlp-hrs');if(e)e.value=inp.hlpHrs;}
   if(inp.hlpRate!==undefined){const e=document.getElementById('hlp-rate');if(e)e.value=inp.hlpRate;}
   if(inp.leadPct!==undefined){const e=document.getElementById('lead-pct');if(e)e.value=inp.leadPct;}
@@ -3117,7 +3445,7 @@ function loadPricingForJob(jid){
   });
   (inp.specialItems||[]).forEach(si=>{addSpecial();const bid='sp-'+spIdx;const sel=document.getElementById(bid+'-t');const want=(si.itemIdx!==undefined&&si.itemIdx!==null)?String(si.itemIdx):'0';
     if(sel){const sp=SPECIAL_ITEMS[parseInt(want)];if(sp&&![...sel.options].some(o=>o.value===want))sel.add(new Option(sp.l+' (retired)',want),0);sel.value=want;}const isOther=String(sel?.value)==='other';const nameEl=document.getElementById(bid+'-name');if(nameEl)nameEl.value=si.customName||'';const nameRow=document.getElementById(bid+'-name-row');if(nameRow)nameRow.style.display=isOther?'':'none';const qEl=document.getElementById(bid+'-q');if(qEl)qEl.value=si.qty;const cEl=document.getElementById(bid+'-c');if(cEl)cEl.value=si.cost;const sEl=document.getElementById(bid+'-s');if(sEl)sEl.value=si.sell;const wEl=document.getElementById(bid+'-w');if(wEl)wEl.value=si.hamperWidth||'24';const hamperRow=document.getElementById(bid+'-hamper');if(hamperRow)hamperRow.style.display=(!isOther&&/hamper/i.test(SPECIAL_ITEMS[parseInt(sel?.value)]?.l||''))?'':'none';});
-  isRestoring=false;calcMel();calcDoors();calcDrawers();calcHw();calcSpecial();calcLabor();calcOrderList();
+  isRestoring=false;calcMel();calcDoors();calcDrawers();calcHw();calcStockHw();calcSpecial();calcLabor();calcOrderList();
 }
 function openAdd(stage=0){
   editId=null;selLbls=[];document.getElementById('mtitle').textContent='New Job';
@@ -3390,7 +3718,8 @@ function closeModal(){
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target===document.getElementById('overlay'))closeModal();});
 
 function openSettings(){
-  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','spb-c':'pbC','spb-s':'pbS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
+  stockHwRate();
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','spb-c':'pbC','spb-s':'pbS','sshw-c':'shwC','sshw-s':'shwS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)el.value=P[key];}
   const gc=document.getElementById('set-gclient');if(gc)gc.value=P.gClientId||'';
   renderSplit();
@@ -3400,9 +3729,10 @@ function closeSettings(){document.getElementById('set-overlay').classList.remove
 document.getElementById('set-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('set-overlay'))closeSettings();});
 document.getElementById('arch-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('arch-overlay'))closeArchive();});
 function saveSettings(){
-  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','spb-c':'pbC','spb-s':'pbS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
+  const m={'sw-wsc':'wSqftC','sw-wss':'wSqftS','sw-whtc':'wShtC','sw-whts':'wShtS','sw-csc':'cSqftC','sw-css':'cSqftS','sw-chtc':'cShtC','sw-chts':'cShtS','sd-wf':'dWF','sd-ws':'dWS','sd-cf':'dCF','sd-cs':'dCS','sd-gm':'dGM','sd-gms':'dGMS','sd-gm':'dGM','sd-gms':'dGMS','sd-mu':'dMu','sdrw-wc':'drwWC','sdrw-ws':'drwWS','sdrw-sc':'drwSC','sdrw-ss':'drwSS','spb-c':'pbC','spb-s':'pbS','sshw-c':'shwC','sshw-s':'shwS','shw-hc':'hgC','shw-hs':'hgS','shw-nc':'hnC','shw-ns':'hnS','shw-bc':'hbC','shw-bs':'hbS','shw-dc':'slC','shw-ds':'slS','shw-rc':'rdC','shw-rs':'rdS','sl-hlh':'hlpHrs','sl-hr':'hlpRate','sl-lp':'leadPct','ssl-mu':'slMu','ssl-12':'sl12','ssl-14':'sl14','ssl-16':'sl16','ssl-18':'sl18','ssl-20':'sl20','ssl-22':'sl22','ssl-24':'sl24','spo-12':'po12','spo-14':'po14','spo-16':'po16','spo-18':'po18','spo-20':'po20','spo-22':'po22','spo-24':'po24'};
   for(const[id,key]of Object.entries(m)){const el=document.getElementById(id);if(el)P[key]=parseFloat(el.value)||0;}
   const gc=document.getElementById('set-gclient');if(gc)P.gClientId=gc.value.trim();
+  if(document.getElementById('sshw-s')?.value===''){P.shwS=null;P.shwC=null;}
   saveP(P);if(window.fbSave)window.fbSave();
   if(typeof driveRenderBox==='function'){driveRenderBox('kcd');driveRenderBox('pdf');}
   const t=document.getElementById('set-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2000);
