@@ -2656,8 +2656,10 @@ async function openSendProposal(){
   // Ask Google for Drive access now, while the tap is fresh, so the sign-in window isn't blocked
   const tokenP=(d.plans&&driveClientId()&&!driveHasToken())?driveGetToken().catch(()=>null):Promise.resolve();
   const run={jobId:job.id,link:'',d,built:null};spState=run;
-  document.getElementById('sp-email').value=job.email||'';
-  document.getElementById('sp-phone').value=job.phone||'';
+  // An email typed into the card's Phone box is used as the email (if there isn't one) and never as a phone number
+  const phoneIsEmail=/@/.test(job.phone||'');
+  document.getElementById('sp-email').value=job.email||(phoneIsEmail?job.phone.trim():'');
+  document.getElementById('sp-phone').value=phoneIsEmail?'':(job.phone||'');
   document.getElementById('sp-email-btn').disabled=true;
   const tb=document.getElementById('sp-text-btn');tb.disabled=true;tb.textContent=isPhoneDevice()?'💬 TEXT':'📋 Copy text message';
   document.getElementById('sp-link').innerHTML='';document.getElementById('sp-plans').innerHTML='';
@@ -2754,7 +2756,7 @@ function sendViaText(btn){
   const run=spState;if(!run||!run.link)return;
   const job=jobs.find(j=>j.id===run.jobId);if(!job)return;
   const phone=document.getElementById('sp-phone').value.trim();
-  if(phone&&!job.phone){job.phone=phone;document.getElementById('f-phone').value=phone;}
+  if(phone&&(!job.phone||/@/.test(job.phone))){job.phone=phone;document.getElementById('f-phone').value=phone;}
   const msg=`Hi ${custFirstName(job)||'there'}, here's your Maximum Closets proposal: ${run.link} – James`;
   if(isPhoneDevice()){
     const sep=/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)?'&':'?';
