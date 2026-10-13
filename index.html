@@ -1000,6 +1000,12 @@ window.fbShareLoad=async function(tok){
   const [c,r]=await Promise.all([part('c',meta.n),part('r',meta.nr)]);
   return{meta,b64:c.join(''),renders:r.filter(Boolean)};
 };
+// When the customer opens their link: first and last time, and how many times
+window.fbShareSeen=function(tok){return get(ref(db,'boards/'+tok+'/seen')).then(x=>x.val()).catch(()=>null);};
+window.fbShareMarkSeen=async function(tok){
+  const r=ref(db,'boards/'+tok+'/seen'),old=(await get(r)).val()||{},now=Date.now();
+  await set(r,{first:old.first||now,last:now,n:(old.n||0)+1});
+};
 if(window.PV_TOKEN&&window.pvStart)window.pvStart();
 
 // ── BOOT (runs after unlock): initial load + listen for changes from other devices ──
@@ -1028,7 +1034,7 @@ function applyRemote(k,val){
     runTransaction(ref(db,PATH+'/jobs'),cur=>{if(cur==null||!jobsNeedMigrate(cur))return;return JSON.parse(JSON.stringify(jobsToObj(cur)));}).catch(()=>{});
   }
   _seen[k]=true;
-  if(!_ready&&SYNC_KEYS.every(x=>_seen[x])){_ready=true;dailyBackup();}
+  if(!_ready&&SYNC_KEYS.every(x=>_seen[x])){_ready=true;dailyBackup();setTimeout(()=>{if(window.refreshViews)window.refreshViews();},3000);}
 }
 function boot(){
   SYNC_KEYS.forEach(k=>onValue(ref(db,PATH+'/'+k),(snap)=>{
@@ -2758,9 +2764,25 @@ function markProposalSent(via){
   const vias=(prev&&prev.day===day&&prev.via)?prev.via.split('/'):[];
   if(!vias.includes(via))vias.push(via);
   job.propSent={day,at:Date.now(),via:vias.join('/')};
+  // Sending the proposal moves an earlier-stage job to Estimate Sent; later stages are left alone
+  if((job.stage||0)<2){job.stage=2;job.stageAt=Date.now();
+    if(editId===job.id){document.getElementById('f-stage').value=2;
+      document.getElementById('mv-btns').innerHTML=STAGES.map((s,i)=>i!==job.stage?`<button class="mv-btn" onclick="moveJob(${i})">${s}</button>`:'').join('');}}
   if(run.built&&editId===run.jobId){docMode='proposal';logAndArchive(run.d,via,run.built.blob,run.built.filename);}
   saveData();render();
 }
+// Check which sent proposals the customer has opened, so the card can say "Viewed"
+async function refreshViews(){
+  if(!window.fbShareSeen)return;
+  let changed=false;
+  for(const job of jobs.filter(j=>j.shareTok&&j.propSent&&!j.archived)){
+    const seen=await window.fbShareSeen(job.shareTok);
+    if(seen&&seen.last&&(!job.propViewed||job.propViewed.last!==seen.last)){job.propViewed={first:seen.first,last:seen.last,n:seen.n||1};changed=true;}
+  }
+  if(changed){saveData();render();}
+}
+setInterval(()=>{if(window.fbHasPath&&window.fbHasPath())refreshViews();},600000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&window.fbHasPath&&window.fbHasPath())refreshViews();});
 // ── CUSTOMER PROPOSAL PAGE ── opened from the link (?p=…): no lock screen, just the proposal
 window.PV_TOKEN=(new URLSearchParams(location.search).get('p')||'').replace(/[^0-9a-f]/gi,'');
 let pvBlob=null,pvName='Maximum-Closets-Proposal.pdf',pvRenders=[];
@@ -2776,6 +2798,8 @@ async function pvStart(){
   try{r=await window.fbShareLoad(window.PV_TOKEN);}catch(e){console.error(e);}
   if(!r){head.textContent='This proposal link is not available. Please call or text 631-339-1303.';return;}
   head.textContent='Proposal for '+r.meta.name+(r.meta.street?' – '+r.meta.street:'');
+  let ours=false;try{ours=!!localStorage.getItem('mc-key');}catch(e){}
+  if(!ours&&window.fbShareMarkSeen)window.fbShareMarkSeen(window.PV_TOKEN).catch(()=>{});
   const bin=atob(r.b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
   pvBlob=new Blob([bytes],{type:'application/pdf'});pvName=r.meta.file||pvName;
   document.getElementById('pv-dl').disabled=false;document.getElementById('pv-print').disabled=false;
@@ -3401,7 +3425,7 @@ function render(){
           if(pd>0){const bal=tot-pd;return `<div class="card-val" style="color:${bal<=0.005?'#1a5c38':'#c0392b'};font-weight:700">${bal<=0.005?'✅ Paid in full':'💵 Balance $'+bal.toLocaleString('en-US',{maximumFractionDigits:0})+' (paid $'+pd.toLocaleString('en-US',{maximumFractionDigits:0})+')'}</div>`;}
           return tot>0?`<div class="card-val">$${tot.toLocaleString()}</div>`:'';})()}
         ${chipRow}
-        ${job.propSent?`<div class="card-meta"><span class="chip">📨 Proposal sent ${new Date(job.propSent.at).toLocaleDateString('en-US',{month:'short',day:'numeric'})} by ${job.propSent.via}</span></div>`:''}
+        ${job.propSent?`<div class="card-meta"><span class="chip">📨 Proposal sent ${new Date(job.propSent.at).toLocaleDateString('en-US',{month:'short',day:'numeric'})} by ${job.propSent.via}</span>${job.propViewed&&job.propViewed.last>=job.propSent.at?` <span class="chip" style="color:#1a5c38;background:#eaf6ef;font-weight:700">👀 Viewed ${new Date(job.propViewed.last).toLocaleDateString('en-US',{month:'short',day:'numeric'})}${job.propViewed.n>1?' ('+job.propViewed.n+'×)':''}</span>`:''}</div>`:''}
         ${(job.kcdFile&&job.kcdFile.link)||(job.pdfFile&&job.pdfFile.link)?`<div class="card-meta" style="margin-top:4px">${job.kcdFile&&job.kcdFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.kcdFile.name)} in KCD" onclick="openKcdFile('${job.id}',this,event)" ontouchend="event.stopPropagation()">📐 KCD</span>`:''}${job.pdfFile&&job.pdfFile.link?`<span class="chip kcd" title="Open ${driveEsc(job.pdfFile.name)}" onclick="event.stopPropagation();window.open('${job.pdfFile.link}','_blank')" ontouchend="event.stopPropagation()">📄 PDF</span>`:''}</div>`:''}
         ${hasL?`<div class="prog-bar"><div class="prog-fill ${pr.pct===100?'full':''}" style="width:${pr.pct}%"></div></div>`:''}
         ${si<=1?leadAgeLine(job):''}`;
