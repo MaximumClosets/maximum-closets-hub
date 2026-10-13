@@ -2614,7 +2614,14 @@ function streetOnly(addr){return String(addr||'').split(',')[0].trim();}
 function propStreet(){const job=jobs.find(j=>j.id===editId);return streetOnly(document.getElementById('p-addr')?.value||document.getElementById('f-addr')?.value||(job&&job.addr));}
 function defaultCustomerMessage(){
   const job=jobs.find(j=>j.id===editId),first=custFirstName(job),street=propStreet();
-  return `Hi ${first||'there'},\n\nThank you for choosing Maximum Closets! Attached is your proposal and design${street?' for '+street:''}. Please look it over and let us know if you'd like any changes. Once you approve, we'll get your install on the schedule.\n\nQuestions? Call or text 631-339-1303.\n\nJames Lowe\nMaximum Closets`;
+  return `Hi ${first||'there'},\n\nThank you for choosing Maximum Closets! Here is your proposal and design${street?' for '+street:''}. Please look it over and let us know if you'd like any changes. Once you approve, we'll get your install on the schedule.\n\nQuestions? Call or text 631-339-1303.\n\nJames Lowe\nMaximum Closets`;
+}
+// Messages saved with the older wording: the proposal is a link now, so "Attached is" becomes "Here is",
+// and a default message that lost its sign-off gets it back. Anything else typed is left exactly as is.
+function fixSavedMessage(t){
+  t=String(t||'').replace(/Attached is your proposal and design/g,'Here is your proposal and design');
+  if(/Thank you for choosing Maximum Closets!/.test(t)&&/Questions\? Call or text 631-339-1303\.\s*$/.test(t))t=t.replace(/\s*$/,'')+'\n\nJames Lowe\nMaximum Closets';
+  return t;
 }
 function fillDefaultMessage(){
   const el=document.getElementById('p-notes');if(!el||el.value.trim())return false;
@@ -2701,7 +2708,9 @@ function blobToB64(blob){return new Promise((res,rej)=>{const r=new FileReader()
 function randHex(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a).map(b=>b.toString(16).padStart(2,'0')).join('');}
 // Puts the PDF (and the renders, so they show big on the customer's screen) online under one private
 // link per job. Sending again updates what that same link shows.
-async function publishProposal(job,d,built){
+async function publishProposal(job0,d,built){
+  // Fresh copy of the job: the board may have refreshed from the database while the PDF was building
+  const job=jobs.find(j=>j.id===job0.id)||job0;
   const renders=[];
   for(const im of (d.images||[]))renders.push(im.dataUrl.length>700000?await shrinkDataUrl(im.dataUrl,1400,0.75):im.dataUrl);
   const meta={name:job.name||'',street:streetOnly(d.addr),file:built.filename,size:built.blob.size,at:Date.now(),ver:Date.now().toString(36)};
@@ -2775,9 +2784,10 @@ function markProposalSent(via){
 async function refreshViews(){
   if(!window.fbShareSeen)return;
   let changed=false;
-  for(const job of jobs.filter(j=>j.shareTok&&j.propSent&&!j.archived)){
-    const seen=await window.fbShareSeen(job.shareTok);
-    if(seen&&seen.last&&(!job.propViewed||job.propViewed.last!==seen.last)){job.propViewed={first:seen.first,last:seen.last,n:seen.n||1};changed=true;}
+  for(const j0 of jobs.filter(j=>j.shareTok&&j.propSent&&!j.archived)){
+    const seen=await window.fbShareSeen(j0.shareTok);
+    const job=jobs.find(j=>j.id===j0.id);   // the board may have refreshed from another device while we waited
+    if(job&&seen&&seen.last&&(!job.propViewed||job.propViewed.last!==seen.last)){job.propViewed={first:seen.first,last:seen.last,n:seen.n||1};changed=true;}
   }
   if(changed){saveData();render();}
 }
@@ -3496,7 +3506,7 @@ function loadPricingForJob(jid){
   const addrEl=document.getElementById('p-addr');if(addrEl)addrEl.value=inp.addr||'';
   const discEl=document.getElementById('p-disc');if(discEl)discEl.value=inp.pDisc||'';
   const taxEl=document.getElementById('p-tax');if(taxEl)taxEl.value=inp.pTax||'';
-  const notesEl=document.getElementById('p-notes');if(notesEl)notesEl.value=inp.pNotes||'';
+  const notesEl=document.getElementById('p-notes');if(notesEl)notesEl.value=fixSavedMessage(inp.pNotes);
   const descEl=document.getElementById('p-desc');if(descEl)descEl.value=inp.pDesc||'';
   const plansEl=document.getElementById('p-plans');if(plansEl)plansEl.checked=inp.pPlans||false;
   proposalImages=pricingData[jid]?.proposalImages||[];renderProposalImagePreview();
