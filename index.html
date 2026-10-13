@@ -695,9 +695,12 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 </div>
 
 <!-- PHOTO LIGHTBOX -->
-<div id="cp-lightbox" onclick="cpCloseLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:1200;align-items:center;justify-content:center;padding:14px">
-  <button onclick="cpCloseLightbox()" style="position:absolute;top:10px;right:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:22px;line-height:1;cursor:pointer">×</button>
-  <img id="cp-lightbox-img" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:6px"/>
+<div id="cp-lightbox" onclick="lbBgClick(event)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:2100;align-items:center;justify-content:center;padding:14px">
+  <button onclick="cpCloseLightbox()" style="position:absolute;top:10px;right:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:22px;line-height:1;cursor:pointer;z-index:2">×</button>
+  <button class="lb-nav" onclick="event.stopPropagation();lbStep(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:2">‹</button>
+  <button class="lb-nav" onclick="event.stopPropagation();lbStep(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.18);border:none;color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:2">›</button>
+  <div id="lb-count" style="position:absolute;bottom:12px;left:0;right:0;text-align:center;color:#ddd;font-size:13px"></div>
+  <img id="cp-lightbox-img" src="" alt="" onclick="event.stopPropagation()" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:6px"/>
 </div>
 
 <!-- SETTINGS -->
@@ -2251,17 +2254,38 @@ function cpPasteClick(){
     Promise.all(jobsQ).then(fs=>{cpAddFiles(fs);cpResetPasteBox();});
   }).catch(()=>{});
 }
-function cpLightbox(i){
-  const ph=customerPhotos[i];if(!ph)return;
-  const lb=document.getElementById('cp-lightbox'),im=document.getElementById('cp-lightbox-img');
-  if(!lb||!im)return;
-  im.src=ph.dataUrl;lb.style.display='flex';
+function cpLightbox(i){lbOpen(customerPhotos.map(p=>p.dataUrl),i);}
+// Full-screen viewer shared by customer photos and 3D renders: arrows / swipe / keyboard to move,
+// tap outside the picture or × to close
+let lbList=[],lbIdx=0,lbSwipeAt=0;
+function lbOpen(list,i){
+  lbList=(list||[]).filter(Boolean);if(!lbList[i])return;
+  const lb=document.getElementById('cp-lightbox');if(!lb)return;
+  lbIdx=i;lb.style.display='flex';lbShow();
 }
+function lbShow(){
+  const im=document.getElementById('cp-lightbox-img');if(im)im.src=lbList[lbIdx]||'';
+  const many=lbList.length>1;
+  document.querySelectorAll('#cp-lightbox .lb-nav').forEach(b=>b.style.display=many?'':'none');
+  const c=document.getElementById('lb-count');if(c)c.textContent=many?(lbIdx+1)+' of '+lbList.length:'';
+}
+function lbStep(n){if(lbList.length<2)return;lbIdx=(lbIdx+n+lbList.length)%lbList.length;lbShow();}
+function lbBgClick(e){if(Date.now()-lbSwipeAt<500)return;cpCloseLightbox();}
 function cpCloseLightbox(){
   const lb=document.getElementById('cp-lightbox'),im=document.getElementById('cp-lightbox-img');
   if(lb)lb.style.display='none';
   if(im)im.src='';
+  lbList=[];
 }
+(function(){
+  const lb=document.getElementById('cp-lightbox');if(!lb)return;
+  let sx=0,sy=0;
+  lb.addEventListener('touchstart',e=>{const t=e.touches[0];sx=t.clientX;sy=t.clientY;},{passive:true});
+  lb.addEventListener('touchend',e=>{const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+    if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){lbSwipeAt=Date.now();lbStep(dx<0?1:-1);}},{passive:true});
+  document.addEventListener('keydown',e=>{if(lb.style.display!=='flex')return;
+    if(e.key==='ArrowRight')lbStep(1);else if(e.key==='ArrowLeft')lbStep(-1);else if(e.key==='Escape')cpCloseLightbox();});
+})();
 function rmItem(id,type){
   document.getElementById(id)?.remove();
   if(type==='mel')calcMel();else if(type==='door')calcDoors();else if(type==='drw')calcDrawers();else if(type==='special')calcSpecial();else calcHw();
@@ -2406,7 +2430,7 @@ function buildProposalHTML(d,mode){
     ${mode!=='proposal'&&d.paid>0?`<div class="prop-trow"><span>Paid to Date</span><span>-${money(d.paid)}</span></div>`:''}</div>
     ${moneyBox}
     ${d.desc?`<div style="background:#f4f5f7;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:#333;line-height:1.7"><strong style="color:#222;display:block;margin-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Project Description</strong>${d.desc}</div>`:''}
-    ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(${d.images.length>1?2:1},1fr);gap:12px">${d.images.map(img=>`<div style="border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><img src="${img.dataUrl}" style="width:100%;height:auto;display:block"></div>`).join('')}</div></div>`:''}
+    ${d.images&&d.images.length?`<div style="margin-bottom:20px"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin-bottom:10px">3D Renders / Photos</p><div style="display:grid;grid-template-columns:repeat(${d.images.length>1?2:1},1fr);gap:12px">${d.images.map((img,i)=>`<div style="border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#fff"><img src="${img.dataUrl}" onclick="lbOpen(proposalImages.map(x=>x.dataUrl),${i})" style="width:100%;height:auto;display:block;cursor:zoom-in"></div>`).join('')}</div></div>`:''}
     ${d.plans&&plansAreAttached()?`<div style="background:#eaf6ef;border:1.5px solid #1a5c38;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1a5c38;font-weight:600">📐 Design plans / drawings are included with this proposal${plansStatus.modifiedTime?` <span style="font-weight:500">(drawings dated ${plansDateLabel(plansStatus.modifiedTime)})</span>`:''}</div>`:''}
     ${plansAreAttached()&&(mode!=='proposal'||d.plans)?`<div style="background:#f4f5f7;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#222;display:flex;align-items:center;gap:8px"><span>📎 Attached plans:</span><span style="color:#1a5c38;font-weight:600">${plansStatus.name||''}</span></div>`:''}
     ${d.notes?`<div class="prop-msg">${d.notes}</div>`:''}
@@ -2739,7 +2763,7 @@ function markProposalSent(via){
 }
 // ── CUSTOMER PROPOSAL PAGE ── opened from the link (?p=…): no lock screen, just the proposal
 window.PV_TOKEN=(new URLSearchParams(location.search).get('p')||'').replace(/[^0-9a-f]/gi,'');
-let pvBlob=null,pvName='Maximum-Closets-Proposal.pdf';
+let pvBlob=null,pvName='Maximum-Closets-Proposal.pdf',pvRenders=[];
 function pvLoadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('load'));document.head.appendChild(s);});}
 async function pvStart(){
   const pv=document.getElementById('pv');pv.style.display='block';
@@ -2755,8 +2779,9 @@ async function pvStart(){
   const bin=atob(r.b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
   pvBlob=new Blob([bytes],{type:'application/pdf'});pvName=r.meta.file||pvName;
   document.getElementById('pv-dl').disabled=false;document.getElementById('pv-print').disabled=false;
-  if(r.renders.length)document.getElementById('pv-renders').innerHTML=`<p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin:0 0 10px">Your 3D Design</p>`+
-    r.renders.map(u=>`<img src="${u}" alt="3D render" style="width:100%;height:auto;display:block;border-radius:8px;margin-bottom:12px;background:#fff">`).join('');
+  if(r.renders.length)document.getElementById('pv-renders').innerHTML=`<p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin:0 0 10px">Your 3D Design <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#666">· tap a picture to enlarge</span></p>`+
+    r.renders.map((u,i)=>`<img src="${u}" alt="3D render" onclick="lbOpen(pvRenders,${i})" style="width:100%;height:auto;display:block;border-radius:8px;margin-bottom:12px;background:#fff;cursor:zoom-in">`).join('');
+  pvRenders=r.renders;
   const pages=document.getElementById('pv-pages');
   try{
     if(!window.pdfjsLib)await pvLoadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
