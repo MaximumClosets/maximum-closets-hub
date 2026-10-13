@@ -684,7 +684,10 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
   <div style="max-width:860px;margin:0 auto;padding:16px">
     <div style="text-align:center;margin:6px 0 14px"><img id="pv-logo" alt="Maximum Closets" style="height:56px"/></div>
     <div id="pv-head" style="text-align:center;font-size:15px;font-weight:700;margin-bottom:12px">Loading your proposal…</div>
-    <button id="pv-dl" onclick="pvDownload()" disabled style="display:block;width:100%;max-width:360px;margin:0 auto 18px;padding:14px;background:#1a5c38;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">⬇️ Download PDF</button>
+    <div style="display:flex;gap:10px;max-width:420px;margin:0 auto 18px">
+      <button id="pv-dl" onclick="pvDownload()" disabled style="flex:1;padding:14px;background:#1a5c38;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">⬇️ Download PDF</button>
+      <button id="pv-print" onclick="pvPrint()" disabled style="flex:1;padding:14px;background:#fff;color:#1a5c38;border:2px solid #1a5c38;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer">🖨 Print</button>
+    </div>
     <div id="pv-renders"></div>
     <div id="pv-pages"></div>
     <p style="text-align:center;font-size:12px;color:#666;margin:18px 0">Questions? Call or text 631-339-1303 · james@maximumclosets.com</p>
@@ -2751,7 +2754,7 @@ async function pvStart(){
   head.textContent='Proposal for '+r.meta.name+(r.meta.street?' – '+r.meta.street:'');
   const bin=atob(r.b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
   pvBlob=new Blob([bytes],{type:'application/pdf'});pvName=r.meta.file||pvName;
-  document.getElementById('pv-dl').disabled=false;
+  document.getElementById('pv-dl').disabled=false;document.getElementById('pv-print').disabled=false;
   if(r.renders.length)document.getElementById('pv-renders').innerHTML=`<p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#1a5c38;margin:0 0 10px">Your 3D Design</p>`+
     r.renders.map(u=>`<img src="${u}" alt="3D render" style="width:100%;height:auto;display:block;border-radius:8px;margin-bottom:12px;background:#fff">`).join('');
   const pages=document.getElementById('pv-pages');
@@ -2776,6 +2779,18 @@ async function pvStart(){
   }catch(e){console.error(e);pages.innerHTML='<p style="text-align:center;font-size:13px;color:#555">Tap <b>Download PDF</b> above to see the full proposal and plans.</p>';}
 }
 function pvDownload(){if(pvBlob)triggerDownload(pvBlob,pvName);}
+// Computer: the PDF goes straight to the print screen. Phone: the PDF opens so they can print from Share / ⋮.
+let pvUrl='';
+function pvPrint(){
+  if(!pvBlob)return;
+  if(!pvUrl)pvUrl=URL.createObjectURL(pvBlob);
+  if(isPhoneDevice()){window.open(pvUrl,'_blank')||(location.href=pvUrl);return;}
+  let f=document.getElementById('pv-print-frame');
+  if(f){try{f.contentWindow.focus();f.contentWindow.print();return;}catch(e){window.open(pvUrl,'_blank');return;}}
+  f=document.createElement('iframe');f.id='pv-print-frame';f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  f.onload=()=>setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print();}catch(e){window.open(pvUrl,'_blank');}},300);
+  f.src=pvUrl;document.body.appendChild(f);
+}
 function dataUrlToBytes(dataUrl){const b64=dataUrl.split(',')[1]||'';const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return arr;}
 // Build the full proposal PDF — a pixel-for-pixel render of the same view shown on screen
 // (photos, pricing, terms) with the uploaded plans PDF appended. Returns {blob, filename}.
