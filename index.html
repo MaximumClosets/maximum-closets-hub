@@ -626,10 +626,21 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
       <div><label>Amount</label><input type="number" id="pay-amt" step=".01" inputmode="decimal" placeholder="0.00"/></div></div>
     <div class="f g2"><div><label>Method</label><select id="pay-method"><option>Check</option><option>Cash</option><option>Zelle</option><option>Card</option><option>Other</option></select></div>
       <div><label>Type</label><select id="pay-kind"><option value="deposit">Deposit</option><option value="final">Final Payment</option><option value="other">Other</option></select></div></div>
+    <div class="f g2"><div><label>Collected by</label><select id="pay-by"><option>James</option><option>User 2</option><option>User 3</option></select></div>
+      <div><label>Where it went</label><select id="pay-to"><option>Business account</option><option>James personal</option><option>Pete personal</option><option>Cash – still holding</option></select></div></div>
     <div class="f"><label>Note (check #, etc.)</label><input type="text" id="pay-note" placeholder="optional"/></div>
     <button class="gen-btn" style="margin-top:4px" onclick="addPayment()">＋ Add Payment</button>
     <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px">Payments received</p>
     <div id="pay-list"></div>
+    <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px">Costs paid</p>
+    <div class="f g2"><div><label>Date</label><input type="date" id="exp-date"/></div>
+      <div><label>Amount</label><input type="number" id="exp-amt" step=".01" inputmode="decimal" placeholder="0.00"/></div></div>
+    <div class="f g2"><div><label>Vendor</label><select id="exp-vendor"><option>Miguel (wood)</option><option>NYDD</option><option>Richelieu</option><option>Amazon</option><option>Installer labor</option><option>Other</option></select></div>
+      <div><label>Paid by</label><select id="exp-by"><option>James</option><option>User 2</option><option>User 3</option></select></div></div>
+    <div class="f g2"><div><label>Paid from</label><select id="exp-from"><option>Business account</option><option>James personal</option><option>Pete personal</option><option>Cash</option></select></div>
+      <div><label>Note</label><input type="text" id="exp-note" placeholder="optional"/></div></div>
+    <button class="gen-btn" style="margin-top:4px" onclick="addExpense()">＋ Add Cost</button>
+    <div id="exp-list" style="margin-top:8px"></div>
     <p style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px">Documents</p>
     <button class="gen-btn" style="background:#0079bf" onclick="previewDoc('invoice')">🧾 Preview Invoice</button>
     <button class="gen-btn" style="background:#1a5c38;margin-top:8px" onclick="previewDoc('receipt')">✅ Preview Receipt</button>
@@ -791,7 +802,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
     </div>
     <div class="set-sec"><div class="set-hd" onclick="toggleSet('s-export')">Export Data<span>▾</span></div>
       <div class="set-bd hide" id="s-export">
-        <button class="mv-btn" onclick="exportAllJobsCsv()">⬇️ Export all jobs (CSV)</button>
+        <button class="mv-btn" onclick="exportAllJobsCsv()">⬇️ Export all jobs (CSV)</button> <button class="mv-btn" onclick="exportMoneyCsv()">💰 Money export</button>
         <p style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6">Every job you have, active and archived, as a spreadsheet file you can open in Excel or Google Sheets. Includes who each job is assigned to, the sale price and how much has actually been paid.</p>
       </div>
     </div>
@@ -818,7 +829,7 @@ html[data-theme="light"] #lock .lver{color:#aab0bf}
 <!-- ARCHIVED JOBS -->
 <div class="set-overlay" id="arch-overlay">
 <div class="set-modal">
-  <div class="mh"><h3>📦 Archived Jobs</h3><button class="mv-btn" onclick="exportArchivedCsv()" style="margin-right:10px">⬇️ Export CSV</button><button class="mv-btn" onclick="exportAllJobsCsv()" style="margin-right:10px">⬇️ Export all jobs (CSV)</button><button class="mclose" onclick="closeArchive()">×</button></div>
+  <div class="mh"><h3>📦 Archived Jobs</h3><button class="mv-btn" onclick="exportArchivedCsv()" style="margin-right:10px">⬇️ Export CSV</button><button class="mv-btn" onclick="exportAllJobsCsv()" style="margin-right:10px">⬇️ Export all jobs (CSV)</button><button class="mv-btn" onclick="exportMoneyCsv()" style="margin-right:10px">💰 Money export</button><button class="mclose" onclick="closeArchive()">×</button></div>
   <div style="padding:14px 15px" id="arch-list"></div>
 </div>
 </div>
@@ -1216,7 +1227,7 @@ const CL={
   0:[{n:'New Lead',items:['Get full name, phone & email','Understand scope (rooms, style, timeline)','Schedule measure / consult']}],
   1:[{n:'Measure & Design',items:['Measure all spaces + take photos','Note client preferences (color, style, hardware)','Draft design in KCD','Price job in pricing tab','Send estimate to client']}],
   2:[{n:'Estimate Follow-Up',items:['Follow up if no response in 3 days','Handle revisions if needed','Estimate approved by client','Request deposit']}],
-  3:[{n:'Deposit Received',items:['Confirm deposit received','Order materials','Confirm install date & add to Google Calendar']}],
+  3:[{n:'Deposit Received',items:['Confirm deposit received','Plans sent to Miguel','Confirm install date & add to Google Calendar']}],
   4:[{n:'Install Prep',items:['Confirm date with client','Confirm Miguel availability','Confirm materials are ready','Send reminder to client 2 days before']}],
   5:[{n:'Install Day',items:['Materials prepped & loaded','Install completed','Client sign-off','Final payment collected','Ask for a review']}],
   6:[]
@@ -1441,7 +1452,7 @@ function getProgress(jid,si){
   lists.forEach((cl,ci)=>cl.items.forEach((_,ii)=>{tot++;if(clSt[clKey(jid,si,ci,ii)])done++;}));
   return{tot,done,pct:tot>0?Math.round(done/tot*100):100};
 }
-function toggleCL(jid,si,ci,ii){const k=clKey(jid,si,ci,ii);clSt[k]=!clSt[k];saveData();renderCL(jid,si);render();}
+function toggleCL(jid,si,ci,ii){const k=clKey(jid,si,ci,ii);if(clSt[k])delete clSt[k];else clSt[k]=Date.now();saveData();renderCL(jid,si);render();}
 function renderCL(jid,si){
   renderOrderList();
   const el=document.getElementById('cl-content');if(!el)return;
@@ -1458,7 +1469,7 @@ function renderCL(jid,si){
       ${items.map((item,ii)=>{const ck=clSt[clKey(jid,si,ci,ii)]||false;
         return`<div class="cl-item ${ck?'ck':''}" onclick="toggleCL('${jid}',${si},${ci},${ii})">
           <input type="checkbox" ${ck?'checked':''} onclick="event.stopPropagation();toggleCL('${jid}',${si},${ci},${ii})"/>
-          <span>${item}</span></div>`;}).join('')}`;
+          <span>${item}${typeof ck==='number'?` <small style="color:var(--muted);font-size:10px">${new Date(ck).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</small>`:''}</span></div>`;}).join('')}`;
     el.appendChild(div);
   });
 }
@@ -2354,7 +2365,8 @@ function addPayment(){
   const kind=document.getElementById('pay-kind').value;
   const note=document.getElementById('pay-note').value||'';
   if(!job.payments)job.payments=[];
-  job.payments.push({id:uid(),date,amt,method,kind,note});
+  const by=document.getElementById('pay-by').value,to=document.getElementById('pay-to').value;
+  job.payments.push({id:uid(),date,amt,method,kind,note,by,to});
   job.payments.sort((a,b)=>a.date.localeCompare(b.date));
   document.getElementById('pay-amt').value='';document.getElementById('pay-note').value='';
   saveData();renderPayments();render();
@@ -2368,18 +2380,49 @@ function deletePayment(pid){
 function renderPayments(){
   const job=jobs.find(j=>j.id===editId);if(!job)return;
   const total=job.sale||0,paid=paidTotal(job),bal=total-paid;
-  const dateEl=document.getElementById('pay-date');if(dateEl&&!dateEl.value)dateEl.value=todayStr();
+  const dateEl=document.getElementById('pay-date');if(dateEl&&!dateEl.value){dateEl.value=todayStr();['pay-by','exp-by'].forEach(id=>{const s=document.getElementById(id);if(s)s.value=deviceWho();});}
   const sum=document.getElementById('pay-summary');
   if(sum)sum.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>Job Total</span><span>${money(total)}</span></div>
     <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px"><span>Paid</span><span style="color:#1a5c38;font-weight:700">${money(paid)}</span></div>
     <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;border-top:1px solid var(--border);padding-top:6px"><span>${bal<=0.005?'Paid in Full':'Balance Due'}</span><span style="color:${bal<=0.005?'#1a5c38':'#c0392b'}">${money(Math.max(0,bal))}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px"><span>Costs paid</span><span style="color:#c0392b">${money(costsTotal(job))}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>Left after costs</span><span>${money(paid-costsTotal(job))}</span></div>
     ${total?`<div style="font-size:11px;color:var(--muted);margin-top:5px">50% deposit would be ${money(total/2)}</div>`:'<div style="font-size:11px;color:var(--muted);margin-top:5px">Add pricing in the Pricing tab to see a balance.</div>'}`;
   const list=document.getElementById('pay-list');if(!list)return;
   const ps=jobPayments(job);
   list.innerHTML=ps.length?ps.map(p=>`<div class="srow" style="align-items:center">
-    <span class="sl" style="flex:1;text-align:left">${new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — <strong>${money(parseFloat(p.amt)||0)}</strong> · ${p.method}${p.note?' · '+p.note:''}</span>
+    <span class="sl" style="flex:1;text-align:left">${new Date(p.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — <strong>${money(parseFloat(p.amt)||0)}</strong> · ${p.method} · by ${p.by||'—'} · to ${p.to||'—'}${p.note?' · '+p.note:''}</span>
     <button class="mv-btn" onclick="deletePayment('${p.id}')">✕</button></div>`).join(''):'<p style="font-size:12px;color:var(--muted)">No payments recorded yet.</p>';
+  const exEl=document.getElementById('exp-date');if(exEl&&!exEl.value)exEl.value=todayStr();
+  const el=document.getElementById('exp-list');if(!el)return;
+  const es=jobExpenses(job);
+  el.innerHTML=es.length?es.map(e=>`<div class="srow" style="align-items:center">
+    <span class="sl" style="flex:1;text-align:left">${new Date(e.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} — <strong>${money(parseFloat(e.amt)||0)}</strong> · ${e.vendor} · by ${e.paidBy||'—'} · from ${e.paidFrom||'—'}${e.note?' · '+e.note:''}</span>
+    <button class="mv-btn" onclick="deleteExpense('${e.id}')">✕</button></div>`).join(''):'<p style="font-size:12px;color:var(--muted)">No costs recorded yet.</p>';
 }
+// ── COSTS PAID ── live on the job (job.expenses) so they sync like payments
+function jobExpenses(job){return (job&&job.expenses)||[];}
+function costsTotal(job){return jobExpenses(job).reduce((s,e)=>s+(parseFloat(e.amt)||0),0);}
+function addExpense(){
+  const job=jobs.find(j=>j.id===editId);if(!job){alert('Save the job first.');return;}
+  const amt=parseFloat(document.getElementById('exp-amt').value)||0;
+  if(amt<=0){alert('Enter an amount.');return;}
+  const g=id=>document.getElementById(id).value;
+  if(!job.expenses)job.expenses=[];
+  job.expenses.push({id:uid(),date:g('exp-date')||todayStr(),vendor:g('exp-vendor'),amt,paidBy:g('exp-by'),paidFrom:g('exp-from'),note:g('exp-note')||''});
+  job.expenses.sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('exp-amt').value='';document.getElementById('exp-note').value='';
+  saveData();renderPayments();render();
+}
+function deleteExpense(eid){
+  const job=jobs.find(j=>j.id===editId);if(!job)return;
+  if(!confirm('Remove this cost?'))return;
+  job.expenses=jobExpenses(job).filter(e=>e.id!==eid);
+  saveData();renderPayments();render();
+}
+// Default "Collected by" / "Paid by" to this device's user (mc-who), falling back to James
+function deviceWho(){let w='';try{w=(localStorage.getItem('mc-who')||'').toLowerCase();}catch(e){}
+  return /user ?2|user2|pete/.test(w)?'User 2':/user ?3|user3/.test(w)?'User 3':'James';}
 function getProposalData(){
   const job=jobs.find(j=>j.id===editId);if(!job)return null;
   const sale=melSl+doorSl+drwSl+hwSl+spSl+shwSl;if(!sale){alert('Add pricing in the Pricing tab first.');return null;}
@@ -3147,6 +3190,19 @@ function exportAllJobsCsv(){
   const csv=[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n';
   triggerDownload(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),'MaximumHub_AllJobs_'+csvDate(Date.now())+'.csv');
 }
+// One row per money movement: customer payments IN and costs OUT, every job incl. archived
+function exportMoneyCsv(){
+  const head=['date','job','sold by','IN/OUT','type/vendor','amount','method','handled by','where it went / paid from','note'];
+  const rows=[];
+  jobs.forEach(j=>{
+    jobPayments(j).forEach(p=>rows.push([csvDate(p.date),j.name,j.assignedTo,'IN',p.kind,csvMoney(p.amt),p.method,p.by||'—',p.to||'—',p.note]));
+    jobExpenses(j).forEach(e=>rows.push([csvDate(e.date),j.name,j.assignedTo,'OUT',e.vendor,csvMoney(e.amt),'',e.paidBy||'—',e.paidFrom||'—',e.note]));
+  });
+  if(!rows.length){alert('No payments or costs recorded yet.');return;}
+  rows.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+  const csv=[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n')+'\r\n';
+  triggerDownload(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),'MaximumHub_Money_'+csvDate(Date.now())+'.csv');
+}
 
 // ── PASTE LEAD — parse a Website "New Estimate Request" email into a Lead card ──
 function openPaste(){
@@ -3440,6 +3496,7 @@ function render(){
       if(hasL)chips.push(`<span class="chip">✓ ${pr.done}/${pr.tot}</span>`);
       if(op.tot&&attn!=='unordered')chips.push(`<span class="chip">📦 ${op.done}/${op.tot}</span>`);
       if(job.photoCount>0)chips.push(`<span class="chip">📷 ${job.photoCount}</span>`);
+      const mig=clSt[clKey(job.id,3,0,1)];if(mig)chips.push(`<span class="chip">📐 Miguel${typeof mig==='number'?' '+new Date(mig).toLocaleDateString('en-US',{month:'short',day:'numeric'}):''}</span>`);
       // Why the card is red leads the row and is exempt from the cap — a reason must never be hidden behind "+N".
       const attnChip=attn==='unordered'?`<span class="chip pri-chip">📦 Not ordered ${op.tot-op.done}/${op.tot}</span>`
         :attn==='nolist'?`<span class="chip pri-chip">📦 Nothing ordered yet</span>`:'';
@@ -3873,7 +3930,21 @@ function renderSplit(){
     <div style="font-size:11px;color:var(--muted);line-height:1.7">${r.cards} card${r.cards===1?'':'s'} entered · ${r.refs} lead${r.refs===1?'':'s'} referred · ${r.sent} proposal${r.sent===1?'':'s'} sent<br>
     <b style="color:var(--text)">${r.deals}</b> reached deposit or past · <b style="color:var(--green)">$${Math.round(r.money).toLocaleString()}</b></div>
     ${r.note?'<div style="font-size:10px;color:var(--muted);margin-top:4px;font-style:italic">Jobs saved without a name on them, including anything added after the name field was removed.</div>':''}
-  </div>`).join('');
+  </div>`).join('')+renderHolding();
+}
+// Who's holding what: customer money that landed in someone's personal account or cash,
+// minus costs they covered from their personal account or cash. Positive = they owe the business.
+const HOLD_WHO=[{label:'James',name:'James',acct:'James personal'},{label:'Pete (User 2)',name:'User 2',acct:'Pete personal'},{label:'User 3',name:'User 3',acct:null}];
+function renderHolding(){
+  const rows=HOLD_WHO.map(w=>{let inn=0,out=0;
+    jobs.forEach(j=>{
+      jobPayments(j).forEach(p=>{if((w.acct&&p.to===w.acct)||(p.to==='Cash – still holding'&&p.by===w.name))inn+=parseFloat(p.amt)||0;});
+      jobExpenses(j).forEach(e=>{if((w.acct&&e.paidFrom===w.acct)||(e.paidFrom==='Cash'&&e.paidBy===w.name))out+=parseFloat(e.amt)||0;});
+    });return{w,inn,out,net:inn-out};}).filter((r,i)=>i<2||r.inn||r.out);
+  return`<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:12px 0 6px">Who's holding what</div>`+rows.map(r=>`<div style="border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:7px">
+    <div style="font-weight:700;color:var(--text);font-size:13px;margin-bottom:3px">${r.w.label}</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7">Customer money kept personally or in cash: ${money(r.inn)} · Costs paid personally or in cash: ${money(r.out)}<br>
+    <b style="color:${Math.abs(r.net)<0.005?'var(--text)':r.net>0?'#c0392b':'var(--green)'}">${Math.abs(r.net)<0.005?'All square':r.net>0?'Owes the business '+money(r.net):'Business owes them '+money(-r.net)}</b></div></div>`).join('');
 }
 
 // ── THEME TOGGLE (light / dark, remembered per device) ──
